@@ -547,7 +547,7 @@
             const genreLinksContainer = document.getElementById('detGenreLinks');
             if (anime.genres && anime.genres.length > 0) {
                 genreLinksContainer.innerHTML = anime.genres.map(genre => `
-                    <button onclick="filterGenre('${genre}')" class="bg-neon-lightCard dark:bg-neon-darkBg text-zinc-900 dark:text-neon-yellow border border-neon-lightBorder dark:border-neon-yellow/40 hover:border-neon-yellow text-[10px] font-semibold px-2.5 py-0.5 rounded-full transition shadow-sm">${genre}</button>
+                    <button onclick="filterGenre('${genre}')" class="bg-white text-zinc-900 dark:bg-neon-darkBg dark:text-neon-yellow border border-zinc-300 dark:border-neon-yellow/40 hover:border-neon-yellow text-[10px] font-semibold px-2.5 py-0.5 rounded-full transition shadow-sm">${genre}</button>
                 `).join('');
             } else {
                 genreLinksContainer.innerHTML = '<span class="text-xs text-zinc-500">-</span>';
