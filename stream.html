@@ -276,8 +276,18 @@
                 if (data && data.episodes && data.episodes.length > 0) {
                     activeEpisodes = data.episodes.filter(ep => ep && (ep.episode_title || ep.video_servers));
                     
-                    // Urutkan dari nomor episode terendah ke tertinggi
+                    // Urutkan episode secara cerdas (mendukung nomor biasa, OVA, dan Special)
                     activeEpisodes.sort((a, b) => {
+                        const titleA = (a.episode_title || "").toLowerCase();
+                        const titleB = (b.episode_title || "").toLowerCase();
+                        
+                        // Menempatkan OVA atau Special di urutan bawah atau sesuai kemunculannya
+                        const isOvaSpecialA = titleA.includes('ova') || titleA.includes('special') || titleA.includes('sp');
+                        const isOvaSpecialB = titleB.includes('ova') || titleB.includes('special') || titleB.includes('sp');
+                        
+                        if (isOvaSpecialA && !isOvaSpecialB) return 1;
+                        if (!isOvaSpecialA && isOvaSpecialB) return -1;
+
                         const numA = extractEpisodeNumber(a.episode_title);
                         const numB = extractEpisodeNumber(b.episode_title);
                         return numA - numB;
@@ -380,24 +390,24 @@
             if(label) label.innerText = `Daftar Episode (${activeEpisodes.length})`;
 
             const currentEp = activeEpisodes[activeEpisodeIndex];
-            const epNum = extractEpisodeNumber(currentEp?.episode_title) || (activeEpisodeIndex + 1);
-            document.getElementById('streamTitle').innerText = `Nonton ${globalAnimeTitle} (Eps ${epNum})`;
+            const rawEpTitleForHeader = currentEp && currentEp.episode_title ? currentEp.episode_title.replace(/Sub.*$/, '').trim() : `Episode ${activeEpisodeIndex + 1}`;
+            document.getElementById('streamTitle').innerText = `Nonton ${globalAnimeTitle} (${rawEpTitleForHeader})`;
 
             document.getElementById('prevEpBtn').disabled = activeEpisodeIndex <= 0;
             document.getElementById('prevEpBtn').style.opacity = activeEpisodeIndex <= 0 ? '0.5' : '1';
             document.getElementById('nextEpBtn').disabled = activeEpisodeIndex >= activeEpisodes.length - 1;
             document.getElementById('nextEpBtn').style.opacity = activeEpisodeIndex >= activeEpisodes.length - 1 ? '0.5' : '1';
 
-            // Menampilkan tombol daftar episode dalam format "Eps 1, Eps 2, dst." dan bersih dari elemen ganda/sisa
+            // Menampilkan tombol daftar episode sesuai string asli (mendukung OVA, Special, dll.)
             container.innerHTML = activeEpisodes.map((ep, index) => {
                 const activeClass = index === activeEpisodeIndex ? 'bg-neon-yellow text-white font-bold shadow-glow-yellow' : 'bg-neon-lightBg dark:bg-neon-darkBg text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow';
-                const epNumber = extractEpisodeNumber(ep.episode_title) || (index + 1);
                 
-                // Mencegah render jika judul episode bernilai sama persis dengan judul anime utama
-                const rawTitle = ep.episode_title ? ep.episode_title.trim() : "";
-                if (rawTitle.toLowerCase() === globalAnimeTitle.toLowerCase()) return '';
+                let epLabel = ep.episode_title ? ep.episode_title.replace(/Sub.*$/, '').trim() : `Eps ${index + 1}`;
+                
+                // Mencegah render jika label kosong atau sama persis dengan judul utama
+                if (!epLabel || epLabel.toLowerCase() === globalAnimeTitle.toLowerCase()) return '';
 
-                return `<button onclick='selectEpisode(${index})' class="episode-btn ${activeClass} px-3 py-1.5 rounded-lg text-xs font-semibold transition">Eps ${epNumber}</button>`;
+                return `<button onclick='selectEpisode(${index})' class="episode-btn ${activeClass} px-3 py-1.5 rounded-lg text-xs font-semibold transition">${epLabel}</button>`;
             }).join('');
 
             if(activeEpisodes[activeEpisodeIndex] && activeEpisodes[activeEpisodeIndex].video_servers) {
