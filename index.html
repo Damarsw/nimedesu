@@ -51,7 +51,7 @@
 </head>
 <body class="bg-neon-lightBg text-zinc-900 dark:bg-neon-darkBg dark:text-white transition-colors duration-300 min-h-screen flex flex-col">
 
-    <!-- Header / Navbar (Tanpa tombol Back & Home, menggunakan browser undo/history) -->
+    <!-- Header / Navbar -->
     <header id="mainHeader" class="fixed top-0 left-0 right-0 z-50 bg-[#FFF78D]/90 dark:bg-[#14130e]/90 backdrop-blur-md border-b border-neon-lightBorder dark:border-neon-darkBorder shadow-md dark:shadow-[0_4px_20px_rgba(217,155,0,0.15)] transition-transform duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-1 sm:space-x-2">
@@ -78,7 +78,7 @@
     <!-- Main Content Container -->
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full mt-16">
 
-        <!-- KOTAK PENCARIAN GLOBAL DENGAN FITUR LIVE SEARCH -->
+        <!-- KOTAK PENCARIAN GLOBAL DENGAN LIVE SEARCH -->
         <div id="searchContainer" class="hidden relative mb-8 transition-all duration-300 z-50">
             <div id="searchBoxWrapper" class="relative max-w-xl mx-auto flex items-center bg-white dark:bg-zinc-900 rounded-full border-2 border-neon-yellow shadow-glow-yellow overflow-hidden">
                 <input type="text" id="searchField" placeholder="Ketik nama anime disini" oninput="liveSearchAnime()" onkeypress="if(event.key === 'Enter') searchAnime()" class="w-full bg-transparent text-sm pl-6 pr-4 py-3.5 focus:outline-none placeholder:text-zinc-500 font-medium text-zinc-900 dark:text-white">
@@ -170,6 +170,7 @@
                         <span class="py-2 px-4 rounded-xl text-xs font-bold bg-neon-yellow text-white shadow-glow-yellow flex items-center gap-2">
                             <i class="fa-solid fa-circle-info"></i> Detail & Sinopsis
                         </span>
+                        <!-- TOMBOL STREAMING MEMBUKA TAB BARU (SELALU MULAI DARI EPS TERKECIL/EPS 0) -->
                         <button onclick="openStreamingTab()" class="py-2 px-4 rounded-xl text-xs font-bold bg-neon-lightBg dark:bg-neon-darkBg text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition flex items-center gap-2">
                             <i class="fa-solid fa-play"></i> Streaming <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
                         </button>
@@ -537,9 +538,10 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
+        // Membuka Streaming di Tab Baru dan Mengarahkan ke Episode Terkecil (eps=0)
         function openStreamingTab() {
             if (!activeAnime || !activeAnime.url) return;
-            window.open(`stream.html?url=${encodeURIComponent(activeAnime.url)}`, '_blank');
+            window.open(`stream.html?url=${encodeURIComponent(activeAnime.url)}&eps=0`, '_blank');
         }
 
         function goHomeAction(pushHistory = true) {
@@ -584,7 +586,6 @@
                 defaultBtn.classList.remove('dark:text-white');
             }
             
-            // Cek URL parameters jika ada query pencarian dari stream.html
             const urlParams = new URLSearchParams(window.location.search);
             const searchQuery = urlParams.get('q');
 
