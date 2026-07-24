@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Streaming - NimeDesu</title>
+    
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -37,18 +38,34 @@
         body { font-family: 'Inter', sans-serif; -webkit-user-select: none; user-select: none; } 
     </style>
 </head>
-<body class="bg-neon-lightBg text-zinc-900 dark:bg-neon-darkBg dark:text-white transition-colors duration-300 min-h-screen flex flex-col p-4 sm:p-8">
+<body class="bg-neon-lightBg text-zinc-900 dark:bg-neon-darkBg dark:text-white transition-colors duration-300 min-h-screen flex flex-col">
 
-    <div class="max-w-4xl mx-auto w-full space-y-6 flex-grow">
-        <!-- Header Nav Stream -->
-        <div class="flex items-center justify-between">
-            <button onclick="window.close()" class="p-2 rounded-full bg-transparent hover:bg-yellow-500/20 transition text-zinc-900 dark:text-neon-yellow flex items-center gap-2 text-xs font-semibold" title="Tutup Tab">
-                <i class="fa-solid fa-arrow-left text-sm"></i> Tutup Tab
-            </button>
-            <span class="text-xs text-zinc-700 dark:text-zinc-400">NimeDesu Streaming Room</span>
+    <!-- Header / Navbar (Tanpa Tombol Undo/Kembali) -->
+    <header id="mainHeader" class="fixed top-0 left-0 right-0 z-50 bg-[#FFF78D]/90 dark:bg-[#14130e]/90 backdrop-blur-md border-b border-neon-lightBorder dark:border-neon-darkBorder shadow-md dark:shadow-[0_4px_20px_rgba(217,155,0,0.15)] transition-transform duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-1 sm:space-x-2">
+                <!-- Logo NimeDesu terhubung ke index.html -->
+                <div class="flex items-center space-x-3 cursor-pointer group ml-1" onclick="window.location.href='index.html'">
+                    <span class="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-neon-yellow">NimeDesu</span>
+                </div>
+            </div>
+
+            <div class="hidden md:flex items-center space-x-6 text-sm font-medium">
+                <span class="text-xs text-zinc-700 dark:text-zinc-300">Ruang Streaming</span>
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <button onclick="toggleTheme()" class="p-2.5 rounded-full bg-transparent hover:bg-yellow-500/20 transition text-zinc-900 dark:text-neon-yellow" title="Ganti Tema">
+                    <i id="themeIcon" class="fa-solid fa-moon text-sm"></i>
+                </button>
+            </div>
         </div>
+    </header>
 
-        <div class="px-1 py-0">
+    <!-- Main Content Container -->
+    <main class="flex-grow max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full mt-16 space-y-6">
+
+        <div class="px-1 py-0 mb-2">
             <h1 id="streamTitle" class="text-xl sm:text-2xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-zinc-900 dark:text-white">Memuat Data Streaming...</h1>
         </div>
 
@@ -82,7 +99,8 @@
 
             <div id="episodeBoxContainer" class="flex gap-2 flex-wrap pt-1"></div>
         </div>
-    </div>
+
+    </main>
 
     <!-- Footer -->
     <footer class="border-t border-neon-lightBorder dark:border-neon-darkBorder py-6 mt-12 text-center text-xs text-zinc-700 dark:text-zinc-400">
@@ -112,7 +130,13 @@
 
                 if (data && data.episodes && data.episodes.length > 0) {
                     activeEpisodes = data.episodes;
-                    document.getElementById('streamTitle').innerText = `Streaming Room`;
+                    // Mengambil judul anime dari data atau mengambil nama dari URL
+                    let animeTitle = data.title || data.Judul;
+                    if (!animeTitle) {
+                        const segments = animeUrl.split('/').filter(Boolean);
+                        animeTitle = segments[segments.length - 1].replace(/-/g, ' ');
+                    }
+                    document.getElementById('streamTitle').innerText = `Nonton ${animeTitle}`;
                     renderDynamicEpisodes();
                 } else {
                     document.getElementById('streamTitle').innerText = "Data Episode Tidak Tersedia.";
@@ -255,6 +279,18 @@
             const iframe = document.getElementById('videoIframe');
             if (videoUrl) {
                 iframe.src = videoUrl;
+            }
+        }
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            const icon = document.getElementById('themeIcon');
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                icon.classList.replace('fa-moon', 'fa-sun');
+            } else {
+                html.classList.add('dark');
+                icon.classList.replace('fa-sun', 'fa-moon');
             }
         }
 
