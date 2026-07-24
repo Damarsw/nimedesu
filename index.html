@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NimeDesu - Nonton Anime Sub Indo</title>
-    
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -31,150 +29,82 @@
             }
         }
     </script>
-    <!-- FontAwesome & Google Fonts -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style> 
         body { font-family: 'Inter', sans-serif; -webkit-user-select: none; user-select: none; } 
-
-        .poster-hover-container .play-overlay {
-            opacity: 0;
-            transition: opacity 0.6s ease-in-out;
-        }
-        .poster-hover-container:hover .play-overlay {
-            opacity: 1;
-        }
-        .poster-hover-container:hover img {
-            transform: scale(1.08);
-        }
+        .poster-hover-container .play-overlay { opacity: 0; transition: opacity 0.6s ease-in-out; }
+        .poster-hover-container:hover .play-overlay { opacity: 1; }
+        .poster-hover-container:hover img { transform: scale(1.08); }
     </style>
 </head>
 <body class="bg-neon-lightBg text-zinc-900 dark:bg-neon-darkBg dark:text-white transition-colors duration-300 min-h-screen flex flex-col">
 
     <!-- Header / Navbar -->
-    <header id="mainHeader" class="fixed top-0 left-0 right-0 z-50 bg-[#FFF78D]/90 dark:bg-[#14130e]/90 backdrop-blur-md border-b border-neon-lightBorder dark:border-neon-darkBorder shadow-md dark:shadow-[0_4px_20px_rgba(217,155,0,0.15)] transition-transform duration-300">
+    <header id="mainHeader" class="fixed top-0 left-0 right-0 z-50 bg-[#FFF78D]/90 dark:bg-[#14130e]/90 backdrop-blur-md border-b border-neon-lightBorder dark:border-neon-darkBorder shadow-md transition-transform duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-1 sm:space-x-2">
-                <button onclick="goBack()" class="p-2 rounded-full bg-transparent hover:bg-yellow-500/20 transition text-zinc-900 dark:text-neon-yellow" title="Kembali">
-                    <i class="fa-solid fa-arrow-left text-sm"></i>
-                </button>
-                <button onclick="goHome()" class="p-2 rounded-full bg-transparent hover:bg-yellow-500/20 transition text-zinc-900 dark:text-neon-yellow" title="Beranda">
-                    <i class="fa-solid fa-house text-sm"></i>
-                </button>
-                <div class="flex items-center space-x-3 cursor-pointer group ml-1" onclick="goHome()">
-                    <span class="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-neon-yellow">NimeDesu</span>
-                </div>
+                <button onclick="goBack()" class="p-2 rounded-full hover:bg-yellow-500/20 transition text-zinc-900 dark:text-neon-yellow" title="Kembali"><i class="fa-solid fa-arrow-left text-sm"></i></button>
+                <button onclick="goHome()" class="p-2 rounded-full hover:bg-yellow-500/20 transition text-zinc-900 dark:text-neon-yellow" title="Beranda"><i class="fa-solid fa-house text-sm"></i></button>
+                <span class="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-neon-yellow cursor-pointer" onclick="goHome()">NimeDesu</span>
             </div>
-
-            <div class="hidden md:flex items-center space-x-6 text-sm font-medium">
-                <span class="text-xs text-zinc-700 dark:text-zinc-300">Selamat Datang di Situs NimeDesu</span>
-            </div>
-
             <div class="flex items-center space-x-2">
-                <button id="btnSearchToggle" onclick="toggleSearchInput()" class="p-2.5 rounded-full bg-transparent hover:bg-yellow-500/20 transition text-zinc-900 dark:text-neon-yellow">
-                    <i class="fa-solid fa-magnifying-glass text-sm"></i>
-                </button>
-                <button onclick="toggleTheme()" class="p-2.5 rounded-full bg-transparent hover:bg-yellow-500/20 transition text-zinc-900 dark:text-neon-yellow" title="Ganti Tema">
-                    <i id="themeIcon" class="fa-solid fa-moon text-sm"></i>
-                </button>
+                <button onclick="toggleSearchInput()" class="p-2.5 rounded-full hover:bg-yellow-500/20 transition text-zinc-900 dark:text-neon-yellow"><i class="fa-solid fa-magnifying-glass text-sm"></i></button>
+                <button onclick="toggleTheme()" class="p-2.5 rounded-full hover:bg-yellow-500/20 transition text-zinc-900 dark:text-neon-yellow"><i id="themeIcon" class="fa-solid fa-moon text-sm"></i></button>
             </div>
         </div>
     </header>
 
-    <!-- Main Content Container -->
+    <!-- Main Content -->
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full mt-16">
-
-        <!-- KOTAK PENCARIAN GLOBAL -->
-        <div id="searchContainer" class="hidden mb-8 transition-all duration-300">
+        <div id="searchContainer" class="hidden mb-8">
             <div class="relative max-w-xl mx-auto flex items-center bg-[#f0e66e] dark:bg-neon-darkCard rounded-full border-2 border-neon-yellow shadow-glow-yellow overflow-hidden">
-                <input type="text" id="searchField" placeholder="Ketik nama anime disini" onkeypress="if(event.key === 'Enter') searchAnime()" class="w-full bg-transparent text-sm pl-6 pr-4 py-3.5 focus:outline-none placeholder:text-zinc-700 dark:placeholder:text-zinc-400 font-medium text-zinc-900 dark:text-white">
-                <button onclick="searchAnime()" class="bg-neon-yellow dark:bg-neon-yellow hover:bg-yellow-600 px-6 py-3.5 h-full flex items-center justify-center text-white dark:text-black transition">
-                    <i class="fa-solid fa-magnifying-glass text-sm"></i>
-                </button>
+                <input type="text" id="searchField" placeholder="Ketik nama anime disini" onkeypress="if(event.key === 'Enter') searchAnime()" class="w-full bg-transparent text-sm pl-6 pr-4 py-3.5 focus:outline-none font-medium text-zinc-900 dark:text-white">
+                <button onclick="searchAnime()" class="bg-neon-yellow px-6 py-3.5 text-white dark:text-black transition"><i class="fa-solid fa-magnifying-glass text-sm"></i></button>
             </div>
         </div>
 
-        <!-- HALAMAN UTAMA (HOME / LIST) -->
+        <!-- Home View -->
         <div id="homeView">
             <div class="flex items-center gap-2 mb-6 relative flex-wrap">
                 <button id="btnSemua" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-lightBorder dark:border-neon-darkBorder transition text-zinc-900 dark:text-white" onclick="changeTab('all', this)">Semua</button>
                 <button id="btnOngoing" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-lightBorder dark:border-neon-darkBorder transition text-zinc-900 dark:text-white" onclick="changeTab('ongoing', this)">Ongoing</button>
                 <button id="btnCompleted" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-lightBorder dark:border-neon-darkBorder transition text-zinc-900 dark:text-white" onclick="changeTab('completed', this)">Completed</button>
                 
-                <!-- DROPDOWN GENRE -->
                 <div class="relative inline-block">
                     <button id="btnGenre" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-lightBorder dark:border-neon-darkBorder transition text-zinc-900 dark:text-white" onclick="toggleDropdown(event)">Genre ▾</button>
-                    <div class="hidden absolute left-0 top-12 bg-[#FFF78D] dark:bg-[#14130e] w-44 max-w-[calc(100vw-2rem)] max-h-[250px] overflow-y-auto shadow-2xl rounded-xl p-1.5 z-50 flex flex-col gap-1 border border-neon-lightBorder dark:border-neon-darkBorder" id="genreDropdown">
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Action')">Action</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Adventure')">Adventure</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Comedy')">Comedy</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Demons')">Demons</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Drama')">Drama</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Ecchi')">Ecchi</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Fantasy')">Fantasy</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Game')">Game</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Harem')">Harem</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Historical')">Historical</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Horror')">Horror</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Josei')">Josei</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Magic')">Magic</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Martial Arts')">Martial Arts</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Mecha')">Mecha</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Military')">Military</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Music')">Music</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Mystery')">Mystery</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Psychological')">Psychological</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Parody')">Parody</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Police')">Police</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Romance')">Romance</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Samurai')">Samurai</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('School')">School</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Sci-Fi')">Sci-Fi</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Seinen')">Seinen</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Shoujo')">Shoujo</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Shoujo Ai')">Shoujo Ai</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Shounen')">Shounen</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Slice of Life')">Slice of Life</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Sports')">Sports</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Space')">Space</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Super Power')">Super Power</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Supernatural')">Supernatural</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Thriller')">Thriller</button>
-                        <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Vampire')">Vampire</button>
+                    <div class="hidden absolute left-0 top-12 bg-[#FFF78D] dark:bg-[#14130e] w-44 max-h-[250px] overflow-y-auto shadow-2xl rounded-xl p-1.5 z-50 flex flex-col gap-1 border border-neon-lightBorder dark:border-neon-darkBorder" id="genreDropdown">
+                        <button class="text-left text-xs font-semibold p-1.5 rounded hover:bg-neon-yellow hover:text-white" onclick="filterGenre('Action')">Action</button>
+                        <button class="text-left text-xs font-semibold p-1.5 rounded hover:bg-neon-yellow hover:text-white" onclick="filterGenre('Adventure')">Adventure</button>
+                        <button class="text-left text-xs font-semibold p-1.5 rounded hover:bg-neon-yellow hover:text-white" onclick="filterGenre('Comedy')">Comedy</button>
+                        <button class="text-left text-xs font-semibold p-1.5 rounded hover:bg-neon-yellow hover:text-white" onclick="filterGenre('Ecchi')">Ecchi</button>
+                        <button class="text-left text-xs font-semibold p-1.5 rounded hover:bg-neon-yellow hover:text-white" onclick="filterGenre('Fantasy')">Fantasy</button>
+                        <button class="text-left text-xs font-semibold p-1.5 rounded hover:bg-neon-yellow hover:text-white" onclick="filterGenre('Romance')">Romance</button>
                     </div>
                 </div>
             </div>
 
-            <div class="mb-6 pb-2">
-                <h2 id="sectionHeader" class="text-xl sm:text-2xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-zinc-900 dark:text-white">Semua Daftar Anime</h2>
-            </div>
-
+            <div class="mb-6 pb-2"><h2 id="sectionHeader" class="text-xl sm:text-2xl font-bold border-l-4 border-neon-yellow pl-3">Semua Daftar Anime</h2></div>
             <div id="animeDisplayGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 sm:gap-5"></div>
-            <!-- Paginasi -->
-            <div id="paginationBox" class="flex justify-center items-center space-x-1.5 sm:space-x-2 mt-8 flex-wrap gap-y-2"></div>
+            <div id="paginationBox" class="flex justify-center items-center space-x-2 mt-8 flex-wrap"></div>
         </div>
 
-        <!-- HALAMAN DETAIL ANIME -->
+        <!-- Detail View -->
         <div id="detailView" class="hidden">
             <div class="flex flex-col sm:flex-row gap-5 items-center sm:items-start mb-8 bg-neon-lightCard dark:bg-neon-darkCard p-5 rounded-2xl border border-neon-lightBorder dark:border-neon-darkBorder">
-                <div class="w-32 sm:w-36 aspect-[3/4] rounded-xl overflow-hidden border border-neon-lightBorder dark:border-neon-darkBorder bg-zinc-200 dark:bg-zinc-800 shadow-md shrink-0">
-                    <img id="detThumbnail" src="" alt="" class="w-full h-full object-cover">
+                <div class="w-32 sm:w-36 aspect-[3/4] rounded-xl overflow-hidden border bg-zinc-200 dark:bg-zinc-800 shrink-0">
+                    <img id="detThumbnail" src="" class="w-full h-full object-cover">
                 </div>
-
                 <div class="flex flex-col justify-center w-full space-y-3 text-center sm:text-left">
                     <div>
                         <span id="detStatusBadge" class="bg-neon-yellow text-white dark:text-black text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase">Ongoing</span>
-                        <h1 id="detTitle" class="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white mt-1.5">Judul Anime</h1>
+                        <h1 id="detTitle" class="text-xl sm:text-2xl font-bold mt-1.5">Judul Anime</h1>
                         <div id="detGenreLinks" class="flex flex-wrap gap-1.5 mt-2 justify-center sm:justify-start"></div>
                     </div>
-
-                    <p class="text-xs text-zinc-700 dark:text-zinc-400">Pilih menu:</p>
-
                     <div class="flex flex-wrap gap-2 justify-center sm:justify-start">
-                        <span class="py-2 px-4 rounded-xl text-xs font-bold bg-neon-yellow text-white shadow-glow-yellow flex items-center gap-2">
-                            <i class="fa-solid fa-circle-info"></i> Detail & Sinopsis
-                        </span>
-                        <button onclick="openStreamingPage()" class="py-2 px-4 rounded-xl text-xs font-bold bg-neon-lightBg dark:bg-neon-darkBg text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition flex items-center gap-2">
+                        <span class="py-2 px-4 rounded-xl text-xs font-bold bg-neon-yellow text-white flex items-center gap-2"><i class="fa-solid fa-circle-info"></i> Detail & Sinopsis</span>
+                        <!-- TOMBOL MEMBUKA STREAMING DI TAB BARU -->
+                        <button id="btnOpenStream" class="py-2 px-4 rounded-xl text-xs font-bold bg-neon-lightBg dark:bg-neon-darkBg border hover:border-neon-yellow transition flex items-center gap-2">
                             <i class="fa-solid fa-play"></i> Streaming <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
                         </button>
                     </div>
@@ -182,589 +112,118 @@
             </div>
 
             <div class="w-full space-y-6">
-                <!-- Sinopsis -->
-                <div class="bg-neon-lightCard dark:bg-neon-darkCard p-6 rounded-xl border border-neon-lightBorder dark:border-neon-darkBorder">
-                    <h3 class="text-sm font-bold text-zinc-900 dark:text-neon-yellow uppercase tracking-wider mb-2">Sinopsis</h3>
-                    <p id="synopsisText" class="text-xs sm:text-sm text-zinc-900 dark:text-zinc-300 leading-relaxed">-</p>
-                </div>
-
-                <!-- Infozingle Detail Table -->
-                <div class="bg-neon-lightCard dark:bg-neon-darkCard rounded-xl border border-neon-lightBorder dark:border-neon-darkBorder overflow-hidden text-xs">
-                    <div class="grid grid-cols-2 border-b border-neon-lightBorder dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-700 dark:text-zinc-400 font-medium">Japanese</span>
-                        <span id="detJapanese" class="font-bold text-zinc-900 dark:text-white text-right">-</span>
-                    </div>
-                    <div class="grid grid-cols-2 border-b border-neon-lightBorder dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-700 dark:text-zinc-400 font-medium">Skor</span>
-                        <span id="detSkor" class="font-bold text-zinc-900 dark:text-white text-right">-</span>
-                    </div>
-                    <div class="grid grid-cols-2 border-b border-neon-lightBorder dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-700 dark:text-zinc-400 font-medium">Produser</span>
-                        <span id="detProduser" class="font-bold text-zinc-900 dark:text-white text-right">-</span>
-                    </div>
-                    <div class="grid grid-cols-2 border-b border-neon-lightBorder dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-700 dark:text-zinc-400 font-medium">Tipe</span>
-                        <span id="detTipe" class="font-bold text-zinc-900 dark:text-white text-right">-</span>
-                    </div>
-                    <div class="grid grid-cols-2 border-b border-neon-lightBorder dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-700 dark:text-zinc-400 font-medium">Status</span>
-                        <span id="detStatus" class="font-bold text-zinc-900 dark:text-white text-right">-</span>
-                    </div>
-                    <div class="grid grid-cols-2 border-b border-neon-lightBorder dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-700 dark:text-zinc-400 font-medium">Total Episode</span>
-                        <span id="detTotalEpisode" class="font-bold text-zinc-900 dark:text-white text-right">-</span>
-                    </div>
-                    <div class="grid grid-cols-2 border-b border-neon-lightBorder dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-700 dark:text-zinc-400 font-medium">Durasi</span>
-                        <span id="detDurasi" class="font-bold text-zinc-900 dark:text-white text-right">-</span>
-                    </div>
-                    <div class="grid grid-cols-2 border-b border-neon-lightBorder dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-700 dark:text-zinc-400 font-medium">Tanggal Rilis</span>
-                        <span id="detTanggalRilis" class="font-bold text-zinc-900 dark:text-white text-right">-</span>
-                    </div>
-                    <div class="grid grid-cols-2 py-3 px-4">
-                        <span class="text-zinc-700 dark:text-zinc-400 font-medium">Studio</span>
-                        <span id="detStudio" class="font-bold text-zinc-900 dark:text-white text-right">-</span>
-                    </div>
+                <div class="bg-neon-lightCard dark:bg-neon-darkCard p-6 rounded-xl border">
+                    <h3 class="text-sm font-bold text-neon-yellow uppercase mb-2">Sinopsis</h3>
+                    <p id="synopsisText" class="text-xs sm:text-sm leading-relaxed">-</p>
                 </div>
             </div>
         </div>
-
-        <!-- HALAMAN STREAMING MENGGUNAKAN IFRAME -->
-        <div id="streamingView" class="hidden space-y-6">
-            <div class="px-1 py-0 mb-4">
-                <h1 id="streamTitle" class="text-xl sm:text-2xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-zinc-900 dark:text-white">Nonton Judul Anime</h1>
-            </div>
-
-            <!-- Video Player Container -->
-            <div class="bg-black rounded-xl overflow-hidden border border-neon-darkBorder shadow-2xl aspect-video relative flex items-center justify-center">
-                <iframe id="videoIframe" src="" class="w-full h-full border-0 select-none" allowfullscreen></iframe>
-            </div>
-
-            <!-- Panel Utama Server (Expand) -->
-            <div class="bg-neon-lightCard dark:bg-neon-darkCard p-4 rounded-xl border border-neon-lightBorder dark:border-neon-darkBorder space-y-3">
-                <div class="flex justify-between items-center cursor-pointer select-none pb-2 border-b border-neon-lightBorder dark:border-neon-darkBorder" onclick="toggleMainServerBox()">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-server text-neon-yellow text-xs"></i>
-                        <span class="text-xs text-zinc-900 dark:text-white font-semibold">Pilih Server: <span id="currentServerLabel" class="text-black dark:text-white font-bold">-</span></span>
-                    </div>
-                    <i id="mainServerArrow" class="fa-solid fa-chevron-down text-xs text-zinc-500 transition-transform duration-300 -rotate-90"></i>
-                </div>
-
-                <div id="mainServerContainer" class="space-y-3 pt-1 hidden"></div>
-            </div>
-
-            <!-- List Episode -->
-            <div class="bg-neon-lightCard dark:bg-neon-darkCard p-4 rounded-xl border border-neon-lightBorder dark:border-neon-darkBorder space-y-3">
-                <div class="flex justify-between items-center cursor-pointer select-none pb-2 border-b border-neon-lightBorder dark:border-neon-darkBorder" onclick="toggleEpisodeBox()">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-list text-neon-yellow text-xs"></i>
-                        <span class="text-xs text-zinc-900 dark:text-white font-semibold" id="episodeBoxLabel">Daftar Episode</span>
-                    </div>
-                    <i id="episodeBoxArrow" class="fa-solid fa-chevron-down text-xs text-zinc-500 transition-transform duration-300"></i>
-                </div>
-
-                <div id="episodeBoxContainer" class="flex gap-2 flex-wrap pt-1"></div>
-            </div>
-        </div>
-
     </main>
 
-    <!-- Footer -->
-    <footer class="border-t border-neon-lightBorder dark:border-neon-darkBorder py-6 mt-12 text-center text-xs text-zinc-700 dark:text-zinc-400">
-        <p>NimeDesu - Nonton Anime Sub Indonesia</p>
-    </footer>
+    <footer class="border-t py-6 mt-12 text-center text-xs text-zinc-700 dark:text-zinc-400"><p>NimeDesu - Nonton Anime Sub Indonesia</p></footer>
 
-    <!-- SCRIPT LOGIKA APLIKASI & KONEKSI API RENDER -->
     <script>
-        document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
-        document.addEventListener('keydown', function(e) {
-            if (e.keyCode === 123 || (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) || (e.ctrlKey && e.keyCode === 85)) {
-                e.preventDefault();
-                return false;
-            }
-        });
-
         let currentData = [];
         let filteredData = [];
         let currentPage = 1;
         let activeAnime = null;
-        let activeEpisodeIndex = 0;
-        let isStreamingMode = false;
         const itemsPerPage = 12;
-
-        document.addEventListener('mousemove', function(e) {
-            if (!isStreamingMode) return;
-            const header = document.getElementById('mainHeader');
-            if (e.clientY <= 60) { header.classList.remove('-translate-y-full'); } 
-            else { header.classList.add('-translate-y-full'); }
-        });
-
         const RENDER_API_URL = "https://nimedesu.onrender.com";
 
         async function loadAnimeDatabase() {
             try {
-                const [infoResponse, synopsisResponse, superResponse] = await Promise.all([
+                const [infoRes, synRes] = await Promise.all([
                     fetch(`${RENDER_API_URL}/api/anime`),
-                    fetch(`${RENDER_API_URL}/api/sinopsis`),
-                    fetch(`${RENDER_API_URL}/api/super-lengkap`).catch(() => ({ json: () => [] }))
+                    fetch(`${RENDER_API_URL}/api/sinopsis`).catch(() => ({ json: () => [] }))
                 ]);
+                const infoData = await infoRes.json();
+                const synData = await synRes.json();
+                const synMap = {};
+                synData.forEach(i => { if(i.url) synMap[i.url.trim()] = i.sinopsis; });
 
-                const infoData = await infoResponse.json();
-                const synopsisData = await synopsisResponse.json();
-                const superData = await superResponse.json();
-
-                const synopsisMap = {};
-                synopsisData.forEach(item => {
-                    if (item.url) { synopsisMap[item.url.trim()] = item.sinopsis || "Tidak ada sinopsis tersedia."; }
-                });
-
-                const superMap = {};
-                superData.forEach(item => {
-                    const itemUrl = item.url || item.link;
-                    if (itemUrl) { superMap[itemUrl.trim()] = item.episodes || []; }
-                });
-                
-                currentData = infoData.map((item, index) => {
-                    const itemUrl = item.url ? item.url.trim() : "";
-                    const matchedSynopsis = synopsisMap[itemUrl] || item.sinopsis || "Tidak ada sinopsis tersedia.";
-                    const matchedEpisodes = superMap[itemUrl] || item.episodes || [];
-
-                    return {
-                        id: index + 1,
-                        title: item.title || item.Judul || "Tanpa Judul",
-                        url: itemUrl,
-                        status: item.Status || "Ongoing",
-                        genres: item.Genre ? item.Genre.split(',').map(g => g.trim()) : [],
-                        synopsis: matchedSynopsis,
-                        thumbnail: item.image_url || item.thumbnail || "https://placehold.co/400x600?text=No+Image",
-                        japanese: item.Japanese || "-",
-                        skor: item.Skor || "-",
-                        produser: item.Produser || "-",
-                        tipe: item.Tipe || "-",
-                        totalEpisode: item["Total Episode"] || "-",
-                        durasi: item.Durasi || "-",
-                        tanggalRilis: item["Tanggal Rilis"] || "-",
-                        studio: item.Studio || "-",
-                        episodes: matchedEpisodes
-                    };
-                });
-
+                currentData = infoData.map((item, index) => ({
+                    id: index + 1,
+                    title: item.title || item.Judul || "Tanpa Judul",
+                    url: item.url ? item.url.trim() : "",
+                    status: item.Status || "Ongoing",
+                    genres: item.Genre ? item.Genre.split(',').map(g => g.trim()) : [],
+                    synopsis: synMap[item.url?.trim()] || item.sinopsis || "Tidak ada sinopsis.",
+                    thumbnail: item.image_url || item.thumbnail || "https://placehold.co/400x600?text=No+Image",
+                    japanese: item.Japanese || "-",
+                    skor: item.Skor || "-"
+                }));
                 filteredData = [...currentData];
                 displayAnimeWithPagination();
-            } catch (error) {
-                console.error("Gagal memuat API server:", error);
-                document.getElementById('animeDisplayGrid').innerHTML = `<p class="text-zinc-700 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat data dari API server Render. Pastikan server aktif.</p>`;
-            }
-        }
-
-        function toggleSearchInput() {
-            const container = document.getElementById('searchContainer');
-            const field = document.getElementById('searchField');
-            if (container.classList.contains('hidden')) {
-                container.classList.remove('hidden');
-                field.focus();
-            } else {
-                if (field.value.trim() === "") { container.classList.add('hidden'); } 
-                else {
-                    field.value = "";
-                    container.classList.add('hidden');
-                    filteredData = [...currentData];
-                    displayAnimeWithPagination();
-                }
-            }
-        }
-
-        function changeTab(type, element) {
-            document.querySelectorAll('.nav-tab-btn').forEach(b => {
-                b.classList.remove('bg-neon-yellow', 'text-white', 'dark:text-neon-yellow', 'font-bold', 'border-neon-yellow');
-                b.classList.add('dark:text-white');
-            });
-            if(element) {
-                element.classList.remove('dark:text-white');
-                element.classList.add('bg-neon-yellow', 'text-white', 'dark:text-neon-yellow', 'font-bold', 'border-neon-yellow');
-            }
-            const dropdown = document.getElementById('genreDropdown');
-            if(dropdown) dropdown.style.display = 'none';
-            currentPage = 1;
-
-            if(type === 'all') {
-                document.getElementById('sectionHeader').innerText = "Semua Daftar Anime";
-                filteredData = [...currentData];
-            } else if(type === 'ongoing') {
-                document.getElementById('sectionHeader').innerText = "Anime Ongoing Terbaru";
-                filteredData = currentData.filter(a => a.status.toLowerCase().includes('ongoing'));
-            } else if(type === 'completed') {
-                document.getElementById('sectionHeader').innerText = "Anime Completed";
-                filteredData = currentData.filter(a => a.status.toLowerCase().includes('completed'));
-            }
-            displayAnimeWithPagination();
-        }
-
-        function toggleDropdown(e) {
-            e.stopPropagation();
-            const dropdown = document.getElementById('genreDropdown');
-            dropdown.style.display = dropdown.style.display === 'flex' ? 'none' : 'flex';
-        }
-
-        function filterGenre(genre) {
-            goHome();
-            currentPage = 1;
-            const dropdown = document.getElementById('genreDropdown');
-            if(dropdown) dropdown.style.display = 'none';
-            document.getElementById('sectionHeader').innerText = `Genre: ${genre}`;
-            
-            document.querySelectorAll('.nav-tab-btn').forEach(b => {
-                b.classList.remove('bg-neon-yellow', 'text-white', 'dark:text-neon-yellow', 'font-bold', 'border-neon-yellow');
-                b.classList.add('dark:text-white');
-            });
-            const genreBtn = document.getElementById('btnGenre');
-            if(genreBtn) {
-                genreBtn.classList.remove('dark:text-white');
-                genreBtn.classList.add('bg-neon-yellow', 'text-white', 'dark:text-neon-yellow', 'font-bold', 'border-neon-yellow');
-            }
-
-            filteredData = currentData.filter(a => a.genres && a.genres.some(g => g.toLowerCase() === genre.toLowerCase()));
-            displayAnimeWithPagination();
+            } catch (e) { console.error(e); }
         }
 
         function displayAnimeWithPagination() {
-            const container = document.getElementById('animeDisplayGrid');
-            const paginationBox = document.getElementById('paginationBox');
-            
-            if(filteredData.length === 0) {
-                container.innerHTML = `<p class="text-zinc-700 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Tidak ada anime ditemukan.</p>`;
-                paginationBox.innerHTML = '';
-                return;
-            }
+            const grid = document.getElementById('animeDisplayGrid');
+            const box = document.getElementById('paginationBox');
+            if(!filteredData.length) { grid.innerHTML = '<p class="col-span-full text-center py-10">Tidak ada anime.</p>'; box.innerHTML = ''; return; }
 
             const totalPages = Math.ceil(filteredData.length / itemsPerPage);
             if (currentPage > totalPages) currentPage = totalPages;
-            if (currentPage < 1) currentPage = 1;
+            const items = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-            const startIndex = (currentPage - 1) * itemsPerPage;
-            const paginatedItems = filteredData.slice(startIndex, startIndex + itemsPerPage);
-
-            container.innerHTML = paginatedItems.map(item => `
-                <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="viewDetails('${item.id}')">
-                    <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
-                        <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
-                        <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
-                            <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
-                                <i class="fa-solid fa-circle-info ml-0.5 text-base"></i>
-                            </div>
+            grid.innerHTML = items.map(item => `
+                <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border hover:border-neon-yellow cursor-pointer shadow-sm flex flex-col" onclick="viewDetails('${item.id}')">
+                    <div class="relative aspect-[3/4] overflow-hidden bg-zinc-800 poster-hover-container">
+                        <img src="${item.thumbnail}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
+                        <div class="play-overlay absolute inset-0 bg-black/30 flex items-center justify-center">
+                            <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg"><i class="fa-solid fa-circle-info"></i></div>
                         </div>
-                        <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${item.status}</span>
+                        <span class="absolute top-2 left-2 bg-black/75 text-white text-[10px] px-2 py-0.5 rounded-full">${item.status}</span>
                     </div>
-                    <div class="p-3">
-                        <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-zinc-900 dark:text-white">${item.title}</h4>
-                    </div>
+                    <div class="p-3"><h4 class="font-semibold text-xs sm:text-sm line-clamp-2">${item.title}</h4></div>
                 </div>
             `).join('');
 
-            let paginationHTML = '';
-            const baseBtnClass = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-neon-lightCard dark:bg-neon-darkCard text-zinc-800 dark:text-white border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition';
-            const disabledBtnClass = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-zinc-200 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border-zinc-300 dark:border-zinc-800 cursor-not-allowed';
-
-            if (currentPage > 1) { paginationHTML += `<button class="${baseBtnClass}" onclick="goToPage(1)">&laquo;</button>`; } 
-            else { paginationHTML += `<button class="${disabledBtnClass}" disabled>&laquo;</button>`; }
-
-            if (currentPage > 1) { paginationHTML += `<button class="${baseBtnClass}" onclick="goToPage(${currentPage - 1})">&lsaquo;</button>`; } 
-            else { paginationHTML += `<button class="${disabledBtnClass}" disabled>&lsaquo;</button>`; }
-
-            let startPage = Math.max(1, currentPage - 2);
-            let endPage = Math.min(totalPages, currentPage + 2);
-
-            for(let i = startPage; i <= endPage; i++) {
-                const activeClass = i === currentPage ? 'bg-neon-yellow text-white dark:text-white font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-zinc-800 dark:text-white border-neon-lightBorder dark:border-neon-darkBorder';
-                paginationHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${activeClass} transition" onclick="goToPage(${i})">${i}</button>`;
-            }
-
-            if (currentPage < totalPages) { paginationHTML += `<button class="${baseBtnClass}" onclick="goToPage(${currentPage + 1})">&rsaquo;</button>`; } 
-            else { paginationHTML += `<button class="${disabledBtnClass}" disabled>&rsaquo;</button>`; }
-
-            if (currentPage < totalPages) { paginationHTML += `<button class="${baseBtnClass}" onclick="goToPage(${totalPages})">&raquo;</button>`; } 
-            else { paginationHTML += `<button class="${disabledBtnClass}" disabled>&raquo;</button>`; }
-
-            paginationBox.innerHTML = paginationHTML;
+            box.innerHTML = `<button class="px-3 py-1.5 border rounded" onclick="goToPage(${currentPage-1})" ${currentPage===1?'disabled':''}>&lsaquo;</button> <span class="text-xs px-2">Hal ${currentPage} dari ${totalPages}</span> <button class="px-3 py-1.5 border rounded" onclick="goToPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>&rsaquo;</button>`;
         }
 
-        function goToPage(pageNumber) {
-            currentPage = pageNumber;
-            displayAnimeWithPagination();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        function searchAnime() {
-            const query = document.getElementById('searchField').value.trim().toLowerCase();
-            const container = document.getElementById('searchContainer');
-            if(!query) {
-                container.classList.add('hidden');
-                filteredData = [...currentData];
-                displayAnimeWithPagination();
-                return;
-            }
-            isStreamingMode = false;
-            document.getElementById('detailView').classList.add('hidden');
-            document.getElementById('streamingView').classList.add('hidden');
-            document.getElementById('homeView').classList.remove('hidden');
-            document.getElementById('mainHeader').classList.remove('-translate-y-full');
-
-            currentPage = 1;
-            document.getElementById('sectionHeader').innerText = `Hasil Pencarian: "${query}"`;
-            filteredData = currentData.filter(a => a.title.toLowerCase().includes(query));
-            displayAnimeWithPagination();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
+        function goToPage(p) { currentPage = p; displayAnimeWithPagination(); window.scrollTo({top:0, behavior:'smooth'}); }
+        
         function viewDetails(id) {
-            const anime = currentData.find(a => a.id == id);
-            if(!anime) return;
-            activeAnime = anime;
-            activeEpisodeIndex = 0;
-            isStreamingMode = false;
-
-            document.getElementById('homeView').classList.add('hidden');
-            document.getElementById('streamingView').classList.add('hidden');
-            document.getElementById('detailView').classList.remove('hidden');
-            document.getElementById('mainHeader').classList.remove('-translate-y-full');
-
-            document.getElementById('detTitle').innerText = anime.title;
-            document.getElementById('detThumbnail').src = anime.thumbnail;
-            document.getElementById('detStatusBadge').innerText = anime.status;
-            document.getElementById('synopsisText').innerText = anime.synopsis;
-
-            document.getElementById('detJapanese').innerText = anime.japanese;
-            document.getElementById('detSkor').innerText = anime.skor;
-            document.getElementById('detProduser').innerText = anime.produser;
-            document.getElementById('detTipe').innerText = anime.tipe;
-            document.getElementById('detStatus').innerText = anime.status;
-            document.getElementById('detTotalEpisode').innerText = anime.totalEpisode;
-            document.getElementById('detDurasi').innerText = anime.durasi;
-            document.getElementById('detTanggalRilis').innerText = anime.tanggalRilis;
-            document.getElementById('detStudio').innerText = anime.studio;
-
-            const genreLinksContainer = document.getElementById('detGenreLinks');
-            if (anime.genres && anime.genres.length > 0) {
-                genreLinksContainer.innerHTML = anime.genres.map(genre => `
-                    <button onclick="filterGenre('${genre}')" class="bg-white text-zinc-900 dark:bg-neon-darkBg dark:text-neon-yellow border border-zinc-300 dark:border-neon-yellow/40 hover:border-neon-yellow text-[10px] font-semibold px-2.5 py-0.5 rounded-full transition shadow-sm">${genre}</button>
-                `).join('');
-            } else {
-                genreLinksContainer.innerHTML = '<span class="text-xs text-zinc-500">-</span>';
-            }
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        function openStreamingPage() {
+            activeAnime = currentData.find(a => a.id == id);
             if(!activeAnime) return;
             document.getElementById('homeView').classList.add('hidden');
-            document.getElementById('detailView').classList.add('hidden');
-            document.getElementById('streamingView').classList.remove('hidden');
-            isStreamingMode = true;
-            document.getElementById('mainHeader').classList.add('-translate-y-full');
-            document.getElementById('streamTitle').innerText = `Nonton ${activeAnime.title}`;
-            renderDynamicEpisodes();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        function renderDynamicEpisodes() {
-            const container = document.getElementById('episodeBoxContainer');
-            const label = document.getElementById('episodeBoxLabel');
-
-            if(!activeAnime.episodes || activeAnime.episodes.length === 0) {
-                container.innerHTML = '<p class="text-xs text-zinc-500">Tidak ada episode tersedia.</p>';
-                if(label) label.innerText = "Daftar Episode (0)";
-                document.getElementById('mainServerContainer').innerHTML = '<p class="text-xs text-zinc-500 p-2">Server tidak ditemukan.</p>';
-                return;
-            }
-
-            if(label) label.innerText = `Daftar Episode (${activeAnime.episodes.length})`;
-
-            container.innerHTML = activeAnime.episodes.map((ep, index) => {
-                const activeClass = index === activeEpisodeIndex ? 'bg-neon-yellow text-white font-bold shadow-glow-yellow' : 'bg-neon-lightBg dark:bg-neon-darkBg text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow';
-                const epLabel = ep.episode_title ? ep.episode_title.replace(/Sub.*$/, '').trim() : `Eps ${index + 1}`;
-                return `<button onclick='selectEpisodeFromJSON(this, ${index}, ${JSON.stringify(ep.video_servers || [])})' class="episode-btn ${activeClass} px-3 py-1.5 rounded-lg text-xs font-semibold transition">${epLabel}</button>`;
-            }).join('');
-
-            if(activeAnime.episodes[activeEpisodeIndex] && activeAnime.episodes[activeEpisodeIndex].video_servers) {
-                renderDynamicServers(activeAnime.episodes[activeEpisodeIndex].video_servers);
-            }
-        }
-
-        function selectEpisodeFromJSON(element, index, servers) {
-            activeEpisodeIndex = index;
-            document.querySelectorAll('.episode-btn').forEach(btn => {
-                btn.className = "episode-btn bg-neon-lightBg dark:bg-neon-darkBg text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow px-3 py-1.5 rounded-lg text-xs font-semibold transition";
-            });
-            element.className = "episode-btn bg-neon-yellow text-white font-bold px-3 py-1.5 rounded-lg text-xs shadow-glow-yellow transition";
-            renderDynamicServers(servers);
-        }
-
-        function renderDynamicServers(servers) {
-            const mainContainer = document.getElementById('mainServerContainer');
-            if (!servers || servers.length === 0) {
-                mainContainer.innerHTML = '<p class="text-xs text-zinc-500 p-2">Server tidak ditemukan.</p>';
-                document.getElementById('currentServerLabel').innerText = "Tidak ada";
-                document.getElementById('videoIframe').src = "";
-                return;
-            }
-
-            const grouped = {};
-            servers.forEach(s => {
-                const res = s.resolution || "Mirror 360p";
-                if(!grouped[res]) grouped[res] = [];
-                grouped[res].push(s);
-            });
-
-            let htmlContent = '';
-            let isFirst = true;
-
-            for(const [resText, srvList] of Object.entries(grouped)) {
-                const groupId = 'group' + resText.replace(/[^a-zA-Z0-9]/g, '');
-                htmlContent += `
-                    <div class="rounded-lg bg-neon-lightBg dark:bg-neon-darkBg border border-neon-lightBorder dark:border-neon-darkBorder overflow-hidden">
-                        <div class="flex justify-between items-center px-3 py-2.5 cursor-pointer text-xs font-semibold select-none" onclick="toggleSubserverGroup('${groupId}')">
-                            <span class="flex items-center gap-2"><i class="fa-solid fa-video text-neon-yellow text-[10px]"></i> ${resText}</span>
-                            <i id="arrow${groupId}" class="fa-solid fa-chevron-down text-[10px] text-zinc-500 transition-transform duration-300"></i>
-                        </div>
-                        <div id="${groupId}" class="hidden px-3 pb-2.5 pt-1 space-y-1.5 border-t border-neon-lightBorder dark:border-neon-darkBorder">
-                `;
-
-                srvList.forEach(srv => {
-                    let qualityBadge = "SD";
-                    let resLower = srv.resolution.toLowerCase();
-                    if (resLower.includes('720')) qualityBadge = "HD";
-                    else if (resLower.includes('1080')) qualityBadge = "FHD";
-
-                    htmlContent += `
-                        <button onclick="selectServer(this, '${srv.resolution}', '${srv.server}', '${srv.video_url}')" class="server-btn w-full text-left px-3 py-1.5 rounded text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-zinc-900 dark:text-white">
-                            <span>${srv.resolution} (${srv.server})</span>
-                            <span class="text-[9px] opacity-75">${qualityBadge}</span>
-                        </button>
-                    `;
-
-                    if(isFirst) {
-                        setTimeout(() => selectServer(null, srv.resolution, srv.server, srv.video_url), 100);
-                        isFirst = false;
-                    }
-                });
-
-                htmlContent += `</div></div>`;
-            }
-            mainContainer.innerHTML = htmlContent;
-        }
-
-        function toggleMainServerBox() {
-            const container = document.getElementById('mainServerContainer');
-            const arrow = document.getElementById('mainServerArrow');
-            if(container.classList.contains('hidden')) {
-                container.classList.remove('hidden');
-                arrow.style.transform = 'rotate(0deg)';
-            } else {
-                container.classList.add('hidden');
-                arrow.style.transform = 'rotate(-90deg)';
-            }
-        }
-
-        function toggleSubserverGroup(groupId) {
-            const group = document.getElementById(groupId);
-            const arrow = document.getElementById('arrow' + groupId);
-            if(group.classList.contains('hidden')) {
-                group.classList.remove('hidden');
-                arrow.style.transform = 'rotate(180deg)';
-            } else {
-                group.classList.add('hidden');
-                arrow.style.transform = 'rotate(0deg)';
-            }
-        }
-
-        function toggleEpisodeBox() {
-            const container = document.getElementById('episodeBoxContainer');
-            const arrow = document.getElementById('episodeBoxArrow');
-            if(container.classList.contains('hidden')) {
-                container.classList.remove('hidden');
-                arrow.style.transform = 'rotate(0deg)';
-            } else {
-                container.classList.add('hidden');
-                arrow.style.transform = 'rotate(-90deg)';
-            }
-        }
-
-        function selectServer(element, resolution, serverNum, videoUrl) {
-            document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
-            document.querySelectorAll('.server-btn').forEach(btn => {
-                btn.className = "server-btn w-full text-left px-3 py-1.5 rounded text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-zinc-900 dark:text-white";
-            });
-            if(element) {
-                element.className = "server-btn w-full text-left px-3 py-1.5 rounded text-xs bg-neon-yellow text-white font-bold shadow-glow-yellow transition flex justify-between items-center";
-            }
-            document.getElementById('mainServerContainer').classList.add('hidden');
-            document.getElementById('mainServerArrow').style.transform = 'rotate(-90deg)';
-
-            const iframe = document.getElementById('videoIframe');
-            if (videoUrl && videoUrl.startsWith('http')) {
-                iframe.src = videoUrl;
-            } else {
-                iframe.src = videoUrl;
-            }
+            document.getElementById('detailView').classList.remove('hidden');
+            document.getElementById('detTitle').innerText = activeAnime.title;
+            document.getElementById('detThumbnail').src = activeAnime.thumbnail;
+            document.getElementById('detStatusBadge').innerText = activeAnime.status;
+            document.getElementById('synopsisText').innerText = activeAnime.synopsis;
+            
+            // Atur agar tombol streaming membuka file stream.html dengan membawa parameter URL encode anime
+            document.getElementById('btnOpenStream').onclick = () => {
+                window.open(`stream.html?url=${encodeURIComponent(activeAnime.url)}`, '_blank');
+            };
+            window.scrollTo({top:0, behavior:'smooth'});
         }
 
         function goHome() {
-            document.getElementById('videoIframe').src = "";
-            isStreamingMode = false;
-            document.getElementById('streamingView').classList.add('hidden');
             document.getElementById('detailView').classList.add('hidden');
             document.getElementById('homeView').classList.remove('hidden');
-            document.getElementById('mainHeader').classList.remove('-translate-y-full');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
-
-        function goBack() {
-            const homeView = document.getElementById('homeView');
-            const detailView = document.getElementById('detailView');
-            const streamingView = document.getElementById('streamingView');
-
-            if (!streamingView.classList.contains('hidden')) {
-                document.getElementById('videoIframe').src = "";
-                isStreamingMode = false;
-                streamingView.classList.add('hidden');
-                detailView.classList.remove('hidden');
-                document.getElementById('mainHeader').classList.remove('-translate-y-full');
-            } else if (!detailView.classList.contains('hidden')) {
-                detailView.classList.add('hidden');
-                homeView.classList.remove('hidden');
-                document.getElementById('mainHeader').classList.remove('-translate-y-full');
-            } else {
-                window.history.back();
-            }
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+        function goBack() { goHome(); }
+        
+        function toggleDropdown(e) { e.stopPropagation(); document.getElementById('genreDropdown').classList.toggle('hidden'); }
+        function filterGenre(g) {
+            goHome(); document.getElementById('genreDropdown').classList.add('hidden');
+            filteredData = currentData.filter(a => a.genres.some(genre => genre.toLowerCase() === g.toLowerCase()));
+            document.getElementById('sectionHeader').innerText = `Genre: ${g}`;
+            displayAnimeWithPagination();
         }
-
-        window.onclick = function(e) {
-            const dropdown = document.getElementById('genreDropdown');
-            if(dropdown && !e.target.closest('#btnGenre')) { dropdown.style.display = 'none'; }
+        function changeTab(t, el) {
+            document.querySelectorAll('.nav-tab-btn').forEach(b => b.classList.remove('bg-neon-yellow', 'text-white'));
+            if(el) el.classList.add('bg-neon-yellow', 'text-white');
+            currentPage = 1;
+            if(t === 'ongoing') { filteredData = currentData.filter(a => a.status.toLowerCase().includes('ongoing')); }
+            else if(t === 'completed') { filteredData = currentData.filter(a => a.status.toLowerCase().includes('completed')); }
+            else { filteredData = [...currentData]; }
+            displayAnimeWithPagination();
         }
-
-        function toggleTheme() {
-            const html = document.documentElement;
-            const icon = document.getElementById('themeIcon');
-            if (html.classList.contains('dark')) {
-                html.classList.remove('dark');
-                icon.classList.replace('fa-moon', 'fa-sun');
-            } else {
-                html.classList.add('dark');
-                icon.classList.replace('fa-sun', 'fa-moon');
-            }
-        }
-
-        window.onload = function() {
-            const defaultBtn = document.getElementById('btnSemua');
-            if(defaultBtn) {
-                defaultBtn.classList.add('bg-neon-yellow', 'text-white', 'dark:text-neon-yellow', 'font-bold', 'border-neon-yellow');
-                defaultBtn.classList.remove('dark:text-white');
-            }
-            loadAnimeDatabase();
-        };
+        window.onload = () => { loadAnimeDatabase(); };
     </script>
 </body>
 </html>
