@@ -14,9 +14,9 @@
                 extend: {
                     colors: {
                         neon: {
-                            lightBg: '#f6f0d8',        
-                            lightCard: '#e6dfbc',      
-                            lightBorder: '#c2b88d',    
+                            lightBg: '#FFF78D',        
+                            lightCard: '#f7ee72',      
+                            lightBorder: '#d4cb57',    
                             darkBg: '#0f0e0a',         
                             darkCard: '#1a1912',       
                             darkBorder: '#33311f',     
@@ -52,7 +52,7 @@
 <body class="bg-neon-lightBg text-zinc-900 dark:bg-neon-darkBg dark:text-white transition-colors duration-300 min-h-screen flex flex-col">
 
     <!-- Header / Navbar -->
-    <header id="mainHeader" class="fixed top-0 left-0 right-0 z-50 bg-[#f6f0d8]/90 dark:bg-[#14130e]/90 backdrop-blur-md border-b border-neon-lightBorder dark:border-neon-darkBorder shadow-md dark:shadow-[0_4px_20px_rgba(217,155,0,0.15)] transition-transform duration-300">
+    <header id="mainHeader" class="fixed top-0 left-0 right-0 z-50 bg-[#FFF78D]/90 dark:bg-[#14130e]/90 backdrop-blur-md border-b border-neon-lightBorder dark:border-neon-darkBorder shadow-md dark:shadow-[0_4px_20px_rgba(217,155,0,0.15)] transition-transform duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-1 sm:space-x-2">
                 <button onclick="goBack()" class="p-2 rounded-full bg-transparent hover:bg-yellow-500/20 transition text-zinc-900 dark:text-neon-yellow" title="Kembali">
@@ -67,7 +67,7 @@
             </div>
 
             <div class="hidden md:flex items-center space-x-6 text-sm font-medium">
-                <span class="text-xs text-zinc-600 dark:text-zinc-300">Selamat Datang di Situs NimeDesu</span>
+                <span class="text-xs text-zinc-700 dark:text-zinc-300">Selamat Datang di Situs NimeDesu</span>
             </div>
 
             <div class="flex items-center space-x-2">
@@ -86,8 +86,8 @@
 
         <!-- KOTAK PENCARIAN GLOBAL -->
         <div id="searchContainer" class="hidden mb-8 transition-all duration-300">
-            <div class="relative max-w-xl mx-auto flex items-center bg-[#ede6c2] dark:bg-neon-darkCard rounded-full border-2 border-neon-yellow shadow-glow-yellow overflow-hidden">
-                <input type="text" id="searchField" placeholder="Ketik nama anime disini" onkeypress="if(event.key === 'Enter') searchAnime()" class="w-full bg-transparent text-sm pl-6 pr-4 py-3.5 focus:outline-none placeholder:text-zinc-600 dark:placeholder:text-zinc-400 font-medium text-zinc-900 dark:text-white">
+            <div class="relative max-w-xl mx-auto flex items-center bg-[#f0e66e] dark:bg-neon-darkCard rounded-full border-2 border-neon-yellow shadow-glow-yellow overflow-hidden">
+                <input type="text" id="searchField" placeholder="Ketik nama anime disini" onkeypress="if(event.key === 'Enter') searchAnime()" class="w-full bg-transparent text-sm pl-6 pr-4 py-3.5 focus:outline-none placeholder:text-zinc-700 dark:placeholder:text-zinc-400 font-medium text-zinc-900 dark:text-white">
                 <button onclick="searchAnime()" class="bg-neon-yellow dark:bg-neon-yellow hover:bg-yellow-600 px-6 py-3.5 h-full flex items-center justify-center text-white dark:text-black transition">
                     <i class="fa-solid fa-magnifying-glass text-sm"></i>
                 </button>
@@ -104,7 +104,7 @@
                 <!-- DROPDOWN GENRE -->
                 <div class="relative inline-block">
                     <button id="btnGenre" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-lightBorder dark:border-neon-darkBorder transition text-zinc-900 dark:text-white" onclick="toggleDropdown(event)">Genre ▾</button>
-                    <div class="hidden absolute left-0 top-12 bg-[#f6f0d8] dark:bg-[#14130e] w-44 max-w-[calc(100vw-2rem)] max-h-[250px] overflow-y-auto shadow-2xl rounded-xl p-1.5 z-50 flex flex-col gap-1 border border-neon-lightBorder dark:border-neon-darkBorder" id="genreDropdown">
+                    <div class="hidden absolute left-0 top-12 bg-[#FFF78D] dark:bg-[#14130e] w-44 max-w-[calc(100vw-2rem)] max-h-[250px] overflow-y-auto shadow-2xl rounded-xl p-1.5 z-50 flex flex-col gap-1 border border-neon-lightBorder dark:border-neon-darkBorder" id="genreDropdown">
                         <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Action')">Action</button>
                         <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Adventure')">Adventure</button>
                         <button class="text-left text-xs font-semibold text-zinc-900 dark:text-white hover:text-white hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Comedy')">Comedy</button>
@@ -168,7 +168,7 @@
                         <div id="detGenreLinks" class="flex flex-wrap gap-1.5 mt-2 justify-center sm:justify-start"></div>
                     </div>
 
-                    <p class="text-xs text-zinc-600 dark:text-zinc-400">Pilih menu:</p>
+                    <p class="text-xs text-zinc-700 dark:text-zinc-400">Pilih menu:</p>
 
                     <div class="flex flex-wrap gap-2 justify-center sm:justify-start">
                         <span class="py-2 px-4 rounded-xl text-xs font-bold bg-neon-yellow text-white shadow-glow-yellow flex items-center gap-2">
@@ -185,45 +185,45 @@
                 <!-- Sinopsis -->
                 <div class="bg-neon-lightCard dark:bg-neon-darkCard p-6 rounded-xl border border-neon-lightBorder dark:border-neon-darkBorder">
                     <h3 class="text-sm font-bold text-zinc-900 dark:text-neon-yellow uppercase tracking-wider mb-2">Sinopsis</h3>
-                    <p id="synopsisText" class="text-xs sm:text-sm text-black dark:text-zinc-300 leading-relaxed">-</p>
+                    <p id="synopsisText" class="text-xs sm:text-sm text-zinc-900 dark:text-zinc-300 leading-relaxed">-</p>
                 </div>
 
                 <!-- Infozingle Detail Table -->
                 <div class="bg-neon-lightCard dark:bg-neon-darkCard rounded-xl border border-neon-lightBorder dark:border-neon-darkBorder overflow-hidden text-xs">
                     <div class="grid grid-cols-2 border-b border-neon-lightBorder dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-600 dark:text-zinc-400 font-medium">Japanese</span>
+                        <span class="text-zinc-700 dark:text-zinc-400 font-medium">Japanese</span>
                         <span id="detJapanese" class="font-bold text-zinc-900 dark:text-white text-right">-</span>
                     </div>
                     <div class="grid grid-cols-2 border-b border-neon-lightBorder dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-600 dark:text-zinc-400 font-medium">Skor</span>
+                        <span class="text-zinc-700 dark:text-zinc-400 font-medium">Skor</span>
                         <span id="detSkor" class="font-bold text-zinc-900 dark:text-white text-right">-</span>
                     </div>
                     <div class="grid grid-cols-2 border-b border-neon-lightBorder dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-600 dark:text-zinc-400 font-medium">Produser</span>
+                        <span class="text-zinc-700 dark:text-zinc-400 font-medium">Produser</span>
                         <span id="detProduser" class="font-bold text-zinc-900 dark:text-white text-right">-</span>
                     </div>
                     <div class="grid grid-cols-2 border-b border-neon-lightBorder dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-600 dark:text-zinc-400 font-medium">Tipe</span>
+                        <span class="text-zinc-700 dark:text-zinc-400 font-medium">Tipe</span>
                         <span id="detTipe" class="font-bold text-zinc-900 dark:text-white text-right">-</span>
                     </div>
                     <div class="grid grid-cols-2 border-b border-neon-lightBorder dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-600 dark:text-zinc-400 font-medium">Status</span>
+                        <span class="text-zinc-700 dark:text-zinc-400 font-medium">Status</span>
                         <span id="detStatus" class="font-bold text-zinc-900 dark:text-white text-right">-</span>
                     </div>
                     <div class="grid grid-cols-2 border-b border-neon-lightBorder dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-600 dark:text-zinc-400 font-medium">Total Episode</span>
+                        <span class="text-zinc-700 dark:text-zinc-400 font-medium">Total Episode</span>
                         <span id="detTotalEpisode" class="font-bold text-zinc-900 dark:text-white text-right">-</span>
                     </div>
                     <div class="grid grid-cols-2 border-b border-neon-lightBorder dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-600 dark:text-zinc-400 font-medium">Durasi</span>
+                        <span class="text-zinc-700 dark:text-zinc-400 font-medium">Durasi</span>
                         <span id="detDurasi" class="font-bold text-zinc-900 dark:text-white text-right">-</span>
                     </div>
                     <div class="grid grid-cols-2 border-b border-neon-lightBorder dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-600 dark:text-zinc-400 font-medium">Tanggal Rilis</span>
+                        <span class="text-zinc-700 dark:text-zinc-400 font-medium">Tanggal Rilis</span>
                         <span id="detTanggalRilis" class="font-bold text-zinc-900 dark:text-white text-right">-</span>
                     </div>
                     <div class="grid grid-cols-2 py-3 px-4">
-                        <span class="text-zinc-600 dark:text-zinc-400 font-medium">Studio</span>
+                        <span class="text-zinc-700 dark:text-zinc-400 font-medium">Studio</span>
                         <span id="detStudio" class="font-bold text-zinc-900 dark:text-white text-right">-</span>
                     </div>
                 </div>
@@ -271,7 +271,7 @@
     </main>
 
     <!-- Footer -->
-    <footer class="border-t border-neon-lightBorder dark:border-neon-darkBorder py-6 mt-12 text-center text-xs text-zinc-600 dark:text-zinc-400">
+    <footer class="border-t border-neon-lightBorder dark:border-neon-darkBorder py-6 mt-12 text-center text-xs text-zinc-700 dark:text-zinc-400">
         <p>NimeDesu - Nonton Anime Sub Indonesia</p>
     </footer>
 
@@ -300,7 +300,6 @@
             else { header.classList.add('-translate-y-full'); }
         });
 
-        // GANTI DENGAN URL WEB SERVICE RENDER ANDA
         const RENDER_API_URL = "https://nimedesu.onrender.com";
 
         async function loadAnimeDatabase() {
@@ -355,7 +354,7 @@
                 displayAnimeWithPagination();
             } catch (error) {
                 console.error("Gagal memuat API server:", error);
-                document.getElementById('animeDisplayGrid').innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat data dari API server Render. Pastikan server aktif.</p>`;
+                document.getElementById('animeDisplayGrid').innerHTML = `<p class="text-zinc-700 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat data dari API server Render. Pastikan server aktif.</p>`;
             }
         }
 
@@ -434,7 +433,7 @@
             const paginationBox = document.getElementById('paginationBox');
             
             if(filteredData.length === 0) {
-                container.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Tidak ada anime ditemukan.</p>`;
+                container.innerHTML = `<p class="text-zinc-700 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Tidak ada anime ditemukan.</p>`;
                 paginationBox.innerHTML = '';
                 return;
             }
