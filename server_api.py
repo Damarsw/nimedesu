@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify
 from flask_cors import CORS
 import requests
 
@@ -13,14 +13,14 @@ SUPABASE_URLS = {
     "episode_baru": "https://yezdnsgypbjcgzoftgmz.supabase.co/storage/v1/object/public/database_anime/data_episode_baru.json"
 }
 
-# Cache agar tidak terus-menerus download file besar dari Supabase
+# Cache agar server cepat dan tidak terus-menerus mendownload file besar dari Supabase
 cache_data = {}
 
 def fetch_supabase_json(key):
     if key in cache_data:
         return cache_data[key]
     try:
-        response = requests.get(SUPABASE_URLS[key], timeout=20)
+        response = requests.get(SUPABASE_URLS[key], timeout=30)
         if response.status_code == 200:
             data = response.json()
             cache_data[key] = data
@@ -31,32 +31,11 @@ def fetch_supabase_json(key):
 
 @app.route("/")
 def home():
-    return "NimeDesu Fast API Server with Supabase is Active!"
+    return "NimeDesu Server API is Active!"
 
 @app.route("/api/anime", methods=["GET"])
 def api_anime():
-    db_type = request.args.get("db", "infozingle")
-    page = int(request.args.get("page", 1))
-    limit = int(request.args.get("limit", 12))
-    
-    data = fetch_supabase_json(db_type)
-    
-    if not isinstance(data, list):
-        return jsonify({"total": 0, "page": page, "total_pages": 0, "data": []})
-
-    total_data = len(data)
-    start = (page - 1) * limit
-    end = start + limit
-    
-    paginated_data = data[start:end]
-    
-    return jsonify({
-        "total": total_data,
-        "page": page,
-        "limit": limit,
-        "total_pages": (total_data + limit - 1) // limit,
-        "data": paginated_data
-    })
+    return jsonify(fetch_supabase_json("infozingle"))
 
 @app.route("/api/sinopsis", methods=["GET"])
 def api_sinopsis():
