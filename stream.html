@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Streaming - NimeDesu</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -12,59 +13,86 @@
                 extend: {
                     colors: {
                         neon: {
-                            lightBg: '#FFFAF0', lightCard: '#FFF78D', lightBorder: '#FFF78D',
-                            darkBg: '#0f0e0a', darkCard: '#1a1912', darkBorder: '#33311f',
-                            yellow: '#d99b00', yellowHover: '#b88200'
+                            lightBg: '#FFFAF0',        
+                            lightCard: '#FFF78D',      
+                            lightBorder: '#FFF78D',    
+                            darkBg: '#0f0e0a',         
+                            darkCard: '#1a1912',       
+                            darkBorder: '#33311f',     
+                            yellow: '#d99b00',         
+                            yellowHover: '#b88200'     
                         }
                     },
-                    boxShadow: { 'glow-yellow': '0 0 15px rgba(217, 155, 0, 0.4)' }
+                    boxShadow: {
+                        'glow-yellow': '0 0 15px rgba(217, 155, 0, 0.4), inset 0 0 5px rgba(217, 155, 0, 0.2)'
+                    }
                 }
             }
         }
     </script>
+    <!-- FontAwesome & Google Fonts -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style> body { font-family: 'Inter', sans-serif; } </style>
+    <style> 
+        body { font-family: 'Inter', sans-serif; -webkit-user-select: none; user-select: none; } 
+    </style>
 </head>
-<body class="bg-neon-lightBg text-zinc-900 dark:bg-neon-darkBg dark:text-white min-h-screen p-4 sm:p-8 flex flex-col">
+<body class="bg-neon-lightBg text-zinc-900 dark:bg-neon-darkBg dark:text-white transition-colors duration-300 min-h-screen flex flex-col p-4 sm:p-8">
 
-    <div class="max-w-4xl mx-auto w-full space-y-6">
-        <div>
-            <a href="javascript:window.close();" class="text-xs font-bold text-neon-yellow hover:underline"><i class="fa-solid fa-arrow-left"></i> Tutup Tab</a>
-            <h1 id="streamTitle" class="text-xl sm:text-2xl font-bold mt-2 border-l-4 border-neon-yellow pl-3">Memuat Streaming...</h1>
+    <div class="max-w-4xl mx-auto w-full space-y-6 flex-grow">
+        <!-- Header Nav Stream -->
+        <div class="flex items-center justify-between">
+            <button onclick="window.close()" class="p-2 rounded-full bg-transparent hover:bg-yellow-500/20 transition text-zinc-900 dark:text-neon-yellow flex items-center gap-2 text-xs font-semibold" title="Tutup Tab">
+                <i class="fa-solid fa-arrow-left text-sm"></i> Tutup Tab
+            </button>
+            <span class="text-xs text-zinc-700 dark:text-zinc-400">NimeDesu Streaming Room</span>
         </div>
 
-        <!-- Video Player -->
+        <div class="px-1 py-0">
+            <h1 id="streamTitle" class="text-xl sm:text-2xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-zinc-900 dark:text-white">Memuat Data Streaming...</h1>
+        </div>
+
+        <!-- Video Player Container -->
         <div class="bg-black rounded-xl overflow-hidden border border-neon-darkBorder shadow-2xl aspect-video relative flex items-center justify-center">
-            <iframe id="videoIframe" src="" class="w-full h-full border-0" allowfullscreen></iframe>
+            <iframe id="videoIframe" src="" class="w-full h-full border-0 select-none" allowfullscreen></iframe>
         </div>
 
-        <!-- Server Selector -->
+        <!-- Panel Utama Server (Expand) -->
         <div class="bg-neon-lightCard dark:bg-neon-darkCard p-4 rounded-xl border border-neon-lightBorder dark:border-neon-darkBorder space-y-3">
-            <div class="flex justify-between items-center cursor-pointer pb-2 border-b" onclick="toggleMainServerBox()">
+            <div class="flex justify-between items-center cursor-pointer select-none pb-2 border-b border-neon-lightBorder dark:border-neon-darkBorder" onclick="toggleMainServerBox()">
                 <div class="flex items-center gap-2">
                     <i class="fa-solid fa-server text-neon-yellow text-xs"></i>
-                    <span class="text-xs font-semibold">Pilih Server: <span id="currentServerLabel" class="font-bold">-</span></span>
+                    <span class="text-xs text-zinc-900 dark:text-white font-semibold">Pilih Server: <span id="currentServerLabel" class="text-black dark:text-white font-bold">-</span></span>
                 </div>
-                <i id="mainServerArrow" class="fa-solid fa-chevron-down text-xs transition-transform -rotate-90"></i>
+                <i id="mainServerArrow" class="fa-solid fa-chevron-down text-xs text-zinc-500 transition-transform duration-300 -rotate-90"></i>
             </div>
+
             <div id="mainServerContainer" class="space-y-3 pt-1 hidden"></div>
         </div>
 
-        <!-- Episode List -->
+        <!-- List Episode -->
         <div class="bg-neon-lightCard dark:bg-neon-darkCard p-4 rounded-xl border border-neon-lightBorder dark:border-neon-darkBorder space-y-3">
-            <div class="flex justify-between items-center cursor-pointer pb-2 border-b" onclick="toggleEpisodeBox()">
+            <div class="flex justify-between items-center cursor-pointer select-none pb-2 border-b border-neon-lightBorder dark:border-neon-darkBorder" onclick="toggleEpisodeBox()">
                 <div class="flex items-center gap-2">
                     <i class="fa-solid fa-list text-neon-yellow text-xs"></i>
-                    <span class="text-xs font-semibold" id="episodeBoxLabel">Daftar Episode</span>
+                    <span class="text-xs text-zinc-900 dark:text-white font-semibold" id="episodeBoxLabel">Daftar Episode</span>
                 </div>
-                <i id="episodeBoxArrow" class="fa-solid fa-chevron-down text-xs transition-transform"></i>
+                <i id="episodeBoxArrow" class="fa-solid fa-chevron-down text-xs text-zinc-500 transition-transform duration-300"></i>
             </div>
+
             <div id="episodeBoxContainer" class="flex gap-2 flex-wrap pt-1"></div>
         </div>
     </div>
 
+    <!-- Footer -->
+    <footer class="border-t border-neon-lightBorder dark:border-neon-darkBorder py-6 mt-12 text-center text-xs text-zinc-700 dark:text-zinc-400">
+        <p>NimeDesu - Nonton Anime Sub Indonesia</p>
+    </footer>
+
+    <!-- SCRIPT STREAMING MANDIRI -->
     <script>
+        document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+        
         const RENDER_API_URL = "https://nimedesu.onrender.com";
         let activeEpisodes = [];
         let activeEpisodeIndex = 0;
@@ -84,29 +112,36 @@
 
                 if (data && data.episodes && data.episodes.length > 0) {
                     activeEpisodes = data.episodes;
-                    document.getElementById('streamTitle').innerText = `Nonton Streaming`;
+                    document.getElementById('streamTitle').innerText = `Streaming Room`;
                     renderDynamicEpisodes();
                 } else {
-                    document.getElementById('streamTitle').innerText = "Data Episode Tidak Tersedia di Server.";
+                    document.getElementById('streamTitle').innerText = "Data Episode Tidak Tersedia.";
                 }
-            } catch (e) {
-                console.error(e);
-                document.getElementById('streamTitle').innerText = "Gagal Menghubungkan ke Server API.";
+            } catch (error) {
+                console.error("Gagal memuat detail streaming:", error);
+                document.getElementById('streamTitle').innerText = "Gagal memuat server streaming.";
             }
         }
 
         function renderDynamicEpisodes() {
             const container = document.getElementById('episodeBoxContainer');
             const label = document.getElementById('episodeBoxLabel');
-            label.innerText = `Daftar Episode (${activeEpisodes.length})`;
+
+            if(!activeEpisodes || activeEpisodes.length === 0) {
+                container.innerHTML = '<p class="text-xs text-zinc-500">Tidak ada episode tersedia.</p>';
+                if(label) label.innerText = "Daftar Episode (0)";
+                return;
+            }
+
+            if(label) label.innerText = `Daftar Episode (${activeEpisodes.length})`;
 
             container.innerHTML = activeEpisodes.map((ep, index) => {
-                const activeClass = index === activeEpisodeIndex ? 'bg-neon-yellow text-white font-bold shadow-glow-yellow' : 'bg-neon-lightBg dark:bg-neon-darkBg border hover:border-neon-yellow';
+                const activeClass = index === activeEpisodeIndex ? 'bg-neon-yellow text-white font-bold shadow-glow-yellow' : 'bg-neon-lightBg dark:bg-neon-darkBg text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow';
                 const epLabel = ep.episode_title ? ep.episode_title.replace(/Sub.*$/, '').trim() : `Eps ${index + 1}`;
                 return `<button onclick='selectEpisode(${index})' class="episode-btn ${activeClass} px-3 py-1.5 rounded-lg text-xs font-semibold transition">${epLabel}</button>`;
             }).join('');
 
-            if (activeEpisodes[activeEpisodeIndex] && activeEpisodes[activeEpisodeIndex].video_servers) {
+            if(activeEpisodes[activeEpisodeIndex] && activeEpisodes[activeEpisodeIndex].video_servers) {
                 renderDynamicServers(activeEpisodes[activeEpisodeIndex].video_servers);
             }
         }
@@ -120,6 +155,8 @@
             const mainContainer = document.getElementById('mainServerContainer');
             if (!servers || servers.length === 0) {
                 mainContainer.innerHTML = '<p class="text-xs text-zinc-500 p-2">Server tidak ditemukan.</p>';
+                document.getElementById('currentServerLabel').innerText = "Tidak ada";
+                document.getElementById('videoIframe').src = "";
                 return;
             }
 
@@ -136,55 +173,94 @@
             for(const [resText, srvList] of Object.entries(grouped)) {
                 const groupId = 'group' + resText.replace(/[^a-zA-Z0-9]/g, '');
                 htmlContent += `
-                    <div class="rounded-lg bg-neon-lightBg dark:bg-neon-darkBg border overflow-hidden">
-                        <div class="flex justify-between items-center px-3 py-2.5 cursor-pointer text-xs font-semibold" onclick="toggleSubserverGroup('${groupId}')">
-                            <span><i class="fa-solid fa-video text-neon-yellow text-[10px]"></i> ${resText}</span>
-                            <i id="arrow${groupId}" class="fa-solid fa-chevron-down text-[10px] text-zinc-500 transition-transform"></i>
+                    <div class="rounded-lg bg-neon-lightBg dark:bg-neon-darkBg border border-neon-lightBorder dark:border-neon-darkBorder overflow-hidden">
+                        <div class="flex justify-between items-center px-3 py-2.5 cursor-pointer text-xs font-semibold select-none" onclick="toggleSubserverGroup('${groupId}')">
+                            <span class="flex items-center gap-2"><i class="fa-solid fa-video text-neon-yellow text-[10px]"></i> ${resText}</span>
+                            <i id="arrow${groupId}" class="fa-solid fa-chevron-down text-[10px] text-zinc-500 transition-transform duration-300"></i>
                         </div>
-                        <div id="${groupId}" class="hidden px-3 pb-2.5 pt-1 space-y-1.5 border-t">
+                        <div id="${groupId}" class="hidden px-3 pb-2.5 pt-1 space-y-1.5 border-t border-neon-lightBorder dark:border-neon-darkBorder">
                 `;
 
                 srvList.forEach(srv => {
+                    let qualityBadge = "SD";
+                    let resLower = srv.resolution.toLowerCase();
+                    if (resLower.includes('720')) qualityBadge = "HD";
+                    else if (resLower.includes('1080')) qualityBadge = "FHD";
+
                     htmlContent += `
-                        <button onclick="selectServer(this, '${srv.resolution}', '${srv.server}', '${srv.video_url}')" class="server-btn w-full text-left px-3 py-1.5 rounded text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center">
+                        <button onclick="selectServer(this, '${srv.resolution}', '${srv.server}', '${srv.video_url}')" class="server-btn w-full text-left px-3 py-1.5 rounded text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-zinc-900 dark:text-white">
                             <span>${srv.resolution} (${srv.server})</span>
+                            <span class="text-[9px] opacity-75">${qualityBadge}</span>
                         </button>
                     `;
+
                     if(isFirst) {
                         setTimeout(() => selectServer(null, srv.resolution, srv.server, srv.video_url), 100);
                         isFirst = false;
                     }
                 });
+
                 htmlContent += `</div></div>`;
             }
             mainContainer.innerHTML = htmlContent;
         }
 
+        function toggleMainServerBox() {
+            const container = document.getElementById('mainServerContainer');
+            const arrow = document.getElementById('mainServerArrow');
+            if(container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                arrow.style.transform = 'rotate(0deg)';
+            } else {
+                container.classList.add('hidden');
+                arrow.style.transform = 'rotate(-90deg)';
+            }
+        }
+
+        function toggleSubserverGroup(groupId) {
+            const group = document.getElementById(groupId);
+            const arrow = document.getElementById('arrow' + groupId);
+            if(group.classList.contains('hidden')) {
+                group.classList.remove('hidden');
+                arrow.style.transform = 'rotate(180deg)';
+            } else {
+                group.classList.add('hidden');
+                arrow.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        function toggleEpisodeBox() {
+            const container = document.getElementById('episodeBoxContainer');
+            const arrow = document.getElementById('episodeBoxArrow');
+            if(container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                arrow.style.transform = 'rotate(0deg)';
+            } else {
+                container.classList.add('hidden');
+                arrow.style.transform = 'rotate(-90deg)';
+            }
+        }
+
         function selectServer(element, resolution, serverNum, videoUrl) {
             document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
             document.querySelectorAll('.server-btn').forEach(btn => {
-                btn.className = "server-btn w-full text-left px-3 py-1.5 rounded text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center";
+                btn.className = "server-btn w-full text-left px-3 py-1.5 rounded text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-zinc-900 dark:text-white";
             });
-            if(element) { element.className = "server-btn w-full text-left px-3 py-1.5 rounded text-xs bg-neon-yellow text-white font-bold transition flex justify-between items-center"; }
+            if(element) {
+                element.className = "server-btn w-full text-left px-3 py-1.5 rounded text-xs bg-neon-yellow text-white font-bold shadow-glow-yellow transition flex justify-between items-center";
+            }
             document.getElementById('mainServerContainer').classList.add('hidden');
             document.getElementById('mainServerArrow').style.transform = 'rotate(-90deg)';
-            document.getElementById('videoIframe').src = videoUrl;
+
+            const iframe = document.getElementById('videoIframe');
+            if (videoUrl) {
+                iframe.src = videoUrl;
+            }
         }
 
-        function toggleMainServerBox() {
-            const c = document.getElementById('mainServerContainer');
-            const a = document.getElementById('mainServerArrow');
-            c.classList.toggle('hidden');
-            a.style.transform = c.classList.contains('hidden') ? 'rotate(-90deg)' : 'rotate(0deg)';
-        }
-        function toggleSubserverGroup(id) {
-            document.getElementById(id).classList.toggle('hidden');
-        }
-        function toggleEpisodeBox() {
-            document.getElementById('episodeBoxContainer').classList.toggle('hidden');
-        }
-
-        window.onload = () => { initStream(); };
+        window.onload = function() {
+            initStream();
+        };
     </script>
 </body>
 </html>
