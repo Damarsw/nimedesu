@@ -36,6 +36,16 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style> 
         body { font-family: 'Inter', sans-serif; -webkit-user-select: none; user-select: none; } 
+        .poster-hover-container .play-overlay {
+            opacity: 0;
+            transition: opacity 0.6s ease-in-out;
+        }
+        .poster-hover-container:hover .play-overlay {
+            opacity: 1;
+        }
+        .poster-hover-container:hover img {
+            transform: scale(1.08);
+        }
     </style>
 </head>
 <body class="bg-neon-lightBg text-zinc-900 dark:bg-neon-darkBg dark:text-white transition-colors duration-300 min-h-screen flex flex-col">
@@ -79,7 +89,7 @@
             <div id="searchSuggestions" class="hidden absolute left-1/2 -translate-x-1/2 mt-2 w-full max-w-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-h-80 overflow-y-auto p-2 z-50"></div>
         </div>
 
-       <!-- Judul & Tombol Navigasi Sejajar -->
+        <!-- Judul & Tombol Navigasi Sejajar di Kanan -->
         <div class="px-1 py-0 mb-2 flex items-center justify-between flex-wrap gap-3">
             <h1 id="streamTitle" class="text-xl sm:text-2xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-zinc-900 dark:text-white">Memuat Data Streaming...</h1>
             
@@ -125,6 +135,14 @@
             <div id="episodeBoxContainer" class="flex gap-2 flex-wrap pt-1"></div>
         </div>
 
+        <!-- FITUR REKOMENDASI ANIME BERDASARKAN GENRE -->
+        <div class="space-y-4 pt-6 border-t border-neon-lightBorder dark:border-neon-darkBorder">
+            <h3 class="text-base font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-zinc-900 dark:text-white">Rekomendasi Anime Serupa</h3>
+            <div id="recommendationGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                <p class="text-xs text-zinc-500 col-span-full">Memuat rekomendasi...</p>
+            </div>
+        </div>
+
     </main>
 
     <!-- Footer -->
@@ -132,7 +150,7 @@
         <p>NimeDesu - Nonton Anime Sub Indonesia</p>
     </footer>
 
-    <!-- SCRIPT STREAMING MANDIRI & LIVE SEARCH -->
+    <!-- SCRIPT STREAMING MANDIRI & REKOMENDASI -->
     <script>
         document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
         
@@ -231,6 +249,11 @@
             }
 
             try {
+                // Ambil daftar info anime lengkap untuk mencocokkan genre & rekomendasi
+                if(allAnimeList.length === 0) {
+                    await fetchAllAnimeForSearch();
+                }
+
                 const response = await fetch(`${RENDER_API_URL}/api/anime-detail?url=${encodeURIComponent(animeUrl)}`);
                 const data = await response.json();
 
@@ -244,6 +267,12 @@
                     
                     document.getElementById('episodeNavContainer').classList.remove('hidden');
                     renderDynamicEpisodes();
+
+                    // Cari data anime saat ini di list umum untuk mendapatkan genrenya
+                    const currentAnimeInfo = allAnimeList.find(a => (a.url && a.url.trim() === animeUrl));
+                    if (currentAnimeInfo) {
+                        renderRecommendations(currentAnimeInfo);
+                    }
                 } else {
                     document.getElementById('streamTitle').innerText = "Data Episode Tidak Tersedia.";
                 }
@@ -251,6 +280,57 @@
                 console.error("Gagal memuat detail streaming:", error);
                 document.getElementById('streamTitle').innerText = "Gagal memuat server streaming.";
             }
+        }
+
+        // Fungsi Menampilkan Rekomendasi Berdasarkan Genre yang Sama
+        function renderRecommendations(currentAnime) {
+            const recGrid = document.getElementById('recommendationGrid');
+            if (!currentAnime.Genre) {
+                recGrid.innerHTML = '<p class="text-xs text-zinc-500 col-span-full">Tidak ada rekomendasi tersedia.</p>';
+                return;
+            }
+
+            const currentGenres = currentAnime.Genre.split(',').map(g => g.trim().toLowerCase());
+            
+            // Filter anime lain yang memiliki genre beririsan (dan bukan anime yang sedang diputar)
+            const recommendations = allAnimeList.filter(a => {
+                const aUrl = a.url ? a.url.trim() : "";
+                const currentUrl = currentAnime.url ? currentAnime.url.trim() : "";
+                if (aUrl === currentUrl || !a.Genre) return false;
+
+                const aGenres = a.Genre.split(',').map(g => g.trim().toLowerCase());
+                // Cek apakah ada minimal 1 genre yang sama
+                return currentGenres.some(g => aGenres.includes(g));
+            }).slice(0, 4); // Ambil maksimal 4 rekomendasi
+
+            if (recommendations.length === 0) {
+                recGrid.innerHTML = '<p class="text-xs text-zinc-500 col-span-full">Tidak ada anime serupa ditemukan.</p>';
+                return;
+            }
+
+            recGrid.innerHTML = recommendations.map(rec => {
+                const title = rec.title || rec.Judul || "Tanpa Judul";
+                const thumb = rec.image_url || rec.thumbnail || "https://placehold.co/300x400?text=No+Image";
+                const recUrl = rec.url ? rec.url.trim() : "";
+                const status = rec.Status || "Ongoing";
+
+                return `
+                    <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="window.location.href='stream.html?url=${encodeURIComponent(recUrl)}'">
+                        <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
+                            <img src="${thumb}" alt="${title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
+                            <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
+                                <div class="w-10 h-10 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
+                                    <i class="fa-solid fa-play text-xs"></i>
+                                </div>
+                            </div>
+                            <span class="absolute top-2 left-2 bg-black/75 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${status}</span>
+                        </div>
+                        <div class="p-2.5">
+                            <h4 class="font-semibold text-xs line-clamp-2 text-zinc-900 dark:text-white">${title}</h4>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
         function renderDynamicEpisodes() {
@@ -265,7 +345,6 @@
 
             if(label) label.innerText = `Daftar Episode (${activeEpisodes.length})`;
 
-            // Update Judul Utama dan status tombol Previous / Next
             const currentEp = activeEpisodes[activeEpisodeIndex];
             const epTitle = currentEp && currentEp.episode_title ? currentEp.episode_title.replace(/Sub.*$/, '').trim() : `Episode ${activeEpisodeIndex + 1}`;
             document.getElementById('streamTitle').innerText = `Nonton ${globalAnimeTitle} (${epTitle})`;
