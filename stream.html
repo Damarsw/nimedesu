@@ -79,8 +79,17 @@
             <div id="searchSuggestions" class="hidden absolute left-1/2 -translate-x-1/2 mt-2 w-full max-w-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-h-80 overflow-y-auto p-2 z-50"></div>
         </div>
 
-        <div class="px-1 py-0 mb-2">
+        <div class="px-1 py-0 space-y-2 mb-2">
             <h1 id="streamTitle" class="text-xl sm:text-2xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-zinc-900 dark:text-white">Memuat Data Streaming...</h1>
+            <!-- Tombol Navigasi Previous & Next Episode -->
+            <div id="episodeNavContainer" class="flex items-center gap-2 pl-4 hidden">
+                <button id="prevEpBtn" onclick="changeEpisodeRelative(-1)" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-neon-lightCard dark:bg-neon-darkCard border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrow-left text-[10px]"></i> Previous
+                </button>
+                <button id="nextEpBtn" onclick="changeEpisodeRelative(1)" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-neon-lightCard dark:bg-neon-darkCard border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition flex items-center gap-1.5">
+                    Next <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                </button>
+            </div>
         </div>
 
         <!-- Video Player Container -->
@@ -128,6 +137,7 @@
         const RENDER_API_URL = "https://nimedesu.onrender.com";
         let activeEpisodes = [];
         let activeEpisodeIndex = 0;
+        let globalAnimeTitle = "Anime";
         let allAnimeList = [];
 
         function toggleSearchInput(event) {
@@ -151,7 +161,6 @@
             } catch (e) { console.error(e); }
         }
 
-        // Live Search menampilkan poster, judul, dan genre (tanpa status ongoing/completed)
         function liveSearchAnime() {
             const query = document.getElementById('searchField').value.trim().toLowerCase();
             const suggestionsBox = document.getElementById('searchSuggestions');
@@ -225,12 +234,13 @@
 
                 if (data && data.episodes && data.episodes.length > 0) {
                     activeEpisodes = data.episodes;
-                    let animeTitle = data.title || data.Judul;
-                    if (!animeTitle) {
+                    globalAnimeTitle = data.title || data.Judul;
+                    if (!globalAnimeTitle) {
                         const segments = animeUrl.split('/').filter(Boolean);
-                        animeTitle = segments[segments.length - 1].replace(/-/g, ' ');
+                        globalAnimeTitle = segments[segments.length - 1].replace(/-/g, ' ');
                     }
-                    document.getElementById('streamTitle').innerText = `Nonton ${animeTitle}`;
+                    
+                    document.getElementById('episodeNavContainer').classList.remove('hidden');
                     renderDynamicEpisodes();
                 } else {
                     document.getElementById('streamTitle').innerText = "Data Episode Tidak Tersedia.";
@@ -253,6 +263,16 @@
 
             if(label) label.innerText = `Daftar Episode (${activeEpisodes.length})`;
 
+            // Update Judul Utama dan status tombol Previous / Next
+            const currentEp = activeEpisodes[activeEpisodeIndex];
+            const epTitle = currentEp && currentEp.episode_title ? currentEp.episode_title.replace(/Sub.*$/, '').trim() : `Episode ${activeEpisodeIndex + 1}`;
+            document.getElementById('streamTitle').innerText = `Nonton ${globalAnimeTitle} (${epTitle})`;
+
+            document.getElementById('prevEpBtn').disabled = activeEpisodeIndex <= 0;
+            document.getElementById('prevEpBtn').style.opacity = activeEpisodeIndex <= 0 ? '0.5' : '1';
+            document.getElementById('nextEpBtn').disabled = activeEpisodeIndex >= activeEpisodes.length - 1;
+            document.getElementById('nextEpBtn').style.opacity = activeEpisodeIndex >= activeEpisodes.length - 1 ? '0.5' : '1';
+
             container.innerHTML = activeEpisodes.map((ep, index) => {
                 const activeClass = index === activeEpisodeIndex ? 'bg-neon-yellow text-white font-bold shadow-glow-yellow' : 'bg-neon-lightBg dark:bg-neon-darkBg text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow';
                 const epLabel = ep.episode_title ? ep.episode_title.replace(/Sub.*$/, '').trim() : `Eps ${index + 1}`;
@@ -267,6 +287,14 @@
         function selectEpisode(index) {
             activeEpisodeIndex = index;
             renderDynamicEpisodes();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function changeEpisodeRelative(direction) {
+            const newIndex = activeEpisodeIndex + direction;
+            if (newIndex >= 0 && newIndex < activeEpisodes.length) {
+                selectEpisode(newIndex);
+            }
         }
 
         function renderDynamicServers(servers) {
