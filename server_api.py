@@ -5,13 +5,12 @@ import requests
 app = Flask(__name__)
 CORS(app)
 
-# Daftar Public URL JSON dari Supabase Anda
+# Public URL dari Supabase Storage Anda
 SUPABASE_URLS = {
-    "anime_final": "https://yezdnsgypbjcgzoftgmz.supabase.co/storage/v1/object/public/database_anime/data_anime_final.json",
+    "infozingle": "https://yezdnsgypbjcgzoftgmz.supabase.co/storage/v1/object/public/database_anime/otakudesu_infozingle.json",
     "sinopsis": "https://yezdnsgypbjcgzoftgmz.supabase.co/storage/v1/object/public/database_anime/data_anime_sinopsis.json",
     "super_lengkap": "https://yezdnsgypbjcgzoftgmz.supabase.co/storage/v1/object/public/database_anime/data_anime_super_lengkap.json",
-    "episode_baru": "https://yezdnsgypbjcgzoftgmz.supabase.co/storage/v1/object/public/database_anime/data_episode_baru.json",
-    "infozingle": "https://yezdnsgypbjcgzoftgmz.supabase.co/storage/v1/object/public/database_anime/otakudesu_infozingle.json"
+    "episode_baru": "https://yezdnsgypbjcgzoftgmz.supabase.co/storage/v1/object/public/database_anime/data_episode_baru.json"
 }
 
 def fetch_supabase_json(key):
