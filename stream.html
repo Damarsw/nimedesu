@@ -46,6 +46,14 @@
         .poster-hover-container:hover img {
             transform: scale(1.08);
         }
+        /* Menyembunyikan scrollbar namun tetap bisa digeser */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
     </style>
 </head>
 <body class="bg-neon-lightBg text-zinc-900 dark:bg-neon-darkBg dark:text-white transition-colors duration-300 min-h-screen flex flex-col">
@@ -57,10 +65,6 @@
                 <div class="flex items-center space-x-3 cursor-pointer group ml-1" onclick="window.location.href='index.html'">
                     <span class="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-neon-yellow">NimeDesu</span>
                 </div>
-            </div>
-
-            <div class="hidden md:flex items-center space-x-6 text-sm font-medium">
-                <span class="text-xs text-zinc-700 dark:text-zinc-300">Ruang Streaming</span>
             </div>
 
             <div class="flex items-center space-x-2">
@@ -89,7 +93,7 @@
             <div id="searchSuggestions" class="hidden absolute left-1/2 -translate-x-1/2 mt-2 w-full max-w-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-h-80 overflow-y-auto p-2 z-50"></div>
         </div>
 
-        <!-- Judul & Tombol Navigasi Sejajar di Kanan -->
+        <!-- Judul & Tombol Navigasi Sejajar -->
         <div class="px-1 py-0 mb-2 flex items-center justify-between flex-wrap gap-3">
             <h1 id="streamTitle" class="text-xl sm:text-2xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-zinc-900 dark:text-white">Memuat Data Streaming...</h1>
             
@@ -135,11 +139,19 @@
             <div id="episodeBoxContainer" class="flex gap-2 flex-wrap pt-1"></div>
         </div>
 
-        <!-- FITUR REKOMENDASI ANIME BERDASARKAN GENRE -->
+        <!-- FITUR REKOMENDASI ANIME SLIDER (BISA DIGESER KANAN KIRI) -->
         <div class="space-y-4 pt-6 border-t border-neon-lightBorder dark:border-neon-darkBorder">
-            <h3 class="text-base font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-zinc-900 dark:text-white">Rekomendasi Anime Serupa</h3>
-            <div id="recommendationGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                <p class="text-xs text-zinc-500 col-span-full">Memuat rekomendasi...</p>
+            <div class="flex items-center justify-between">
+                <h3 class="text-base font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-zinc-900 dark:text-white">Rekomendasi Anime Serupa</h3>
+                <div class="flex gap-1.5">
+                    <button onclick="scrollSlider(-1)" class="w-8 h-8 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow flex items-center justify-center text-xs transition"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button onclick="scrollSlider(1)" class="w-8 h-8 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow flex items-center justify-center text-xs transition"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+            </div>
+            
+            <!-- Container Slider Geser -->
+            <div id="recommendationSlider" class="flex gap-4 overflow-x-auto no-scrollbar scroll-smooth pb-2 pt-1">
+                <p class="text-xs text-zinc-500">Memuat rekomendasi...</p>
             </div>
         </div>
 
@@ -150,7 +162,7 @@
         <p>NimeDesu - Nonton Anime Sub Indonesia</p>
     </footer>
 
-    <!-- SCRIPT STREAMING MANDIRI & REKOMENDASI -->
+    <!-- SCRIPT STREAMING MANDIRI & REKOMENDASI SLIDER -->
     <script>
         document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
         
@@ -249,7 +261,6 @@
             }
 
             try {
-                // Ambil daftar info anime lengkap untuk mencocokkan genre & rekomendasi
                 if(allAnimeList.length === 0) {
                     await fetchAllAnimeForSearch();
                 }
@@ -268,7 +279,6 @@
                     document.getElementById('episodeNavContainer').classList.remove('hidden');
                     renderDynamicEpisodes();
 
-                    // Cari data anime saat ini di list umum untuk mendapatkan genrenya
                     const currentAnimeInfo = allAnimeList.find(a => (a.url && a.url.trim() === animeUrl));
                     if (currentAnimeInfo) {
                         renderRecommendations(currentAnimeInfo);
@@ -282,40 +292,45 @@
             }
         }
 
-        // Fungsi Menampilkan Rekomendasi Berdasarkan Genre yang Sama
+        // Fungsi Slider Scroll Kanan Kiri
+        function scrollSlider(direction) {
+            const slider = document.getElementById('recommendationSlider');
+            const scrollAmount = 220; // Ukuran lebar card + gap
+            slider.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
+        }
+
+        // Render Rekomendasi dengan Status Menyesuaikan Tema Gelap/Terang
         function renderRecommendations(currentAnime) {
-            const recGrid = document.getElementById('recommendationGrid');
+            const recSlider = document.getElementById('recommendationSlider');
             if (!currentAnime.Genre) {
-                recGrid.innerHTML = '<p class="text-xs text-zinc-500 col-span-full">Tidak ada rekomendasi tersedia.</p>';
+                recSlider.innerHTML = '<p class="text-xs text-zinc-500">Tidak ada rekomendasi tersedia.</p>';
                 return;
             }
 
             const currentGenres = currentAnime.Genre.split(',').map(g => g.trim().toLowerCase());
             
-            // Filter anime lain yang memiliki genre beririsan (dan bukan anime yang sedang diputar)
             const recommendations = allAnimeList.filter(a => {
                 const aUrl = a.url ? a.url.trim() : "";
                 const currentUrl = currentAnime.url ? currentAnime.url.trim() : "";
                 if (aUrl === currentUrl || !a.Genre) return false;
 
                 const aGenres = a.Genre.split(',').map(g => g.trim().toLowerCase());
-                // Cek apakah ada minimal 1 genre yang sama
                 return currentGenres.some(g => aGenres.includes(g));
-            }).slice(0, 4); // Ambil maksimal 4 rekomendasi
+            }).slice(0, 10); // Menampilkan hingga 10 item untuk digeser
 
             if (recommendations.length === 0) {
-                recGrid.innerHTML = '<p class="text-xs text-zinc-500 col-span-full">Tidak ada anime serupa ditemukan.</p>';
+                recSlider.innerHTML = '<p class="text-xs text-zinc-500">Tidak ada anime serupa ditemukan.</p>';
                 return;
             }
 
-            recGrid.innerHTML = recommendations.map(rec => {
+            recSlider.innerHTML = recommendations.map(rec => {
                 const title = rec.title || rec.Judul || "Tanpa Judul";
                 const thumb = rec.image_url || rec.thumbnail || "https://placehold.co/300x400?text=No+Image";
                 const recUrl = rec.url ? rec.url.trim() : "";
                 const status = rec.Status || "Ongoing";
 
                 return `
-                    <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="window.location.href='stream.html?url=${encodeURIComponent(recUrl)}'">
+                    <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?url=${encodeURIComponent(recUrl)}'">
                         <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
                             <img src="${thumb}" alt="${title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
                             <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
@@ -323,7 +338,8 @@
                                     <i class="fa-solid fa-play text-xs"></i>
                                 </div>
                             </div>
-                            <span class="absolute top-2 left-2 bg-black/75 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${status}</span>
+                            <!-- Status badge menyesuaikan tema terang/gelap (Teks putih di mode terang/gelap agar kontras atau hitam di mode terang) -->
+                            <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${status}</span>
                         </div>
                         <div class="p-2.5">
                             <h4 class="font-semibold text-xs line-clamp-2 text-zinc-900 dark:text-white">${title}</h4>
