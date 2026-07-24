@@ -40,7 +40,7 @@
 </head>
 <body class="bg-neon-lightBg text-zinc-900 dark:bg-neon-darkBg dark:text-white transition-colors duration-300 min-h-screen flex flex-col">
 
-    <!-- Header / Navbar (Tanpa Tombol Undo/Kembali) -->
+    <!-- Header / Navbar (Hanya Tombol Back yang Dihapus) -->
     <header id="mainHeader" class="fixed top-0 left-0 right-0 z-50 bg-[#FFF78D]/90 dark:bg-[#14130e]/90 backdrop-blur-md border-b border-neon-lightBorder dark:border-neon-darkBorder shadow-md dark:shadow-[0_4px_20px_rgba(217,155,0,0.15)] transition-transform duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-1 sm:space-x-2">
@@ -55,6 +55,10 @@
             </div>
 
             <div class="flex items-center space-x-2">
+                <!-- TOMBOL SEARCH KEMBALI DISEDIAKAN -->
+                <button id="btnSearchToggle" onclick="toggleSearchInput()" class="p-2.5 rounded-full bg-transparent hover:bg-yellow-500/20 transition text-zinc-900 dark:text-neon-yellow" title="Cari Anime">
+                    <i class="fa-solid fa-magnifying-glass text-sm"></i>
+                </button>
                 <button onclick="toggleTheme()" class="p-2.5 rounded-full bg-transparent hover:bg-yellow-500/20 transition text-zinc-900 dark:text-neon-yellow" title="Ganti Tema">
                     <i id="themeIcon" class="fa-solid fa-moon text-sm"></i>
                 </button>
@@ -64,6 +68,16 @@
 
     <!-- Main Content Container -->
     <main class="flex-grow max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full mt-16 space-y-6">
+
+        <!-- KOTAK PENCARIAN GLOBAL -->
+        <div id="searchContainer" class="hidden mb-8 transition-all duration-300">
+            <div class="relative max-w-xl mx-auto flex items-center bg-[#f0e66e] dark:bg-neon-darkCard rounded-full border-2 border-neon-yellow shadow-glow-yellow overflow-hidden">
+                <input type="text" id="searchField" placeholder="Ketik nama anime disini" onkeypress="if(event.key === 'Enter') searchAnime()" class="w-full bg-transparent text-sm pl-6 pr-4 py-3.5 focus:outline-none placeholder:text-zinc-700 dark:placeholder:text-zinc-400 font-medium text-zinc-900 dark:text-white">
+                <button onclick="searchAnime()" class="bg-neon-yellow dark:bg-neon-yellow hover:bg-yellow-600 px-6 py-3.5 h-full flex items-center justify-center text-white dark:text-black transition">
+                    <i class="fa-solid fa-magnifying-glass text-sm"></i>
+                </button>
+            </div>
+        </div>
 
         <div class="px-1 py-0 mb-2">
             <h1 id="streamTitle" class="text-xl sm:text-2xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-zinc-900 dark:text-white">Memuat Data Streaming...</h1>
@@ -115,6 +129,28 @@
         let activeEpisodes = [];
         let activeEpisodeIndex = 0;
 
+        function toggleSearchInput() {
+            const container = document.getElementById('searchContainer');
+            const field = document.getElementById('searchField');
+            if (container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                field.focus();
+            } else {
+                if (field.value.trim() === "") { container.classList.add('hidden'); }
+                else {
+                    field.value = "";
+                    container.classList.add('hidden');
+                }
+            }
+        }
+
+        function searchAnime() {
+            const query = document.getElementById('searchField').value.trim();
+            if (query) {
+                window.location.href = `index.html?q=${encodeURIComponent(query)}`;
+            }
+        }
+
         async function initStream() {
             const urlParams = new URLSearchParams(window.location.search);
             const animeUrl = urlParams.get('url');
@@ -130,7 +166,6 @@
 
                 if (data && data.episodes && data.episodes.length > 0) {
                     activeEpisodes = data.episodes;
-                    // Mengambil judul anime dari data atau mengambil nama dari URL
                     let animeTitle = data.title || data.Judul;
                     if (!animeTitle) {
                         const segments = animeUrl.split('/').filter(Boolean);
