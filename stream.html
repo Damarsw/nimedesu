@@ -67,6 +67,10 @@
                 </div>
             </div>
 
+            <div class="hidden md:flex items-center space-x-6 text-sm font-medium">
+                <span class="text-xs text-zinc-700 dark:text-zinc-300">Ruang Streaming</span>
+            </div>
+
             <div class="flex items-center space-x-2">
                 <button id="btnSearchToggle" onclick="toggleSearchInput(event)" class="p-2.5 rounded-full bg-transparent hover:bg-yellow-500/20 transition text-zinc-900 dark:text-neon-yellow" title="Cari Anime">
                     <i class="fa-solid fa-magnifying-glass text-sm"></i>
@@ -81,7 +85,7 @@
     <!-- Main Content Container -->
     <main class="flex-grow max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full mt-16 space-y-6">
 
-        <!-- KOTAK PENCARIAN GLOBAL -->
+        <!-- KOTAK PENCARIAN GLOBAL DENGAN LIVE SEARCH -->
         <div id="searchContainer" class="hidden relative mb-8 transition-all duration-300 z-50">
             <div id="searchBoxWrapper" class="relative max-w-xl mx-auto flex items-center bg-white dark:bg-zinc-900 rounded-full border-2 border-neon-yellow shadow-glow-yellow overflow-hidden">
                 <input type="text" id="searchField" placeholder="Ketik nama anime disini" oninput="liveSearchAnime()" onkeypress="if(event.key === 'Enter') executeSearch()" class="w-full bg-transparent text-sm pl-6 pr-4 py-3.5 focus:outline-none placeholder:text-zinc-500 font-medium text-zinc-900 dark:text-white">
@@ -93,7 +97,7 @@
             <div id="searchSuggestions" class="hidden absolute left-1/2 -translate-x-1/2 mt-2 w-full max-w-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-h-80 overflow-y-auto p-2 z-50"></div>
         </div>
 
-        <!-- Judul & Tombol Navigasi Sejajar -->
+        <!-- Judul & Tombol Navigasi Sejajar di Kanan -->
         <div class="px-1 py-0 mb-2 flex items-center justify-between flex-wrap gap-3">
             <h1 id="streamTitle" class="text-xl sm:text-2xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-zinc-900 dark:text-white">Memuat Data Streaming...</h1>
             
@@ -218,7 +222,7 @@
                 const genres = anime.Genre ? anime.Genre.split(',').map(g => g.trim()).join(', ') : '-';
                 
                 return `
-                    <div onclick="window.location.href='stream.html?url=${encodeURIComponent(animeUrl)}'" class="flex items-center gap-3 p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer transition">
+                    <div onclick="window.location.href='stream.html?url=${encodeURIComponent(animeUrl)}&eps=0'" class="flex items-center gap-3 p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer transition">
                         <img src="${thumb}" class="w-10 h-14 object-cover rounded-lg shrink-0">
                         <div class="overflow-hidden">
                             <h4 class="text-xs font-semibold text-zinc-900 dark:text-white truncate">${title}</h4>
@@ -254,6 +258,7 @@
         async function initStream() {
             const urlParams = new URLSearchParams(window.location.search);
             const animeUrl = urlParams.get('url');
+            const targetEps = parseInt(urlParams.get('eps')) || 0; // Mengambil target episode (default 0/terkecil)
 
             if (!animeUrl) {
                 document.getElementById('streamTitle').innerText = "URL Anime Tidak Ditemukan!";
@@ -270,6 +275,10 @@
 
                 if (data && data.episodes && data.episodes.length > 0) {
                     activeEpisodes = data.episodes;
+                    
+                    // Menyesuaikan index episode awal sesuai parameter url (eps)
+                    activeEpisodeIndex = (targetEps >= 0 && targetEps < activeEpisodes.length) ? targetEps : 0;
+
                     globalAnimeTitle = data.title || data.Judul;
                     if (!globalAnimeTitle) {
                         const segments = animeUrl.split('/').filter(Boolean);
@@ -292,14 +301,12 @@
             }
         }
 
-        // Fungsi Slider Scroll Kanan Kiri
         function scrollSlider(direction) {
             const slider = document.getElementById('recommendationSlider');
-            const scrollAmount = 220; // Ukuran lebar card + gap
+            const scrollAmount = 220; 
             slider.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
         }
 
-        // Render Rekomendasi dengan Status Menyesuaikan Tema Gelap/Terang
         function renderRecommendations(currentAnime) {
             const recSlider = document.getElementById('recommendationSlider');
             if (!currentAnime.Genre) {
@@ -316,7 +323,7 @@
 
                 const aGenres = a.Genre.split(',').map(g => g.trim().toLowerCase());
                 return currentGenres.some(g => aGenres.includes(g));
-            }).slice(0, 10); // Menampilkan hingga 10 item untuk digeser
+            }).slice(0, 10);
 
             if (recommendations.length === 0) {
                 recSlider.innerHTML = '<p class="text-xs text-zinc-500">Tidak ada anime serupa ditemukan.</p>';
@@ -330,7 +337,7 @@
                 const status = rec.Status || "Ongoing";
 
                 return `
-                    <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?url=${encodeURIComponent(recUrl)}'">
+                    <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?url=${encodeURIComponent(recUrl)}&eps=0'">
                         <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
                             <img src="${thumb}" alt="${title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
                             <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
@@ -338,7 +345,6 @@
                                     <i class="fa-solid fa-play text-xs"></i>
                                 </div>
                             </div>
-                            <!-- Status badge menyesuaikan tema terang/gelap (Teks putih di mode terang/gelap agar kontras atau hitam di mode terang) -->
                             <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${status}</span>
                         </div>
                         <div class="p-2.5">
