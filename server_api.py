@@ -43,16 +43,14 @@ def api_sinopsis():
 def api_super_lengkap():
     return jsonify(fetch_supabase_json("super_lengkap"))
 
-# Endpoint baru untuk mencari detail anime spesifik untuk halaman streaming mandiri
 @app.route("/api/anime-detail", methods=["GET"])
 def api_anime_detail():
-    anime_url = request.args.get("url", "")
+    anime_url = request.args.get("url", "").strip()
     if not anime_url:
         return jsonify({"error": "URL tidak valid"}), 400
 
     super_data = fetch_supabase_json("super_lengkap")
-    # Cari data episode berdasarkan url
-    matched = next((item for item in super_data if item.get("url") == anime_url or item.get("link") == anime_url), None)
+    matched = next((item for item in super_data if str(item.get("url", "")).strip() == anime_url or str(item.get("link", "")).strip() == anime_url), None)
     
     if matched:
         return jsonify(matched)
