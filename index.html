@@ -275,7 +275,7 @@
         <p>NimeDesu - Nonton Anime Sub Indonesia</p>
     </footer>
 
-    <!-- SCRIPT LOGIKA APLIKASI & KONEKSI API RENDER DENGAN SERVER-SIDE PAGINATION -->
+    <!-- SCRIPT LOGIKA APLIKASI & KONEKSI API RENDER -->
     <script>
         document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
         document.addEventListener('keydown', function(e) {
@@ -288,7 +288,6 @@
         let currentData = [];
         let filteredData = [];
         let currentPage = 1;
-        let totalPagesServer = 1;
         let activeAnime = null;
         let activeEpisodeIndex = 0;
         let isStreamingMode = false;
@@ -303,31 +302,36 @@
 
         const RENDER_API_URL = "https://nimedesu.onrender.com";
 
-        async function loadAnimeDatabase(page = 1) {
+        async function loadAnimeDatabase() {
             try {
-                // Mengambil data secara cepat per halaman (Server-Side Pagination)
-                const [response, synopsisResponse] = await Promise.all([
-                    fetch(`${RENDER_API_URL}/api/anime?db=infozingle&page=${page}&limit=${itemsPerPage}`),
-                    fetch(`${RENDER_API_URL}/api/sinopsis`).catch(() => ({ json: () => [] }))
+                const [infoResponse, synopsisResponse, superResponse] = await Promise.all([
+                    fetch(`${RENDER_API_URL}/api/anime`),
+                    fetch(`${RENDER_API_URL}/api/sinopsis`),
+                    fetch(`${RENDER_API_URL}/api/super-lengkap`).catch(() => ({ json: () => [] }))
                 ]);
 
-                const result = await response.json();
+                const infoData = await infoResponse.json();
                 const synopsisData = await synopsisResponse.json();
-
-                totalPagesServer = result.total_pages || 1;
+                const superData = await superResponse.json();
 
                 const synopsisMap = {};
                 synopsisData.forEach(item => {
                     if (item.url) { synopsisMap[item.url.trim()] = item.sinopsis || "Tidak ada sinopsis tersedia."; }
                 });
+
+                const superMap = {};
+                superData.forEach(item => {
+                    const itemUrl = item.url || item.link;
+                    if (itemUrl) { superMap[itemUrl.trim()] = item.episodes || []; }
+                });
                 
-                currentData = result.data.map((item, index) => {
+                currentData = infoData.map((item, index) => {
                     const itemUrl = item.url ? item.url.trim() : "";
                     const matchedSynopsis = synopsisMap[itemUrl] || item.sinopsis || "Tidak ada sinopsis tersedia.";
-                    const matchedEpisodes = item.episodes || [];
+                    const matchedEpisodes = superMap[itemUrl] || item.episodes || [];
 
                     return {
-                        id: (page - 1) * itemsPerPage + (index + 1),
+                        id: index + 1,
                         title: item.title || item.Judul || "Tanpa Judul",
                         url: itemUrl,
                         status: item.Status || "Ongoing",
@@ -350,7 +354,7 @@
                 displayAnimeWithPagination();
             } catch (error) {
                 console.error("Gagal memuat API server:", error);
-                document.getElementById('animeDisplayGrid').innerHTML = `<p class="text-zinc-700 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat data dari API server Render.</p>`;
+                document.getElementById('animeDisplayGrid').innerHTML = `<p class="text-zinc-700 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat data dari API server Render. Pastikan server aktif.</p>`;
             }
         }
 
@@ -365,7 +369,8 @@
                 else {
                     field.value = "";
                     container.classList.add('hidden');
-                    loadAnimeDatabase(1);
+                    filteredData = [...currentData];
+                    displayAnimeWithPagination();
                 }
             }
         }
@@ -385,12 +390,15 @@
 
             if(type === 'all') {
                 document.getElementById('sectionHeader').innerText = "Semua Daftar Anime";
+                filteredData = [...currentData];
             } else if(type === 'ongoing') {
                 document.getElementById('sectionHeader').innerText = "Anime Ongoing Terbaru";
+                filteredData = currentData.filter(a => a.status.toLowerCase().includes('ongoing'));
             } else if(type === 'completed') {
                 document.getElementById('sectionHeader').innerText = "Anime Completed";
+                filteredData = currentData.filter(a => a.status.toLowerCase().includes('completed'));
             }
-            loadAnimeDatabase(currentPage);
+            displayAnimeWithPagination();
         }
 
         function toggleDropdown(e) {
@@ -416,7 +424,8 @@
                 genreBtn.classList.add('bg-neon-yellow', 'text-white', 'dark:text-neon-yellow', 'font-bold', 'border-neon-yellow');
             }
 
-            loadAnimeDatabase(currentPage);
+            filteredData = currentData.filter(a => a.genres && a.genres.some(g => g.toLowerCase() === genre.toLowerCase()));
+            displayAnimeWithPagination();
         }
 
         function displayAnimeWithPagination() {
@@ -429,7 +438,14 @@
                 return;
             }
 
-            container.innerHTML = filteredData.map(item => `
+            const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const paginatedItems = filteredData.slice(startIndex, startIndex + itemsPerPage);
+
+            container.innerHTML = paginatedItems.map(item => `
                 <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="viewDetails('${item.id}')">
                     <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
                         <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
@@ -457,17 +473,17 @@
             else { paginationHTML += `<button class="${disabledBtnClass}" disabled>&lsaquo;</button>`; }
 
             let startPage = Math.max(1, currentPage - 2);
-            let endPage = Math.min(totalPagesServer, currentPage + 2);
+            let endPage = Math.min(totalPages, currentPage + 2);
 
             for(let i = startPage; i <= endPage; i++) {
                 const activeClass = i === currentPage ? 'bg-neon-yellow text-white dark:text-white font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-zinc-800 dark:text-white border-neon-lightBorder dark:border-neon-darkBorder';
                 paginationHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${activeClass} transition" onclick="goToPage(${i})">${i}</button>`;
             }
 
-            if (currentPage < totalPagesServer) { paginationHTML += `<button class="${baseBtnClass}" onclick="goToPage(${currentPage + 1})">&rsaquo;</button>`; } 
+            if (currentPage < totalPages) { paginationHTML += `<button class="${baseBtnClass}" onclick="goToPage(${currentPage + 1})">&rsaquo;</button>`; } 
             else { paginationHTML += `<button class="${disabledBtnClass}" disabled>&rsaquo;</button>`; }
 
-            if (currentPage < totalPagesServer) { paginationHTML += `<button class="${baseBtnClass}" onclick="goToPage(${totalPagesServer})">&raquo;</button>`; } 
+            if (currentPage < totalPages) { paginationHTML += `<button class="${baseBtnClass}" onclick="goToPage(${totalPages})">&raquo;</button>`; } 
             else { paginationHTML += `<button class="${disabledBtnClass}" disabled>&raquo;</button>`; }
 
             paginationBox.innerHTML = paginationHTML;
@@ -475,7 +491,7 @@
 
         function goToPage(pageNumber) {
             currentPage = pageNumber;
-            loadAnimeDatabase(currentPage);
+            displayAnimeWithPagination();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
@@ -484,7 +500,8 @@
             const container = document.getElementById('searchContainer');
             if(!query) {
                 container.classList.add('hidden');
-                loadAnimeDatabase(1);
+                filteredData = [...currentData];
+                displayAnimeWithPagination();
                 return;
             }
             isStreamingMode = false;
@@ -746,7 +763,7 @@
                 defaultBtn.classList.add('bg-neon-yellow', 'text-white', 'dark:text-neon-yellow', 'font-bold', 'border-neon-yellow');
                 defaultBtn.classList.remove('dark:text-white');
             }
-            loadAnimeDatabase(1);
+            loadAnimeDatabase();
         };
     </script>
 </body>
