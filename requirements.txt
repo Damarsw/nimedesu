@@ -1,0 +1,6 @@
+beautifulsoup4
+requests
+selenium
+flask
+flask-cors
+gunicorn
