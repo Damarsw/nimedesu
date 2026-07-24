@@ -112,9 +112,11 @@
             </div>
         </div>
 
-        <!-- Video Player Container -->
+        <!-- Video Player Container (Diubah ke Tag <video> Langsung) -->
         <div class="bg-black rounded-xl overflow-hidden border border-neon-darkBorder shadow-2xl aspect-video relative flex items-center justify-center">
-            <iframe id="videoIframe" src="" class="w-full h-full border-0 select-none" allowfullscreen></iframe>
+            <video id="videoPlayer" class="w-full h-full select-none" controls autoplay>
+                Browser Anda tidak mendukung tag video.
+            </video>
         </div>
 
         <!-- Panel Utama Server (Expand) -->
@@ -433,7 +435,7 @@
             if (!servers || servers.length === 0) {
                 mainContainer.innerHTML = '<p class="text-xs text-zinc-500 p-2">Server tidak ditemukan.</p>';
                 document.getElementById('currentServerLabel').innerText = "Tidak ada";
-                document.getElementById('videoIframe').src = "";
+                document.getElementById('videoPlayer').src = "";
                 return;
             }
 
@@ -529,9 +531,11 @@
             document.getElementById('mainServerContainer').classList.add('hidden');
             document.getElementById('mainServerArrow').style.transform = 'rotate(-90deg)';
 
-            const iframe = document.getElementById('videoIframe');
+            const videoPlayer = document.getElementById('videoPlayer');
             if (videoUrl) {
-                iframe.src = videoUrl;
+                videoPlayer.src = videoUrl;
+                videoPlayer.load();
+                videoPlayer.play().catch(e => console.log("Autoplay diblokir browser:", e));
             }
         }
 
