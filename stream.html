@@ -35,7 +35,11 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style> 
-        body { font-family: 'Inter', sans-serif; -webkit-user-select: none; user-select: none; } 
+        body { 
+            font-family: 'Inter', sans-serif; 
+            -webkit-user-select: none; 
+            user-select: none; 
+        } 
         .poster-hover-container .play-overlay {
             opacity: 0;
             transition: opacity 0.6s ease-in-out;
@@ -112,7 +116,7 @@
             </div>
         </div>
 
-        <!-- Video Player Container (Kembali menggunakan Iframe) -->
+        <!-- Video Player Container (Iframe) -->
         <div class="bg-black rounded-xl overflow-hidden border border-neon-darkBorder shadow-2xl aspect-video relative flex items-center justify-center">
             <iframe id="videoIframe" src="" class="w-full h-full border-0 select-none" allowfullscreen></iframe>
         </div>
@@ -143,7 +147,7 @@
             <div id="episodeBoxContainer" class="flex gap-2 flex-wrap pt-1"></div>
         </div>
 
-        <!-- FITUR REKOMENDASI ANIME SLIDER (BISA DIGESER KANAN KIRI) -->
+        <!-- FITUR REKOMENDASI ANIME SLIDER -->
         <div class="space-y-4 pt-6 border-t border-neon-lightBorder dark:border-neon-darkBorder">
             <div class="flex items-center justify-between">
                 <h3 class="text-base font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-zinc-900 dark:text-white">Rekomendasi Anime Serupa</h3>
@@ -281,7 +285,6 @@
                         const titleA = (a.episode_title || "").toLowerCase();
                         const titleB = (b.episode_title || "").toLowerCase();
                         
-                        // Menempatkan OVA atau Special di urutan bawah atau sesuai kemunculannya
                         const isOvaSpecialA = titleA.includes('ova') || titleA.includes('special') || titleA.includes('sp');
                         const isOvaSpecialB = titleB.includes('ova') || titleB.includes('special') || titleB.includes('sp');
                         
@@ -398,13 +401,11 @@
             document.getElementById('nextEpBtn').disabled = activeEpisodeIndex >= activeEpisodes.length - 1;
             document.getElementById('nextEpBtn').style.opacity = activeEpisodeIndex >= activeEpisodes.length - 1 ? '0.5' : '1';
 
-            // Menampilkan tombol daftar episode sesuai string asli (mendukung OVA, Special, dll.)
             container.innerHTML = activeEpisodes.map((ep, index) => {
                 const activeClass = index === activeEpisodeIndex ? 'bg-neon-yellow text-white font-bold shadow-glow-yellow' : 'bg-neon-lightBg dark:bg-neon-darkBg text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow';
                 
                 let epLabel = ep.episode_title ? ep.episode_title.replace(/Sub.*$/, '').trim() : `Eps ${index + 1}`;
                 
-                // Mencegah render jika label kosong atau sama persis dengan judul utama
                 if (!epLabel || epLabel.toLowerCase() === globalAnimeTitle.toLowerCase()) return '';
 
                 return `<button onclick='selectEpisode(${index})' class="episode-btn ${activeClass} px-3 py-1.5 rounded-lg text-xs font-semibold transition">${epLabel}</button>`;
