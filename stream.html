@@ -79,10 +79,12 @@
             <div id="searchSuggestions" class="hidden absolute left-1/2 -translate-x-1/2 mt-2 w-full max-w-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-h-80 overflow-y-auto p-2 z-50"></div>
         </div>
 
-        <div class="px-1 py-0 space-y-2 mb-2">
+       <!-- Judul & Tombol Navigasi Sejajar -->
+        <div class="px-1 py-0 mb-2 flex items-center justify-between flex-wrap gap-3">
             <h1 id="streamTitle" class="text-xl sm:text-2xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-zinc-900 dark:text-white">Memuat Data Streaming...</h1>
+            
             <!-- Tombol Navigasi Previous & Next Episode -->
-            <div id="episodeNavContainer" class="flex items-center gap-2 pl-4 hidden">
+            <div id="episodeNavContainer" class="flex items-center gap-2 hidden">
                 <button id="prevEpBtn" onclick="changeEpisodeRelative(-1)" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-neon-lightCard dark:bg-neon-darkCard border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition flex items-center gap-1.5">
                     <i class="fa-solid fa-arrow-left text-[10px]"></i> Previous
                 </button>
