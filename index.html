@@ -274,24 +274,17 @@
         // GANTI DENGAN URL WEB SERVICE RENDER ANDA
         const RENDER_API_URL = "https://nimedesu.onrender.com";
 
-        async function fetchWithCache(url) {
-            const cacheKey = 'nimedesu_cache_' + url;
-            const cached = localStorage.getItem(cacheKey);
-            if (cached) { try { return JSON.parse(cached); } catch(e) { localStorage.removeItem(cacheKey); } }
-            const res = await fetch(url);
-            if (!res.ok) throw new Error("Gagal mengambil data dari API");
-            const data = await res.json();
-            try { localStorage.setItem(cacheKey, JSON.stringify(data)); } catch(e) {}
-            return data;
-        }
-
         async function loadAnimeDatabase() {
             try {
-                const [infoData, synopsisData, superData] = await Promise.all([
-                    fetchWithCache(`${RENDER_API_URL}/api/anime`),
-                    fetchWithCache(`${RENDER_API_URL}/api/sinopsis`),
-                    fetchWithCache(`${RENDER_API_URL}/api/super-lengkap`).catch(() => [])
+                const [infoResponse, synopsisResponse, superResponse] = await Promise.all([
+                    fetch(`${RENDER_API_URL}/api/anime`),
+                    fetch(`${RENDER_API_URL}/api/sinopsis`),
+                    fetch(`${RENDER_API_URL}/api/super-lengkap`).catch(() => ({ json: () => [] }))
                 ]);
+
+                const infoData = await infoResponse.json();
+                const synopsisData = await synopsisResponse.json();
+                const superData = await superResponse.json();
 
                 const synopsisMap = {};
                 synopsisData.forEach(item => {
@@ -316,7 +309,7 @@
                         status: item.Status || "Ongoing",
                         genres: item.Genre ? item.Genre.split(',').map(g => g.trim()) : [],
                         synopsis: matchedSynopsis,
-                        thumbnail: item.image_url || "https://placehold.co/400x600?text=No+Image",
+                        thumbnail: item.image_url || item.thumbnail || "https://placehold.co/400x600?text=No+Image",
                         japanese: item.Japanese || "-",
                         skor: item.Skor || "-",
                         produser: item.Produser || "-",
@@ -333,7 +326,7 @@
                 displayAnimeWithPagination();
             } catch (error) {
                 console.error("Gagal memuat API server:", error);
-                document.getElementById('animeDisplayGrid').innerHTML = `<div class="col-span-full text-center py-10"><p class="text-zinc-600 dark:text-zinc-400 mb-2 font-medium">Gagal memuat data dari server API Render.</p><button onclick="loadAnimeDatabase()" class="px-4 py-2 bg-neon-yellow text-black font-bold rounded text-xs">Coba Lagi</button></div>`;
+                document.getElementById('animeDisplayGrid').innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat data dari API server Render. Pastikan server aktif.</p>`;
             }
         }
 
