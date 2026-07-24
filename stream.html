@@ -258,7 +258,7 @@
         async function initStream() {
             const urlParams = new URLSearchParams(window.location.search);
             const animeUrl = urlParams.get('url');
-            const targetEps = parseInt(urlParams.get('eps')) || 0; // Mengambil target episode (default 0/terkecil)
+            const targetEps = parseInt(urlParams.get('eps')) || 0; 
 
             if (!animeUrl) {
                 document.getElementById('streamTitle').innerText = "URL Anime Tidak Ditemukan!";
@@ -274,9 +274,15 @@
                 const data = await response.json();
 
                 if (data && data.episodes && data.episodes.length > 0) {
-                    activeEpisodes = data.episodes;
+                    activeEpisodes = data.episodes.filter(ep => ep && (ep.episode_title || ep.video_servers));
                     
-                    // Menyesuaikan index episode awal sesuai parameter url (eps)
+                    // Urutkan dari nomor episode terendah ke tertinggi
+                    activeEpisodes.sort((a, b) => {
+                        const numA = extractEpisodeNumber(a.episode_title);
+                        const numB = extractEpisodeNumber(b.episode_title);
+                        return numA - numB;
+                    });
+
                     activeEpisodeIndex = (targetEps >= 0 && targetEps < activeEpisodes.length) ? targetEps : 0;
 
                     globalAnimeTitle = data.title || data.Judul;
@@ -299,6 +305,12 @@
                 console.error("Gagal memuat detail streaming:", error);
                 document.getElementById('streamTitle').innerText = "Gagal memuat server streaming.";
             }
+        }
+
+        function extractEpisodeNumber(title) {
+            if (!title) return 0;
+            const match = title.match(/episode\s*(\d+)/i) || title.match(/eps\.?\s*(\d+)/i) || title.match(/(\d+)/);
+            return match ? parseInt(match[1]) : 0;
         }
 
         function scrollSlider(direction) {
@@ -368,18 +380,24 @@
             if(label) label.innerText = `Daftar Episode (${activeEpisodes.length})`;
 
             const currentEp = activeEpisodes[activeEpisodeIndex];
-            const epTitle = currentEp && currentEp.episode_title ? currentEp.episode_title.replace(/Sub.*$/, '').trim() : `Episode ${activeEpisodeIndex + 1}`;
-            document.getElementById('streamTitle').innerText = `Nonton ${globalAnimeTitle} (${epTitle})`;
+            const epNum = extractEpisodeNumber(currentEp?.episode_title) || (activeEpisodeIndex + 1);
+            document.getElementById('streamTitle').innerText = `Nonton ${globalAnimeTitle} (Eps ${epNum})`;
 
             document.getElementById('prevEpBtn').disabled = activeEpisodeIndex <= 0;
             document.getElementById('prevEpBtn').style.opacity = activeEpisodeIndex <= 0 ? '0.5' : '1';
             document.getElementById('nextEpBtn').disabled = activeEpisodeIndex >= activeEpisodes.length - 1;
             document.getElementById('nextEpBtn').style.opacity = activeEpisodeIndex >= activeEpisodes.length - 1 ? '0.5' : '1';
 
+            // Menampilkan tombol daftar episode dalam format "Eps 1, Eps 2, dst." dan bersih dari elemen ganda/sisa
             container.innerHTML = activeEpisodes.map((ep, index) => {
                 const activeClass = index === activeEpisodeIndex ? 'bg-neon-yellow text-white font-bold shadow-glow-yellow' : 'bg-neon-lightBg dark:bg-neon-darkBg text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow';
-                const epLabel = ep.episode_title ? ep.episode_title.replace(/Sub.*$/, '').trim() : `Eps ${index + 1}`;
-                return `<button onclick='selectEpisode(${index})' class="episode-btn ${activeClass} px-3 py-1.5 rounded-lg text-xs font-semibold transition">${epLabel}</button>`;
+                const epNumber = extractEpisodeNumber(ep.episode_title) || (index + 1);
+                
+                // Mencegah render jika judul episode bernilai sama persis dengan judul anime utama
+                const rawTitle = ep.episode_title ? ep.episode_title.trim() : "";
+                if (rawTitle.toLowerCase() === globalAnimeTitle.toLowerCase()) return '';
+
+                return `<button onclick='selectEpisode(${index})' class="episode-btn ${activeClass} px-3 py-1.5 rounded-lg text-xs font-semibold transition">Eps ${epNumber}</button>`;
             }).join('');
 
             if(activeEpisodes[activeEpisodeIndex] && activeEpisodes[activeEpisodeIndex].video_servers) {
