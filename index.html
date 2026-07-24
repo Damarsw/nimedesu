@@ -118,7 +118,7 @@
             container.innerHTML = `<p class="col-span-full text-center py-10 font-medium">Memuat data dari API Render...</p>`;
             try {
                 // GANTI URL DI BAWAH INI DENGAN LINK WEB SERVICE RENDER ANDA
-                const RENDER_API_URL = "https://nama-bot-anda.onrender.com";
+                const RENDER_API_URL = "https://nimedesu.onrender.com/";
 
                 const [infoData, synopsisData, superData] = await Promise.all([
                     fetchWithCache(`${RENDER_API_URL}/api/anime`),
