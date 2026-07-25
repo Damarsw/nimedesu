@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Streaming - NimeDesu</title>
-    
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -31,7 +29,6 @@
             }
         }
     </script>
-    <!-- FontAwesome & Google Fonts -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style> 
@@ -50,7 +47,6 @@
         .poster-hover-container:hover img {
             transform: scale(1.08);
         }
-        /* Menyembunyikan scrollbar namun tetap bisa digeser */
         .no-scrollbar::-webkit-scrollbar {
             display: none;
         }
@@ -62,7 +58,6 @@
 </head>
 <body class="bg-neon-lightBg text-zinc-900 dark:bg-neon-darkBg dark:text-white transition-colors duration-300 min-h-screen flex flex-col">
 
-    <!-- Header / Navbar -->
     <header id="mainHeader" class="fixed top-0 left-0 right-0 z-50 bg-[#FFF78D]/90 dark:bg-[#14130e]/90 backdrop-blur-md border-b border-neon-lightBorder dark:border-neon-darkBorder shadow-md dark:shadow-[0_4px_20px_rgba(217,155,0,0.15)] transition-transform duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-1 sm:space-x-2">
@@ -86,10 +81,8 @@
         </div>
     </header>
 
-    <!-- Main Content Container -->
     <main class="flex-grow max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full mt-16 space-y-6">
 
-        <!-- KOTAK PENCARIAN GLOBAL DENGAN LIVE SEARCH -->
         <div id="searchContainer" class="hidden relative mb-8 transition-all duration-300 z-50">
             <div id="searchBoxWrapper" class="relative max-w-xl mx-auto flex items-center bg-white dark:bg-zinc-900 rounded-full border-2 border-neon-yellow shadow-glow-yellow overflow-hidden">
                 <input type="text" id="searchField" placeholder="Ketik nama anime disini" oninput="liveSearchAnime()" onkeypress="if(event.key === 'Enter') executeSearch()" class="w-full bg-transparent text-sm pl-6 pr-4 py-3.5 focus:outline-none placeholder:text-zinc-500 font-medium text-zinc-900 dark:text-white">
@@ -97,15 +90,12 @@
                     <i class="fa-solid fa-magnifying-glass text-sm"></i>
                 </button>
             </div>
-            <!-- Dropdown Hasil Poster & Genre Live Search -->
             <div id="searchSuggestions" class="hidden absolute left-1/2 -translate-x-1/2 mt-2 w-full max-w-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-h-80 overflow-y-auto p-2 z-50"></div>
         </div>
 
-        <!-- Judul & Tombol Navigasi Sejajar di Kanan -->
         <div class="px-1 py-0 mb-2 flex items-center justify-between flex-wrap gap-3">
             <h1 id="streamTitle" class="text-xl sm:text-2xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-zinc-900 dark:text-white">Memuat Data Streaming...</h1>
             
-            <!-- Tombol Navigasi Previous & Next Episode -->
             <div id="episodeNavContainer" class="flex items-center gap-2 hidden">
                 <button id="prevEpBtn" onclick="changeEpisodeRelative(-1)" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-neon-lightCard dark:bg-neon-darkCard border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition flex items-center gap-1.5">
                     <i class="fa-solid fa-arrow-left text-[10px]"></i> Previous
@@ -116,12 +106,10 @@
             </div>
         </div>
 
-        <!-- Video Player Container (Iframe) -->
-        <div class="bg-black rounded-xl overflow-hidden border border-neon-darkBorder shadow-2xl aspect-video relative flex items-center justify-center">
-            <iframe id="videoIframe" src="" class="w-full h-full border-0 select-none" allowfullscreen></iframe>
+        <div class="bg-black rounded-xl overflow-hidden border border-neon-darkBorder shadow-2xl aspect-video relative flex items-center justify-center" oncontextmenu="return false;">
+            <iframe id="videoIframe" src="" class="w-full h-full border-0 select-none" sandbox="allow-scripts allow-same-origin allow-presentation" allowfullscreen></iframe>
         </div>
 
-        <!-- Panel Utama Server (Expand) -->
         <div class="bg-neon-lightCard dark:bg-neon-darkCard p-4 rounded-xl border border-neon-lightBorder dark:border-neon-darkBorder space-y-3">
             <div class="flex justify-between items-center cursor-pointer select-none pb-2 border-b border-neon-lightBorder dark:border-neon-darkBorder" onclick="toggleMainServerBox()">
                 <div class="flex items-center gap-2">
@@ -134,7 +122,6 @@
             <div id="mainServerContainer" class="space-y-3 pt-1 hidden"></div>
         </div>
 
-        <!-- List Episode -->
         <div class="bg-neon-lightCard dark:bg-neon-darkCard p-4 rounded-xl border border-neon-lightBorder dark:border-neon-darkBorder space-y-3">
             <div class="flex justify-between items-center cursor-pointer select-none pb-2 border-b border-neon-lightBorder dark:border-neon-darkBorder" onclick="toggleEpisodeBox()">
                 <div class="flex items-center gap-2">
@@ -147,7 +134,6 @@
             <div id="episodeBoxContainer" class="flex gap-2 flex-wrap pt-1"></div>
         </div>
 
-        <!-- FITUR REKOMENDASI ANIME SLIDER -->
         <div class="space-y-4 pt-6 border-t border-neon-lightBorder dark:border-neon-darkBorder">
             <div class="flex items-center justify-between">
                 <h3 class="text-base font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-zinc-900 dark:text-white">Rekomendasi Anime Serupa</h3>
@@ -157,7 +143,6 @@
                 </div>
             </div>
             
-            <!-- Container Slider Geser -->
             <div id="recommendationSlider" class="flex gap-4 overflow-x-auto no-scrollbar scroll-smooth pb-2 pt-1">
                 <p class="text-xs text-zinc-500">Memuat rekomendasi...</p>
             </div>
@@ -165,12 +150,10 @@
 
     </main>
 
-    <!-- Footer -->
     <footer class="border-t border-neon-lightBorder dark:border-neon-darkBorder py-6 mt-12 text-center text-xs text-zinc-700 dark:text-zinc-400">
         <p>NimeDesu - Nonton Anime Sub Indonesia</p>
     </footer>
 
-    <!-- SCRIPT STREAMING MANDIRI & REKOMENDASI SLIDER -->
     <script>
         document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
         
@@ -280,7 +263,6 @@
                 if (data && data.episodes && data.episodes.length > 0) {
                     activeEpisodes = data.episodes.filter(ep => ep && (ep.episode_title || ep.video_servers));
                     
-                    // Urutkan episode secara cerdas (mendukung nomor biasa, OVA, dan Special)
                     activeEpisodes.sort((a, b) => {
                         const titleA = (a.episode_title || "").toLowerCase();
                         const titleB = (b.episode_title || "").toLowerCase();
@@ -315,7 +297,7 @@
                     document.getElementById('streamTitle').innerText = "Data Episode Tidak Tersedia.";
                 }
             } catch (error) {
-                console.error("Gagal memuat detail streaming:", error);
+                console.error(error);
                 document.getElementById('streamTitle').innerText = "Gagal memuat server streaming.";
             }
         }
@@ -519,7 +501,7 @@
             }
         }
 
-        function selectServer(element, resolution, serverNum, videoUrl) {
+        function selectServer(element, resolution, serverNum, encodedVideoUrl) {
             document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
             document.querySelectorAll('.server-btn').forEach(btn => {
                 btn.className = "server-btn w-full text-left px-3 py-1.5 rounded text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-zinc-900 dark:text-white";
@@ -531,8 +513,12 @@
             document.getElementById('mainServerArrow').style.transform = 'rotate(-90deg)';
 
             const iframe = document.getElementById('videoIframe');
-            if (videoUrl) {
-                iframe.src = videoUrl;
+            if (encodedVideoUrl) {
+                try {
+                    iframe.src = atob(encodedVideoUrl);
+                } catch (e) {
+                    iframe.src = "";
+                }
             }
         }
 
