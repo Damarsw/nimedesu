@@ -1,3 +1,4 @@
+import base64
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import requests
@@ -24,7 +25,7 @@ def fetch_supabase_json(key):
             cache_data[key] = data
             return data
     except Exception as e:
-        print(f"Gagal mengambil data dari Supabase ({key}): {e}")
+        print(f"Error: {e}")
     return []
 
 @app.route("/")
@@ -53,7 +54,15 @@ def api_anime_detail():
     matched = next((item for item in super_data if str(item.get("url", "")).strip() == anime_url or str(item.get("link", "")).strip() == anime_url), None)
     
     if matched:
-        return jsonify(matched)
+        import copy
+        safe_data = copy.deepcopy(matched)
+        for ep in safe_data.get("episodes", []):
+            for srv in ep.get("video_servers", []):
+                original_url = srv.get("video_url", "")
+                if original_url:
+                    encoded_url = base64.b64encode(original_url.encode('utf-8')).decode('utf-8')
+                    srv["video_url"] = encoded_url 
+        return jsonify(safe_data)
     return jsonify({"episodes": []})
 
 if __name__ == "__main__":
