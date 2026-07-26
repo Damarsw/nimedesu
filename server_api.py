@@ -8,8 +8,8 @@ app = Flask(__name__)
 CORS(app)
 
 # Konfigurasi Supabase Client
-SUPABASE_URL = "https://yezdnsgypbjcqzoftgmz.supabase.co"
-SUPABASE_KEY = "PASTE_SUPABASE_SERVICE_ROLE_ATAU_ANON_KEY" # Dapatkan di Supabase Settings > API
+SUPABASE_URL = "https://yezdnsgypbjcgzoftgmz.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllemRuc2d5cGJqY2d6b2Z0Z216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4ODc4OTUsImV4cCI6MjEwMDQ2Mzg5NX0.oTp6v4ahm0Ta654CuB7a13l9apBtUrD-Wyn-YTKYl7I" # Dapatkan di Supabase Settings > API
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
