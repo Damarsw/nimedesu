@@ -157,7 +157,6 @@
     <script>
         document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
         
-        // 1. Tentukan URL API backend Render
         const RENDER_API_URL = "https://nimedesu.onrender.com";
         let activeEpisodes = [];
         let activeEpisodeIndex = 0;
@@ -505,7 +504,7 @@
             }
         }
 
-        function selectServer(element, resolution, serverNum, encodedVideoUrl) {
+        function selectServer(element, resolution, serverNum, videoUrl) {
             document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
             document.querySelectorAll('.server-btn').forEach(btn => {
                 btn.className = "server-btn w-full text-left px-3 py-1.5 rounded text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-zinc-900 dark:text-white";
@@ -517,12 +516,19 @@
             document.getElementById('mainServerArrow').style.transform = 'rotate(-90deg)';
 
             const iframe = document.getElementById('videoIframe');
-            if (encodedVideoUrl) {
-                try {
-                    iframe.src = atob(encodedVideoUrl);
-                } catch (e) {
-                    iframe.src = "";
+            if (videoUrl) {
+                let finalUrl = videoUrl;
+                
+                // Cek apakah string berupa Base64 atau URL biasa (http/https)
+                if (!videoUrl.startsWith('http://') && !videoUrl.startsWith('https://')) {
+                    try {
+                        finalUrl = atob(videoUrl);
+                    } catch (e) {
+                        finalUrl = videoUrl;
+                    }
                 }
+                
+                iframe.src = finalUrl;
             }
         }
 
