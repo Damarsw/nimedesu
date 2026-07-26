@@ -157,6 +157,7 @@
     <script>
         document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
         
+        // 1. Tentukan URL API backend Render
         const RENDER_API_URL = "https://nimedesu.onrender.com";
         let activeEpisodes = [];
         let activeEpisodeIndex = 0;
@@ -206,7 +207,8 @@
                 const title = anime.title || anime.Judul || "Tanpa Judul";
                 const thumb = anime.image_url || anime.thumbnail || "https://placehold.co/100x150?text=No+Image";
                 const animeUrl = anime.url ? anime.url.trim() : "";
-                const genres = anime.Genre ? anime.Genre.split(',').map(g => g.trim()).join(', ') : '-';
+                const rawGenre = anime.genre || anime.Genre || "";
+                const genres = rawGenre ? rawGenre.split(',').map(g => g.trim()).join(', ') : '-';
                 
                 return `
                     <div onclick="window.location.href='stream.html?url=${encodeURIComponent(animeUrl)}&eps=0'" class="flex items-center gap-3 p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer transition">
@@ -316,19 +318,21 @@
 
         function renderRecommendations(currentAnime) {
             const recSlider = document.getElementById('recommendationSlider');
-            if (!currentAnime.Genre) {
+            const rawGenre = currentAnime.genre || currentAnime.Genre;
+            if (!rawGenre) {
                 recSlider.innerHTML = '<p class="text-xs text-zinc-500">Tidak ada rekomendasi tersedia.</p>';
                 return;
             }
 
-            const currentGenres = currentAnime.Genre.split(',').map(g => g.trim().toLowerCase());
+            const currentGenres = rawGenre.split(',').map(g => g.trim().toLowerCase());
             
             const recommendations = allAnimeList.filter(a => {
                 const aUrl = a.url ? a.url.trim() : "";
                 const currentUrl = currentAnime.url ? currentAnime.url.trim() : "";
-                if (aUrl === currentUrl || !a.Genre) return false;
+                const itemGenre = a.genre || a.Genre;
+                if (aUrl === currentUrl || !itemGenre) return false;
 
-                const aGenres = a.Genre.split(',').map(g => g.trim().toLowerCase());
+                const aGenres = itemGenre.split(',').map(g => g.trim().toLowerCase());
                 return currentGenres.some(g => aGenres.includes(g));
             }).slice(0, 10);
 
@@ -341,7 +345,7 @@
                 const title = rec.title || rec.Judul || "Tanpa Judul";
                 const thumb = rec.image_url || rec.thumbnail || "https://placehold.co/300x400?text=No+Image";
                 const recUrl = rec.url ? rec.url.trim() : "";
-                const status = rec.Status || "Ongoing";
+                const status = rec.status || rec.Status || "Ongoing";
 
                 return `
                     <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?url=${encodeURIComponent(recUrl)}&eps=0'">
