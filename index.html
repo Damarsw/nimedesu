@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NimeDesu - Nonton Anime Sub Indo</title>
     
-    <!-- Tailwind CSS CDN -->
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -31,7 +31,7 @@
             }
         }
     </script>
-    <!-- FontAwesome & Google Fonts -->
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style> 
@@ -51,7 +51,7 @@
 </head>
 <body class="bg-neon-lightBg text-zinc-900 dark:bg-neon-darkBg dark:text-white transition-colors duration-300 min-h-screen flex flex-col">
 
-    <!-- Header / Navbar -->
+
     <header id="mainHeader" class="fixed top-0 left-0 right-0 z-50 bg-[#FFF78D]/90 dark:bg-[#14130e]/90 backdrop-blur-md border-b border-neon-lightBorder dark:border-neon-darkBorder shadow-md dark:shadow-[0_4px_20px_rgba(217,155,0,0.15)] transition-transform duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-1 sm:space-x-2">
@@ -75,10 +75,10 @@
         </div>
     </header>
 
-    <!-- Main Content Container -->
+
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full mt-16">
 
-        <!-- KOTAK PENCARIAN GLOBAL DENGAN LIVE SEARCH -->
+     
         <div id="searchContainer" class="hidden relative mb-8 transition-all duration-300 z-50">
             <div id="searchBoxWrapper" class="relative max-w-xl mx-auto flex items-center bg-white dark:bg-zinc-900 rounded-full border-2 border-neon-yellow shadow-glow-yellow overflow-hidden">
                 <input type="text" id="searchField" placeholder="Ketik nama anime disini" oninput="liveSearchAnime()" onkeypress="if(event.key === 'Enter') searchAnime()" class="w-full bg-transparent text-sm pl-6 pr-4 py-3.5 focus:outline-none placeholder:text-zinc-500 font-medium text-zinc-900 dark:text-white">
@@ -86,18 +86,18 @@
                     <i class="fa-solid fa-magnifying-glass text-sm"></i>
                 </button>
             </div>
-            <!-- Dropdown Hasil Poster & Genre Live Search -->
+     
             <div id="searchSuggestions" class="hidden absolute left-1/2 -translate-x-1/2 mt-2 w-full max-w-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-h-80 overflow-y-auto p-2 z-50"></div>
         </div>
 
-        <!-- HALAMAN UTAMA (HOME / LIST) -->
+    
         <div id="homeView">
             <div class="flex items-center gap-2 mb-6 relative flex-wrap">
                 <button id="btnSemua" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-lightBorder dark:border-neon-darkBorder transition text-zinc-900 dark:text-white" onclick="changeTab('all', this)">Semua</button>
                 <button id="btnOngoing" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-lightBorder dark:border-neon-darkBorder transition text-zinc-900 dark:text-white" onclick="changeTab('ongoing', this)">Ongoing</button>
                 <button id="btnCompleted" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-lightBorder dark:border-neon-darkBorder transition text-zinc-900 dark:text-white" onclick="changeTab('completed', this)">Completed</button>
                 
-                <!-- DROPDOWN GENRE -->
+   
                 <div class="relative inline-block">
                     <button id="btnGenre" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-lightBorder dark:border-neon-darkBorder transition text-zinc-900 dark:text-white" onclick="toggleDropdown(event)">Genre ▾</button>
                     <div class="hidden absolute left-0 top-12 bg-[#FFF78D] dark:bg-[#14130e] w-44 max-w-[calc(100vw-2rem)] max-h-[250px] overflow-y-auto shadow-2xl rounded-xl p-1.5 z-50 flex flex-col gap-1 border border-neon-lightBorder dark:border-neon-darkBorder" id="genreDropdown">
@@ -146,11 +146,10 @@
             </div>
 
             <div id="animeDisplayGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 sm:gap-5"></div>
-            <!-- Paginasi -->
+
             <div id="paginationBox" class="flex justify-center items-center space-x-1.5 sm:space-x-2 mt-8 flex-wrap gap-y-2"></div>
         </div>
 
-        <!-- HALAMAN DETAIL ANIME -->
         <div id="detailView" class="hidden">
             <div class="flex flex-col sm:flex-row gap-5 items-center sm:items-start mb-8 bg-neon-lightCard dark:bg-neon-darkCard p-5 rounded-2xl border border-neon-lightBorder dark:border-neon-darkBorder">
                 <div class="w-32 sm:w-36 aspect-[3/4] rounded-xl overflow-hidden border border-neon-lightBorder dark:border-neon-darkBorder bg-zinc-200 dark:bg-zinc-800 shadow-md shrink-0">
@@ -170,7 +169,6 @@
                         <span class="py-2 px-4 rounded-xl text-xs font-bold bg-neon-yellow text-white shadow-glow-yellow flex items-center gap-2">
                             <i class="fa-solid fa-circle-info"></i> Detail & Sinopsis
                         </span>
-                        <!-- TOMBOL STREAMING MEMBUKA TAB BARU (SELALU MULAI DARI EPS TERKECIL/EPS 0) -->
                         <button onclick="openStreamingTab()" class="py-2 px-4 rounded-xl text-xs font-bold bg-neon-lightBg dark:bg-neon-darkBg text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition flex items-center gap-2">
                             <i class="fa-solid fa-play"></i> Streaming <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
                         </button>
@@ -179,13 +177,13 @@
             </div>
 
             <div class="w-full space-y-6">
-                <!-- Sinopsis -->
+            
                 <div class="bg-neon-lightCard dark:bg-neon-darkCard p-6 rounded-xl border border-neon-lightBorder dark:border-neon-darkBorder">
                     <h3 class="text-sm font-bold text-zinc-900 dark:text-neon-yellow uppercase tracking-wider mb-2">Sinopsis</h3>
                     <p id="synopsisText" class="text-xs sm:text-sm text-zinc-900 dark:text-zinc-300 leading-relaxed">-</p>
                 </div>
 
-                <!-- Info Detail Table -->
+            
                 <div class="bg-neon-lightCard dark:bg-neon-darkCard rounded-xl border border-neon-lightBorder dark:border-neon-darkBorder overflow-hidden text-xs">
                     <div class="grid grid-cols-2 border-b border-neon-lightBorder dark:border-neon-darkBorder py-3 px-4">
                         <span class="text-zinc-700 dark:text-zinc-400 font-medium">Japanese</span>
@@ -221,12 +219,10 @@
 
     </main>
 
-    <!-- Footer -->
     <footer class="border-t border-neon-lightBorder dark:border-neon-darkBorder py-6 mt-12 text-center text-xs text-zinc-700 dark:text-zinc-400">
         <p>NimeDesu - Nonton Anime Sub Indonesia</p>
     </footer>
 
-    <!-- SCRIPT APLIKASI -->
     <script>
         document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
         document.addEventListener('keydown', function(e) {
@@ -237,49 +233,110 @@
         });
 
         let currentData = [];
-        let filteredData = [];
         let currentPage = 1;
+        let totalPages = 1;
         let activeAnime = null;
         const itemsPerPage = 12;
 
+        let activeSearchQuery = "";
+        let activeStatusFilter = "";
+        let activeGenreFilter = "";
+
         const RENDER_API_URL = "https://nimedesu.onrender.com";
 
-        async function loadAnimeDatabase() {
+        async function loadAnimeDatabase(page = 1) {
             try {
-                // Memanggil endpoint /api/anime yang sudah terhubung langsung ke TABEL Supabase
-                const response = await fetch(`${RENDER_API_URL}/api/anime`);
-                const infoData = await response.json();
+                currentPage = page;
+                let fetchUrl = `${RENDER_API_URL}/api/anime?page=${page}&per_page=${itemsPerPage}`;
+                
+                if (activeSearchQuery) fetchUrl += `&q=${encodeURIComponent(activeSearchQuery)}`;
+                if (activeStatusFilter) fetchUrl += `&status=${encodeURIComponent(activeStatusFilter)}`;
+                if (activeGenreFilter) fetchUrl += `&genre=${encodeURIComponent(activeGenreFilter)}`;
 
-                currentData = infoData.map((item, index) => {
-                    const itemUrl = item.url ? item.url.trim() : "";
+                const response = await fetch(fetchUrl);
+                const result = await response.json();
 
-                    return {
-                        id: index + 1,
-                        title: item.title || "Tanpa Judul",
-                        url: itemUrl,
-                        status: item.status || "Ongoing",
-                        genres: item.genre ? item.genre.split(',').map(g => g.trim()) : [],
-                        synopsis: item.sinopsis || "Sinopsis belum tersedia.",
-                        thumbnail: item.image_url || "https://placehold.co/400x600?text=No+Image",
-                        japanese: item.japanese || "-",
-                        skor: item.score || "-",
-                        statusText: item.status || "-",
-                        totalEpisode: item.total_episodes || "-",
-                        durasi: item.duration || "-",
-                        tanggalRilis: item.release_date || "-",
-                        studio: item.studio || "-"
-                    };
-                });
+                currentData = (result.data || []).map((item, index) => ({
+                    id: item.id || (index + 1),
+                    title: item.title || "Tanpa Judul",
+                    url: item.url ? item.url.trim() : "",
+                    status: item.status || "Ongoing",
+                    genres: item.genre ? item.genre.split(',').map(g => g.trim()) : [],
+                    synopsis: item.sinopsis || "Sinopsis belum tersedia.",
+                    thumbnail: item.image_url || "https://placehold.co/400x600?text=No+Image",
+                    japanese: item.japanese || "-",
+                    skor: item.score || "-",
+                    statusText: item.status || "-",
+                    totalEpisode: item.total_episodes || "-",
+                    durasi: item.duration || "-",
+                    tanggalRilis: item.release_date || "-",
+                    studio: item.studio || "-"
+                }));
 
-                filteredData = [...currentData];
+                totalPages = result.total_pages || 1;
                 displayAnimeWithPagination();
+
             } catch (error) {
                 console.error("Gagal memuat API server:", error);
                 document.getElementById('animeDisplayGrid').innerHTML = `<p class="text-zinc-700 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat data dari API server Render. Pastikan server aktif.</p>`;
             }
         }
 
-        // Live Search di index.html
+        function displayAnimeWithPagination() {
+            const container = document.getElementById('animeDisplayGrid');
+            const paginationBox = document.getElementById('paginationBox');
+
+            if (currentData.length === 0) {
+                container.innerHTML = `<p class="text-zinc-700 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Tidak ada anime ditemukan.</p>`;
+                paginationBox.innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = currentData.map(item => `
+                <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="viewDetails('${item.id}')">
+                    <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
+                        <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
+                        <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
+                            <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
+                                <i class="fa-solid fa-circle-info ml-0.5 text-base"></i>
+                            </div>
+                        </div>
+                        <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${item.status}</span>
+                    </div>
+                    <div class="p-3">
+                        <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-zinc-900 dark:text-white">${item.title}</h4>
+                    </div>
+                </div>
+            `).join('');
+
+            // Render Navigasi Paginasi Server-Side
+            let paginationHTML = '';
+            const baseBtnClass = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-neon-lightCard dark:bg-neon-darkCard text-zinc-800 dark:text-white border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition';
+            const disabledBtnClass = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-zinc-200 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border-zinc-300 dark:border-zinc-800 cursor-not-allowed';
+
+            paginationHTML += `<button class="${currentPage > 1 ? baseBtnClass : disabledBtnClass}" ${currentPage <= 1 ? 'disabled' : ''} onclick="goToPage(1)">&laquo;</button>`;
+            paginationHTML += `<button class="${currentPage > 1 ? baseBtnClass : disabledBtnClass}" ${currentPage <= 1 ? 'disabled' : ''} onclick="goToPage(${currentPage - 1})">&lsaquo;</button>`;
+
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(totalPages, currentPage + 2);
+
+            for (let i = startPage; i <= endPage; i++) {
+                const activeClass = i === currentPage ? 'bg-neon-yellow text-white dark:text-white font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-zinc-800 dark:text-white border-neon-lightBorder dark:border-neon-darkBorder';
+                paginationHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${activeClass} transition" onclick="goToPage(${i})">${i}</button>`;
+            }
+
+            paginationHTML += `<button class="${currentPage < totalPages ? baseBtnClass : disabledBtnClass}" ${currentPage >= totalPages ? 'disabled' : ''} onclick="goToPage(${currentPage + 1})">&rsaquo;</button>`;
+            paginationHTML += `<button class="${currentPage < totalPages ? baseBtnClass : disabledBtnClass}" ${currentPage >= totalPages ? 'disabled' : ''} onclick="goToPage(${totalPages})">&raquo;</button>`;
+
+            paginationBox.innerHTML = paginationHTML;
+        }
+
+        function goToPage(pageNumber) {
+            loadAnimeDatabase(pageNumber);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+
         function toggleSearchInput(event) {
             if(event) event.stopPropagation();
             const container = document.getElementById('searchContainer');
@@ -293,8 +350,8 @@
             }
         }
 
-        function liveSearchAnime() {
-            const query = document.getElementById('searchField').value.trim().toLowerCase();
+        async function liveSearchAnime() {
+            const query = document.getElementById('searchField').value.trim();
             const suggestionsBox = document.getElementById('searchSuggestions');
 
             if (!query) {
@@ -303,27 +360,32 @@
                 return;
             }
 
-            const matched = currentData.filter(a => a.title.toLowerCase().includes(query)).slice(0, 6);
+            try {
+                const res = await fetch(`${RENDER_API_URL}/api/anime?q=${encodeURIComponent(query)}&per_page=6`);
+                const result = await res.json();
+                const matched = result.data || [];
 
-            if (matched.length === 0) {
-                suggestionsBox.innerHTML = `<p class="text-xs text-center text-zinc-500 py-3">Anime tidak ditemukan</p>`;
-                suggestionsBox.classList.remove('hidden');
-                return;
-            }
+                if (matched.length === 0) {
+                    suggestionsBox.innerHTML = `<p class="text-xs text-center text-zinc-500 py-3">Anime tidak ditemukan</p>`;
+                    suggestionsBox.classList.remove('hidden');
+                    return;
+                }
 
-            suggestionsBox.innerHTML = matched.map(anime => {
-                const genres = anime.genres.join(', ') || '-';
-                return `
-                    <div onclick="viewDetails('${anime.id}'); document.getElementById('searchContainer').classList.add('hidden'); document.getElementById('searchSuggestions').classList.add('hidden');" class="flex items-center gap-3 p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer transition">
-                        <img src="${anime.thumbnail}" class="w-10 h-14 object-cover rounded-lg shrink-0">
-                        <div class="overflow-hidden">
-                            <h4 class="text-xs font-semibold text-zinc-900 dark:text-white truncate">${anime.title}</h4>
-                            <span class="text-[10px] text-zinc-500 dark:text-zinc-400 truncate block">${genres}</span>
+                suggestionsBox.innerHTML = matched.map(anime => {
+                    const genres = anime.genre ? anime.genre.split(',').map(g => g.trim()).join(', ') : '-';
+                    const img = anime.image_url || "https://placehold.co/100x150?text=No+Image";
+                    return `
+                        <div onclick="activeSearchQuery='${anime.title.replace(/'/g, "\\'")}'; loadAnimeDatabase(1); document.getElementById('searchContainer').classList.add('hidden'); document.getElementById('searchSuggestions').classList.add('hidden');" class="flex items-center gap-3 p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer transition">
+                            <img src="${img}" class="w-10 h-14 object-cover rounded-lg shrink-0">
+                            <div class="overflow-hidden">
+                                <h4 class="text-xs font-semibold text-zinc-900 dark:text-white truncate">${anime.title}</h4>
+                                <span class="text-[10px] text-zinc-500 dark:text-zinc-400 truncate block">${genres}</span>
+                            </div>
                         </div>
-                    </div>
-                `;
-            }).join('');
-            suggestionsBox.classList.remove('hidden');
+                    `;
+                }).join('');
+                suggestionsBox.classList.remove('hidden');
+            } catch (e) { console.error(e); }
         }
 
         document.addEventListener('click', function(e) {
@@ -351,19 +413,21 @@
             }
             const dropdown = document.getElementById('genreDropdown');
             if(dropdown) dropdown.style.display = 'none';
-            currentPage = 1;
+
+            activeSearchQuery = "";
+            activeGenreFilter = "";
 
             if(type === 'all') {
+                activeStatusFilter = "";
                 document.getElementById('sectionHeader').innerText = "Semua Daftar Anime";
-                filteredData = [...currentData];
             } else if(type === 'ongoing') {
+                activeStatusFilter = "Ongoing";
                 document.getElementById('sectionHeader').innerText = "Anime Ongoing Terbaru";
-                filteredData = currentData.filter(a => a.status.toLowerCase().includes('ongoing'));
             } else if(type === 'completed') {
+                activeStatusFilter = "Completed";
                 document.getElementById('sectionHeader').innerText = "Anime Completed";
-                filteredData = currentData.filter(a => a.status.toLowerCase().includes('completed'));
             }
-            displayAnimeWithPagination();
+            loadAnimeDatabase(1);
         }
 
         function toggleDropdown(e) {
@@ -374,10 +438,8 @@
 
         function filterGenre(genre) {
             goHomeAction(false);
-            currentPage = 1;
             const dropdown = document.getElementById('genreDropdown');
             if(dropdown) dropdown.style.display = 'none';
-            document.getElementById('sectionHeader').innerText = `Genre: ${genre}`;
             
             document.querySelectorAll('.nav-tab-btn').forEach(b => {
                 b.classList.remove('bg-neon-yellow', 'text-white', 'dark:text-neon-yellow', 'font-bold', 'border-neon-yellow');
@@ -389,98 +451,27 @@
                 genreBtn.classList.add('bg-neon-yellow', 'text-white', 'dark:text-neon-yellow', 'font-bold', 'border-neon-yellow');
             }
 
-            filteredData = currentData.filter(a => a.genres && a.genres.some(g => g.toLowerCase() === genre.toLowerCase()));
-            displayAnimeWithPagination();
-        }
-
-        function displayAnimeWithPagination() {
-            const container = document.getElementById('animeDisplayGrid');
-            const paginationBox = document.getElementById('paginationBox');
-            
-            if(filteredData.length === 0) {
-                container.innerHTML = `<p class="text-zinc-700 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Tidak ada anime ditemukan.</p>`;
-                paginationBox.innerHTML = '';
-                return;
-            }
-
-            const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-            if (currentPage > totalPages) currentPage = totalPages;
-            if (currentPage < 1) currentPage = 1;
-
-            const startIndex = (currentPage - 1) * itemsPerPage;
-            const paginatedItems = filteredData.slice(startIndex, startIndex + itemsPerPage);
-
-            container.innerHTML = paginatedItems.map(item => `
-                <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="viewDetails('${item.id}')">
-                    <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
-                        <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
-                        <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
-                            <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
-                                <i class="fa-solid fa-circle-info ml-0.5 text-base"></i>
-                            </div>
-                        </div>
-                        <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${item.status}</span>
-                    </div>
-                    <div class="p-3">
-                        <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-zinc-900 dark:text-white">${item.title}</h4>
-                    </div>
-                </div>
-            `).join('');
-
-            let paginationHTML = '';
-            const baseBtnClass = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-neon-lightCard dark:bg-neon-darkCard text-zinc-800 dark:text-white border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition';
-            const disabledBtnClass = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-zinc-200 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border-zinc-300 dark:border-zinc-800 cursor-not-allowed';
-
-            if (currentPage > 1) { paginationHTML += `<button class="${baseBtnClass}" onclick="goToPage(1)">&laquo;</button>`; } 
-            else { paginationHTML += `<button class="${disabledBtnClass}" disabled>&laquo;</button>`; }
-
-            if (currentPage > 1) { paginationHTML += `<button class="${baseBtnClass}" onclick="goToPage(${currentPage - 1})">&lsaquo;</button>`; } 
-            else { paginationHTML += `<button class="${disabledBtnClass}" disabled>&lsaquo;</button>`; }
-
-            let startPage = Math.max(1, currentPage - 2);
-            let endPage = Math.min(totalPages, currentPage + 2);
-
-            for(let i = startPage; i <= endPage; i++) {
-                const activeClass = i === currentPage ? 'bg-neon-yellow text-white dark:text-white font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-zinc-800 dark:text-white border-neon-lightBorder dark:border-neon-darkBorder';
-                paginationHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${activeClass} transition" onclick="goToPage(${i})">${i}</button>`;
-            }
-
-            if (currentPage < totalPages) { paginationHTML += `<button class="${baseBtnClass}" onclick="goToPage(${currentPage + 1})">&rsaquo;</button>`; } 
-            else { paginationHTML += `<button class="${disabledBtnClass}" disabled>&rsaquo;</button>`; }
-
-            if (currentPage < totalPages) { paginationHTML += `<button class="${baseBtnClass}" onclick="goToPage(${totalPages})">&raquo;</button>`; } 
-            else { paginationHTML += `<button class="${disabledBtnClass}" disabled>&raquo;</button>`; }
-
-            paginationBox.innerHTML = paginationHTML;
-        }
-
-        function goToPage(pageNumber) {
-            currentPage = pageNumber;
-            displayAnimeWithPagination();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            activeSearchQuery = "";
+            activeStatusFilter = "";
+            activeGenreFilter = genre;
+            document.getElementById('sectionHeader').innerText = `Genre: ${genre}`;
+            loadAnimeDatabase(1);
         }
 
         function searchAnime() {
-            const query = document.getElementById('searchField').value.trim().toLowerCase();
-            const container = document.getElementById('searchContainer');
+            const query = document.getElementById('searchField').value.trim();
             document.getElementById('searchSuggestions').classList.add('hidden');
-            if(!query) {
-                container.classList.add('hidden');
-                filteredData = [...currentData];
-                displayAnimeWithPagination();
-                return;
-            }
             document.getElementById('detailView').classList.add('hidden');
             document.getElementById('homeView').classList.remove('hidden');
 
-            currentPage = 1;
-            document.getElementById('sectionHeader').innerText = `Hasil Pencarian: "${query}"`;
-            filteredData = currentData.filter(a => a.title.toLowerCase().includes(query));
-            displayAnimeWithPagination();
+            activeSearchQuery = query;
+            activeGenreFilter = "";
+            document.getElementById('sectionHeader').innerText = query ? `Hasil Pencarian: "${query}"` : "Semua Daftar Anime";
+            loadAnimeDatabase(1);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // Navigasi Detail
+
         function viewDetails(id, pushHistory = true) {
             const anime = currentData.find(a => a.id == id);
             if(!anime) return;
@@ -517,7 +508,6 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // Membuka Streaming di Tab Baru (Eps 0)
         function openStreamingTab() {
             if (!activeAnime || !activeAnime.url) return;
             window.open(`stream.html?url=${encodeURIComponent(activeAnime.url)}&eps=0`, '_blank');
@@ -567,13 +557,13 @@
             const urlParams = new URLSearchParams(window.location.search);
             const searchQuery = urlParams.get('q');
 
-            loadAnimeDatabase().then(() => {
-                if (searchQuery) {
-                    document.getElementById('searchContainer').classList.remove('hidden');
-                    document.getElementById('searchField').value = searchQuery;
-                    searchAnime();
-                }
-            });
+            if (searchQuery) {
+                document.getElementById('searchContainer').classList.remove('hidden');
+                document.getElementById('searchField').value = searchQuery;
+                activeSearchQuery = searchQuery;
+            }
+
+            loadAnimeDatabase(1);
         };
     </script>
 </body>
