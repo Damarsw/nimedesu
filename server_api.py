@@ -85,9 +85,12 @@ def api_anime_detail():
                     if original_url:
                         encoded_url = base64.b64encode(original_url.encode('utf-8')).decode('utf-8')
                     
+                    # Menangani berbagai kemungkinan nama key server dari hasil scraping
+                    server_val = srv.get("server") or srv.get("server_name") or "1"
+                    
                     video_servers.append({
                         "resolution": srv.get("resolution", "Mirror 360p"),
-                        "server": str(srv.get("server", srv.get("server_name", "1"))),
+                        "server": str(server_val),
                         "video_url": encoded_url
                     })
 
