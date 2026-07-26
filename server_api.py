@@ -8,7 +8,7 @@ app = Flask(__name__)
 CORS(app)
 
 SUPABASE_URL = "https://yezdnsgypbjcgzoftgmz.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllemRuc2d5cGJqY2d6b2Z0Z216Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDg4Nzg5NSwiZXhwIjoyMTAwNDYzODk1fQ.RV8xeE4YMwEJrkq04y3hScKIkSEduOJLABtCPykdZf8"
+SUPABASE_KEY = "sb_publishable_6zAs4KTrqGhcHf2fvcAlWw_IO7gkLsw"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
