@@ -518,16 +518,11 @@
             const iframe = document.getElementById('videoIframe');
             if (videoUrl) {
                 let finalUrl = videoUrl;
-                
-                // Cek apakah string berupa Base64 atau URL biasa (http/https)
-                if (!videoUrl.startsWith('http://') && !videoUrl.startsWith('https://')) {
-                    try {
-                        finalUrl = atob(videoUrl);
-                    } catch (e) {
-                        finalUrl = videoUrl;
-                    }
+                try {
+                    finalUrl = atob(videoUrl);
+                } catch (e) {
+                    finalUrl = videoUrl;
                 }
-                
                 iframe.src = finalUrl;
             }
         }
