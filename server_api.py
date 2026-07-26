@@ -38,7 +38,7 @@ def api_anime():
         if genre_filter:
             query = query.ilike("genre", f"%{genre_filter}%")
 
-        response = query.range(start, end).execute()
+        response = query.order("id").range(start, end).execute()
 
         total_records = response.count if response.count is not None else 0
         total_pages = -(-total_records // per_page) if total_records > 0 else 1
@@ -70,7 +70,7 @@ def api_anime_detail():
         anime_id = anime_item.get("id")
 
         # Ambil data episodes berdasarkan anime_id
-        ep_res = supabase.table("episodes").select("*").eq("anime_id", anime_id).execute()
+        ep_res = supabase.table("episodes").select("*").eq("anime_id", anime_id).order("id").execute()
         episodes_data = ep_res.data or []
 
         episodes_list = []
