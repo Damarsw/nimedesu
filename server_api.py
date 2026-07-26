@@ -2,47 +2,48 @@ import base64
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import requests
+from supabase import create_client
 
 app = Flask(__name__)
 CORS(app)
 
-SUPABASE_URLS = {
-    "infozingle": "https://yezdnsgypbjcgzoftgmz.supabase.co/storage/v1/object/public/database_anime/otakudesu_infozingle.json",
-    "sinopsis": "https://yezdnsgypbjcgzoftgmz.supabase.co/storage/v1/object/public/database_anime/data_anime_sinopsis.json",
-    "super_lengkap": "https://yezdnsgypbjcgzoftgmz.supabase.co/storage/v1/object/public/database_anime/data_anime_super_lengkap.json",
-    "episode_baru": "https://yezdnsgypbjcgzoftgmz.supabase.co/storage/v1/object/public/database_anime/data_episode_baru.json"
-}
+# Konfigurasi Supabase Client
+SUPABASE_URL = "https://yezdnsgypbjcqzoftgmz.supabase.co"
+SUPABASE_KEY = "PASTE_SUPABASE_SERVICE_ROLE_ATAU_ANON_KEY" # Dapatkan di Supabase Settings > API
 
-cache_data = {}
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-def fetch_supabase_json(key):
-    if key in cache_data:
-        return cache_data[key]
+# Masih mengambil data episode streaming dari storage/JSON jika diperlukan
+STORAGE_EPISODE_URL = "https://yezdnsgypbjcqzoftgmz.supabase.co/storage/v1/object/public/database_anime/data_anime_super_lengkap.json"
+
+cache_episodes = None
+
+def fetch_episode_data():
+    global cache_episodes
+    if cache_episodes:
+        return cache_episodes
     try:
-        response = requests.get(SUPABASE_URLS[key], timeout=30)
+        response = requests.get(STORAGE_EPISODE_URL, timeout=30)
         if response.status_code == 200:
-            data = response.json()
-            cache_data[key] = data
-            return data
+            cache_episodes = response.json()
+            return cache_episodes
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error fetching episodes: {e}")
     return []
 
 @app.route("/")
 def home():
     return "NimeDesu Server API is Active!"
 
+# Endpoint /api/anime membaca langsung dari TABEL 'anime'
 @app.route("/api/anime", methods=["GET"])
 def api_anime():
-    return jsonify(fetch_supabase_json("infozingle"))
-
-@app.route("/api/sinopsis", methods=["GET"])
-def api_sinopsis():
-    return jsonify(fetch_supabase_json("sinopsis"))
-
-@app.route("/api/super-lengkap", methods=["GET"])
-def api_super_lengkap():
-    return jsonify(fetch_supabase_json("super_lengkap"))
+    try:
+        # Mengambil seluruh baris dari tabel 'anime'
+        response = supabase.table("anime").select("*").execute()
+        return jsonify(response.data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/anime-detail", methods=["GET"])
 def api_anime_detail():
@@ -50,7 +51,7 @@ def api_anime_detail():
     if not anime_url:
         return jsonify({"error": "URL tidak valid"}), 400
 
-    super_data = fetch_supabase_json("super_lengkap")
+    super_data = fetch_episode_data()
     matched = next((item for item in super_data if str(item.get("url", "")).strip() == anime_url or str(item.get("link", "")).strip() == anime_url), None)
     
     if matched:
