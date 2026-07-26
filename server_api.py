@@ -13,9 +13,6 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Masih mengambil data episode streaming dari storage/JSON jika diperlukan
-STORAGE_EPISODE_URL = "https://yezdnsgypbjcqzoftgmz.supabase.co/storage/v1/object/public/database_anime/data_anime_super_lengkap.json"
-
 cache_episodes = None
 
 def fetch_episode_data():
