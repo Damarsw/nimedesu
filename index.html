@@ -145,7 +145,13 @@
                 <h2 id="sectionHeader" class="text-xl sm:text-2xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-zinc-900 dark:text-white">Semua Daftar Anime</h2>
             </div>
 
-            <div id="animeDisplayGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 sm:gap-5"></div>
+            <!-- Grid dengan Tampilan Awal "Memuat Data Anime" -->
+            <div id="animeDisplayGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 sm:gap-5">
+                <div class="col-span-full flex flex-col items-center justify-center py-16 space-y-3">
+                    <i class="fa-solid fa-spinner fa-spin text-2xl text-neon-yellow"></i>
+                    <p class="text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300">Memuat Data Anime...</p>
+                </div>
+            </div>
 
             <div id="paginationBox" class="flex justify-center items-center space-x-1.5 sm:space-x-2 mt-8 flex-wrap gap-y-2"></div>
         </div>
@@ -221,6 +227,7 @@
 
     <footer class="border-t border-neon-lightBorder dark:border-neon-darkBorder py-6 mt-12 text-center text-xs text-zinc-700 dark:text-zinc-400">
         <p>NimeDesu - Nonton Anime Sub Indonesia</p>
+        <p>Perlu bantuan dan masukan? (<a href="mailto:damdesu@proton.me" class="text-neon-yellow hover:underline font-medium">email</a>)</p>
     </footer>
 
     <script>
@@ -374,8 +381,9 @@
                 suggestionsBox.innerHTML = matched.map(anime => {
                     const genres = anime.genre ? anime.genre.split(',').map(g => g.trim()).join(', ') : '-';
                     const img = anime.image_url || "https://placehold.co/100x150?text=No+Image";
+                    const safeTitle = anime.title.replace(/'/g, "\\'");
                     return `
-                        <div onclick="activeSearchQuery='${anime.title.replace(/'/g, "\\'")}'; loadAnimeDatabase(1); document.getElementById('searchContainer').classList.add('hidden'); document.getElementById('searchSuggestions').classList.add('hidden');" class="flex items-center gap-3 p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer transition">
+                        <div onclick="activeSearchQuery='${safeTitle}'; document.getElementById('detailView').classList.add('hidden'); document.getElementById('homeView').classList.remove('hidden'); loadAnimeDatabase(1); document.getElementById('searchContainer').classList.add('hidden'); document.getElementById('searchSuggestions').classList.add('hidden'); history.pushState({ view: 'home' }, '', window.location.pathname);" class="flex items-center gap-3 p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer transition">
                             <img src="${img}" class="w-10 h-14 object-cover rounded-lg shrink-0">
                             <div class="overflow-hidden">
                                 <h4 class="text-xs font-semibold text-zinc-900 dark:text-white truncate">${anime.title}</h4>
@@ -461,12 +469,20 @@
         function searchAnime() {
             const query = document.getElementById('searchField').value.trim();
             document.getElementById('searchSuggestions').classList.add('hidden');
-            document.getElementById('detailView').classList.add('hidden');
-            document.getElementById('homeView').classList.remove('hidden');
 
             activeSearchQuery = query;
             activeGenreFilter = "";
             document.getElementById('sectionHeader').innerText = query ? `Hasil Pencarian: "${query}"` : "Semua Daftar Anime";
+            
+            const detailView = document.getElementById('detailView');
+            const isDetailActive = detailView && !detailView.classList.contains('hidden');
+
+            if (isDetailActive) {
+                detailView.classList.add('hidden');
+                document.getElementById('homeView').classList.remove('hidden');
+                history.pushState({ view: 'home' }, "", window.location.pathname);
+            }
+
             loadAnimeDatabase(1);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
