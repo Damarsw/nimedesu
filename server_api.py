@@ -35,11 +35,8 @@ def api_anime():
             query = query.ilike("title", f"%{search_query}%")
         if genre_filter:
             query = query.ilike("genre", f"%{genre_filter}%")
-        # NOTE: kolom "status" belum ada di tabel "anime" (lihat struktur di
-        # Supabase: id, title, url, sinopsis, img_url, genre). Kalau kolom ini
-        # ditambahkan nanti, tinggal un-comment baris di bawah ini.
-        # if status_filter:
-        #     query = query.ilike("status", f"%{status_filter}%")
+        if status_filter:
+            query = query.ilike("status", f"%{status_filter}%")
 
         response = query.order("id").range(start, end).execute()
 
