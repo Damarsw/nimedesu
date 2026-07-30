@@ -35,6 +35,7 @@
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style> 
         body { 
             font-family: 'Inter', sans-serif; 
@@ -166,6 +167,56 @@
         let activeEpisodeIndex = 0;
         let globalAnimeTitle = "Anime";
         let allAnimeList = [];
+        let currentAnimeThumbnail = "";
+
+        const KEY_X = "LayerX_Secret2026";
+        const KEY_Y = "LayerY_Secret2026";
+        const KEY_Z = "LayerZ_Secret2026";
+
+        function encryptTripleLayer(data) {
+            const jsonString = JSON.stringify(data);
+            const layer1 = CryptoJS.AES.encrypt(jsonString, KEY_X).toString();
+            const layer2 = CryptoJS.Rabbit.encrypt(layer1, KEY_Y).toString();
+            const layer3 = CryptoJS.TripleDES.encrypt(layer2, KEY_Z).toString();
+            return layer3;
+        }
+
+        function decryptTripleLayer(ciphertext) {
+            try {
+                const bytesZ = CryptoJS.TripleDES.decrypt(ciphertext, KEY_Z);
+                const layer2 = bytesZ.toString(CryptoJS.enc.Utf8);
+                if (!layer2) return null;
+                const bytesY = CryptoJS.Rabbit.decrypt(layer2, KEY_Y);
+                const layer1 = bytesY.toString(CryptoJS.enc.Utf8);
+                if (!layer1) return null;
+                const bytesX = CryptoJS.AES.decrypt(layer1, KEY_X);
+                const decryptedString = bytesX.toString(CryptoJS.enc.Utf8);
+                if (!decryptedString) return null;
+                return JSON.parse(decryptedString);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIndex, thumbnailImg) {
+            let encryptedData = localStorage.getItem('nimedesu_history_triple');
+            let history = encryptedData ? decryptTripleLayer(encryptedData) || [] : [];
+
+            const animeItem = {
+                id: animeUrl,
+                title: animeTitle,
+                url: animeUrl,
+                thumbnail: thumbnailImg || "https://placehold.co/400x600?text=No+Image",
+                lastWatchedEpisode: episodeTitle,
+                lastEpisodeIndex: episodeIndex
+            };
+
+            history = history.filter(item => item.url != animeUrl);
+            history.unshift(animeItem);
+            if (history.length > 6) history.pop();
+
+            localStorage.setItem('nimedesu_history_triple', encryptTripleLayer(history));
+        }
 
         function toggleSearchInput(event) {
             if(event) event.stopPropagation();
@@ -183,10 +234,6 @@
 
         async function fetchAllAnimeForSearch() {
             try {
-                // Ambil SEMUA anime dengan loop per halaman, bukan sekali tembak.
-                // Ini penting karena kalau total anime di database > per_page,
-                // anime dengan id besar (di "halaman belakang") akan kepotong
-                // dan tidak pernah masuk ke allAnimeList kalau cuma fetch 1x.
                 const perPage = 1000;
                 let page = 1;
                 let all = [];
@@ -311,15 +358,16 @@
                         const segments = animeUrl.split('/').filter(Boolean);
                         globalAnimeTitle = segments[segments.length - 1].replace(/-/g, ' ');
                     }
+
+                    const currentAnimeInfo = allAnimeList.find(a => (a.url && a.url.trim() === animeUrl));
+                    if (currentAnimeInfo) {
+                        currentAnimeThumbnail = currentAnimeInfo.image_url || currentAnimeInfo.thumbnail || "";
+                    }
                     
                     document.getElementById('episodeNavContainer').classList.remove('hidden');
                     renderDynamicEpisodes();
 
-                    // Bagian rekomendasi dipisah try/catch sendiri supaya kalau ada
-                    // error di sini, judul & player yang sudah berhasil dimuat
-                    // TIDAK ikut tertimpa pesan "Gagal memuat server streaming."
                     try {
-                        const currentAnimeInfo = allAnimeList.find(a => (a.url && a.url.trim() === animeUrl));
                         if (currentAnimeInfo) {
                             renderRecommendations(currentAnimeInfo);
                         } else {
@@ -433,6 +481,14 @@
 
             if(activeEpisodes[activeEpisodeIndex] && activeEpisodes[activeEpisodeIndex].video_servers) {
                 renderDynamicServers(activeEpisodes[activeEpisodeIndex].video_servers);
+            }
+
+            // Simpan riwayat otomatis saat halaman dimuat/episode terpilih
+            if (currentEp) {
+                const epLabelClean = currentEp.episode_title ? currentEp.episode_title.replace(/Sub.*$/, '').trim() : `Eps ${activeEpisodeIndex + 1}`;
+                const urlParams = new URLSearchParams(window.location.search);
+                const animeUrl = urlParams.get('url');
+                saveStreamToHistory(globalAnimeTitle, animeUrl, epLabelClean, activeEpisodeIndex, currentAnimeThumbnail);
             }
         }
 
