@@ -16,7 +16,7 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 def home():
     return "NimeDesu Server API is Active!"
 
-# Endpoint anime dengan Pagination & Search di Server
+# 1. Endpoint anime dengan Pagination & Search di Server
 @app.route("/api/anime", methods=["GET"])
 def api_anime():
     try:
@@ -33,26 +33,35 @@ def api_anime():
 
         if search_query:
             query = query.ilike("title", f"%{search_query}%")
-        if status_filter:
-            query = query.ilike("status", f"%{status_filter}%")
         if genre_filter:
             query = query.ilike("genre", f"%{genre_filter}%")
+        # NOTE: kolom "status" belum ada di tabel "anime" (lihat struktur di
+        # Supabase: id, title, url, sinopsis, img_url, genre). Kalau kolom ini
+        # ditambahkan nanti, tinggal un-comment baris di bawah ini.
+        # if status_filter:
+        #     query = query.ilike("status", f"%{status_filter}%")
 
         response = query.order("id").range(start, end).execute()
 
         total_records = response.count if response.count is not None else 0
         total_pages = -(-total_records // per_page) if total_records > 0 else 1
 
+        # Samakan nama field dengan yang dipakai frontend (index.html / stream.html
+        # mengharapkan "image_url", padahal kolom di DB namanya "img_url")
+        data = response.data or []
+        for item in data:
+            item["image_url"] = item.get("img_url")
+
         return jsonify({
-            "data": response.data if response.data else [],
+            "data": data,
             "total": total_records,
             "page": page,
             "total_pages": total_pages
         })
     except Exception as e:
-        return jsonify({"error": str(e), "data": [], "total_pages": 1}), 500
+        return jsonify({"error": str(e)}), 500
 
-# Endpoint detail streaming menggunakan tabel anime & episode
+# 2. Endpoint detail streaming (Menggunakan 2 tabel: anime & episodes dengan JSONB video_servers)
 @app.route("/api/anime-detail", methods=["GET"])
 def api_anime_detail():
     anime_url = request.args.get("url", "").strip()
@@ -60,6 +69,7 @@ def api_anime_detail():
         return jsonify({"error": "URL tidak valid"}), 400
 
     try:
+        # Cari data anime berdasarkan URL
         anime_res = supabase.table("anime").select("*").ilike("url", f"%{anime_url}%").execute()
 
         if not anime_res.data or len(anime_res.data) == 0:
@@ -68,6 +78,8 @@ def api_anime_detail():
         anime_item = anime_res.data[0]
         anime_id = anime_item.get("id")
 
+        # Ambil data episodes berdasarkan anime_id
+        # PENTING: nama tabel di Supabase adalah "episode" (tunggal), bukan "episodes"
         ep_res = supabase.table("episode").select("*").eq("anime_id", anime_id).order("id").execute()
         episodes_data = ep_res.data or []
 
@@ -78,11 +90,15 @@ def api_anime_detail():
             
             if isinstance(raw_servers, list):
                 for srv in raw_servers:
-                    original_url = srv.get("video_url", "")
+                    # Di kolom jsonb "video_servers", key aslinya adalah "url"
+                    # (bukan "video_url"). Tetap cek "video_url" juga untuk jaga-jaga
+                    # kalau ada data lama dengan format berbeda.
+                    original_url = srv.get("url") or srv.get("video_url", "")
                     encoded_url = ""
                     if original_url:
                         encoded_url = base64.b64encode(original_url.encode('utf-8')).decode('utf-8')
                     
+                    # Menangani berbagai kemungkinan nama key server dari hasil scraping
                     server_val = srv.get("server") or srv.get("server_name") or "1"
                     
                     video_servers.append({
@@ -112,9 +128,3 @@ def api_anime_detail():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-```[cite: 9]
-
----
-
-### 2. File Frontend: `index.html`
-Ganti seluruh isi file `index.html` dengan kode berikut[cite: 5]:
