@@ -258,15 +258,15 @@
 
             <div class="border-t border-zinc-200 dark:border-zinc-800 pt-6 space-y-3 text-center">
                 <label class="block text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">Backup Data Cookies:</label>
-           
+                <!-- Tombol Download dengan Efek Klik Kuning Menyala -->
                 <button id="btnDownloadCookies" onclick="downloadCookiesJson()" class="px-5 py-2.5 bg-neon-lightBg dark:bg-neon-darkBg text-black dark:text-white border border-neon-yellow hover:bg-neon-yellow hover:text-black font-semibold rounded-xl transition text-xs shadow-xs">
-                    <i class="fa-solid fa-download mr-1.5"></i> Download cookies untuk menympan progres (JSON)
+                    <i class="fa-solid fa-download mr-1.5"></i> Download cookies Anda (JSON)
                 </button>
             </div>
 
             <div class="p-4 bg-yellow-500/10 border border-neon-yellow/30 rounded-xl text-center">
                 <p class="text-[11px] text-zinc-700 dark:text-zinc-300 italic">
-                    Note: Login cookies digunakan untuk menyimpan fitur "terakhir kali ditonton" di perangkat lama apabila perangkat dihapus cache, ganti browser, ataupun ganti perangkat. Jika mau pakai silahkan, sifatnya opsional agar history kalian gak kembali lagi dari awal. Admin tidak menyimpan info login kalian, jadi simpen sendiri ya wkwk.
+                    💡 **Note kecil:** Simpan cookies anda untuk fitur "terakhir kali ditonton".
                 </p>
             </div>
         </div>
@@ -602,7 +602,6 @@
             if(!anime) return;
             activeAnime = anime;
 
-            saveToHistory(anime, "Eps 1");
             switchView('detail');
 
             document.getElementById('detTitle').innerText = anime.title;
@@ -628,21 +627,6 @@
             }
         }
 
-        function saveToHistory(anime, episodeInfo = "Eps 1") {
-            let encryptedData = localStorage.getItem('nimedesu_history_triple');
-            let history = encryptedData ? decryptTripleLayer(encryptedData) || [] : [];
-            
-            // Simpan info episode terakhir ditonton ke dalam objek anime
-            anime.lastWatchedEpisode = episodeInfo;
-
-            history = history.filter(item => item.id != anime.id);
-            history.unshift(anime);
-            if (history.length > 6) history.pop();
-
-            localStorage.setItem('nimedesu_history_triple', encryptTripleLayer(history));
-            renderHistory();
-        }
-
         function renderHistory() {
             const historySection = document.getElementById('historySection');
             const historyGrid = document.getElementById('historyGrid');
@@ -656,25 +640,29 @@
             }
 
             historySection.classList.remove('hidden');
-            historyGrid.innerHTML = history.map(item => `
-                <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="viewDetails('${item.id}')">
-                    <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
-                        <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
-                        <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
-                            <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
-                                <i class="fa-solid fa-play ml-0.5 text-base"></i>
+            historyGrid.innerHTML = history.map(item => {
+                const targetEpsIndex = item.lastEpisodeIndex !== undefined ? item.lastEpisodeIndex : 0;
+                
+                return `
+                    <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="window.location.href='stream.html?url=${encodeURIComponent(item.url)}&eps=${targetEpsIndex}'">
+                        <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
+                            <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
+                            <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
+                                <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
+                                    <i class="fa-solid fa-play ml-0.5 text-base"></i>
+                                </div>
                             </div>
+                            <!-- Badge menampilkan nomor/label episode terakhir yang ditonton -->
+                            <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">
+                                ${item.lastWatchedEpisode || 'Eps 1'}
+                            </span>
                         </div>
-                        <!-- Menampilkan Episode berapa terakhir yang ditonton di poster -->
-                        <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">
-                            ${item.lastWatchedEpisode || 'Eps 1'}
-                        </span>
+                        <div class="p-3">
+                            <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
+                        </div>
                     </div>
-                    <div class="p-3">
-                        <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         function clearHistory() {
