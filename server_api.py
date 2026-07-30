@@ -52,7 +52,7 @@ def api_anime():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# 2. Endpoint detail streaming (Menggunakan 2 tabel: anime & episodes dengan JSONB video_servers)
+# 2. Endpoint detail streaming (Menggunakan tabel: anime & episode tanpa 's')
 @app.route("/api/anime-detail", methods=["GET"])
 def api_anime_detail():
     anime_url = request.args.get("url", "").strip()
@@ -69,8 +69,8 @@ def api_anime_detail():
         anime_item = anime_res.data[0]
         anime_id = anime_item.get("id")
 
-        # Ambil data episodes berdasarkan anime_id
-        ep_res = supabase.table("episodes").select("*").eq("anime_id", anime_id).order("id").execute()
+        # Ambil data dari tabel "episode" (sesuai database Supabase kamu)
+        ep_res = supabase.table("episode").select("*").eq("anime_id", anime_id).order("id").execute()
         episodes_data = ep_res.data or []
 
         episodes_list = []
@@ -85,7 +85,6 @@ def api_anime_detail():
                     if original_url:
                         encoded_url = base64.b64encode(original_url.encode('utf-8')).decode('utf-8')
                     
-                    # Menangani berbagai kemungkinan nama key server dari hasil scraping
                     server_val = srv.get("server") or srv.get("server_name") or "1"
                     
                     video_servers.append({
