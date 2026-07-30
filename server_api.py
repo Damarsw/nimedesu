@@ -16,7 +16,7 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 def home():
     return "NimeDesu Server API is Active!"
 
-# 1. Endpoint anime dengan Pagination & Search di Server
+# Endpoint anime dengan Pagination & Search di Server
 @app.route("/api/anime", methods=["GET"])
 def api_anime():
     try:
@@ -44,15 +44,15 @@ def api_anime():
         total_pages = -(-total_records // per_page) if total_records > 0 else 1
 
         return jsonify({
-            "data": response.data,
+            "data": response.data if response.data else [],
             "total": total_records,
             "page": page,
             "total_pages": total_pages
         })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e), "data": [], "total_pages": 1}), 500
 
-# 2. Endpoint detail streaming (Menggunakan tabel: anime & episode tanpa 's')
+# Endpoint detail streaming menggunakan tabel anime & episode
 @app.route("/api/anime-detail", methods=["GET"])
 def api_anime_detail():
     anime_url = request.args.get("url", "").strip()
@@ -60,7 +60,6 @@ def api_anime_detail():
         return jsonify({"error": "URL tidak valid"}), 400
 
     try:
-        # Cari data anime berdasarkan URL
         anime_res = supabase.table("anime").select("*").ilike("url", f"%{anime_url}%").execute()
 
         if not anime_res.data or len(anime_res.data) == 0:
@@ -69,7 +68,6 @@ def api_anime_detail():
         anime_item = anime_res.data[0]
         anime_id = anime_item.get("id")
 
-        # Ambil data dari tabel "episode" (sesuai database Supabase kamu)
         ep_res = supabase.table("episode").select("*").eq("anime_id", anime_id).order("id").execute()
         episodes_data = ep_res.data or []
 
@@ -114,3 +112,9 @@ def api_anime_detail():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+```[cite: 9]
+
+---
+
+### 2. File Frontend: `index.html`
+Ganti seluruh isi file `index.html` dengan kode berikut[cite: 5]:
