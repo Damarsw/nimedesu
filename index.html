@@ -290,13 +290,12 @@
         let activeStatusFilter = "";
         let activeGenreFilter = "";
 
-        const RENDER_API_URL = "https://nimedesu.onrender.com";
+        const RENDER_API_URL = "/api-backend";
 
         const KEY_X = "LayerX_Secret2026";
         const KEY_Y = "LayerY_Secret2026";
         const KEY_Z = "LayerZ_Secret2026";
 
-        // Fungsi Penghasil Token Keamanan Dinamis untuk Mencegah Scraper
         function generateSecurityToken() {
             const timestamp = Math.floor(Date.now() / 1000);
             const rawPayload = `${timestamp}_NimeDesuSecretKey2026`;
@@ -370,7 +369,7 @@
         async function loadAnimeDatabase(page = 1) {
             try {
                 currentPage = page;
-                let fetchUrl = `${RENDER_API_URL}/api/anime?page=${page}&per_page=${itemsPerPage}`;
+                let fetchUrl = `${RENDER_API_URL}/anime?page=${page}&per_page=${itemsPerPage}`;
                 
                 if (activeSearchQuery) fetchUrl += `&q=${encodeURIComponent(activeSearchQuery)}`;
                 if (activeStatusFilter) fetchUrl += `&status=${encodeURIComponent(activeStatusFilter)}`;
@@ -489,7 +488,7 @@
 
             try {
                 const sec = generateSecurityToken();
-                const res = await fetch(`${RENDER_API_URL}/api/anime?q=${encodeURIComponent(query)}&per_page=6`, {
+                const res = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(query)}&per_page=6`, {
                     headers: {
                         "X-Client-Token": sec.token,
                         "X-Client-Time": sec.time
