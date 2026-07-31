@@ -97,7 +97,7 @@ def security_validation():
     if request.method == "OPTIONS":
         return
         
-    # PENGECAKUAN MUTLAK DI BARIS PALING ATAS
+    # Pengecualian mutlak agar proxy langsung lolos tanpa cek header
     if "proxy-stream" in request.path:
         return
 
