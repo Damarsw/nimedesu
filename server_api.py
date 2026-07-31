@@ -226,7 +226,7 @@ def api_anime():
 def api_anime_detail():
     anime_url = request.args.get("url", "").strip()
     if not anime_url:
-        return jsonify({"error": "URL tidak valid"}}, 400
+      return jsonify({"error": "URL tidak valid"}), 400
 
     try:
         anime_res = client_obj.table(X1).select("*").ilike(Y3, f"%{anime_url}%").execute()
