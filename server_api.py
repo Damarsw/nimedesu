@@ -98,6 +98,10 @@ def security_validation():
         return
         
     if request.path.startswith("/api/"):
+        # Pengecualian agar iframe dapat memuat proxy stream secara langsung tanpa header kustom
+        if request.path == "/api/proxy-stream":
+            return
+
         origin = request.headers.get("Origin", "")
         referer = request.headers.get("Referer", "")
         
@@ -135,7 +139,6 @@ def security_validation():
 def home():
     return "NimeDesu Server API is Active!"
 
-# ===== TAMBAHAN ENDPOINT PROXY STREAM UNIVERSAL =====
 @app.route("/api/proxy-stream", methods=["GET"])
 def proxy_stream():
     target_url = request.args.get("target", "").strip()
