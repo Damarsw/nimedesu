@@ -62,7 +62,6 @@ def process_token(s):
     w9 = p9(w8)
     return p10(w9)
 
-# Gunakan token asli Anda yang aman dari file lama Anda
 H_URL = "TVRrNU1EQTVNVEl5TURBNE1URXlNRFEwTWpZNU5qa3dNREF3TURFd01EQXdNREF3TURBd01EQXdNREF3TURBd01EQXdNREF3TURBd01EQXdNREF3TURBPS=="
 H_KEY = "TWpZd016VXdNakkzTURJd01qSTRNREEwTURnMU5qTTNNRFl3TURFd01EQXdNREF3TURBd01EQXdNREF3TURBd01EQXdNREF3TURBd01EQXdNREF3TURBd01EQXdNREFzPQ=="
 
@@ -98,6 +97,7 @@ def security_validation():
     if request.method == "OPTIONS":
         return
         
+    # PENGECAKUAN MUTLAK PALING ATAS
     if "proxy-stream" in request.path:
         return
 
@@ -140,6 +140,7 @@ def home():
     return "NimeDesu Server API is Active!"
 
 @app.route("/api/proxy-stream", methods=["GET"])
+@app.route("/proxy-stream", methods=["GET"])
 def proxy_stream():
     target_url = request.args.get("target", "").strip()
     if not target_url:
