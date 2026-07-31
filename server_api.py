@@ -145,8 +145,10 @@ def proxy_stream():
     if not target_url:
         return "URL target tidak valid", 400
 
+    if target_url.startswith("http://"):
+        target_url = "https://" + target_url[7:]
+
     try:
-        # Meniru header browser lengkap agar lolos dari proteksi server video sumber
         req_headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
             "Referer": target_url,
@@ -154,13 +156,12 @@ def proxy_stream():
             "Accept-Encoding": "identity",
             "Connection": "keep-alive"
         }
-
-        # Meneruskan header Range (penting agar video bisa di-seek / digeser durasinya)
+        
         range_header = request.headers.get("Range")
         if range_header:
             req_headers["Range"] = range_header
 
-        upstream_response = requests.get(target_url, headers=req_headers, stream=True, timeout=20)
+        upstream_response = requests.get(target_url, headers=req_headers, stream=True, timeout=20, allow_redirects=True)
         
         excluded_headers = ["content-encoding", "content-length", "transfer-encoding", "connection"]
         response_headers = [
@@ -181,7 +182,7 @@ def proxy_stream():
         )
     except Exception as e:
         return f"Proxy Error: {str(e)}", 500
-
+        
 @app.route("/api/anime", methods=["GET"])
 def api_anime():
     try:
