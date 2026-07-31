@@ -97,7 +97,7 @@ def security_validation():
     if request.method == "OPTIONS":
         return
         
-    # Pengecualian mutlak diletakkan paling atas sebelum pemeriksaan path api lainnya
+    # Pengecualian mutlak untuk proxy stream diletakkan paling atas
     if request.path == "/api/proxy-stream":
         return
 
@@ -263,3 +263,4 @@ def api_anime_detail():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+```[cite: 9]
