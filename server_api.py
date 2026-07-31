@@ -97,8 +97,8 @@ def security_validation():
     if request.method == "OPTIONS":
         return
         
-    # Pengecualian mutlak: Letakkan paling atas sebelum pemeriksaan path apapun
-    if request.path == "/api/proxy-stream" or "/proxy-stream" in request.path:
+    # LOLOS MUTLAK: Jika URL mengandung kata proxy-stream, langsung izinkan tanpa cek apapun
+    if "proxy-stream" in request.path:
         return
 
     if request.path.startswith("/api/"):
