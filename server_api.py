@@ -97,7 +97,7 @@ def security_validation():
     if request.method == "OPTIONS":
         return
         
-    # LOLOS MUTLAK: Jika URL mengandung kata proxy-stream, langsung izinkan tanpa cek apapun
+    # PENGECAKUAN MUTLAK DI BARIS PALING ATAS
     if "proxy-stream" in request.path:
         return
 
