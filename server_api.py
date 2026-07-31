@@ -15,9 +15,15 @@ CORS(app, resources={r"/api/*": {"origins": "https://nimedesu.vercel.app"}})
 # CONFIG - all secrets come from environment variables (set these in Render:
 # Dashboard -> your service -> Environment)
 # ---------------------------------------------------------------------------
-SUPABASE_URL = os.environ["SUPABASE_URL"]          # e.g. https://yezdnsgypbjcgzoftgmz.supabase.co
-SUPABASE_KEY = os.environ["SUPABASE_KEY"]          # your sb_publishable_... key
+SUPABASE_URL = os.environ.get("https://yezdnsgypbjcgzoftgmz.supabase.co")
+SUPABASE_KEY = os.environ.get("sb_publishable_6zAs4KTrqGhcHf2fvcAlWw_IO7gkLsw")
 SECRET_SERVER_KEY = os.environ.get("SECRET_SERVER_KEY", "NimeDesuSecretKey2026")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise RuntimeError(
+        "Missing SUPABASE_URL / SUPABASE_KEY environment variables. "
+        "Set them in Render -> Environment before deploying."
+    )
 
 client_obj = create_client(SUPABASE_URL, SUPABASE_KEY)
 
