@@ -97,11 +97,11 @@ def security_validation():
     if request.method == "OPTIONS":
         return
         
-    if request.path.startswith("/api/"):
-        # Pengecualian diletakkan paling atas agar iframe langsung lolos tanpa validasi header
-        if request.path == "/api/proxy-stream":
-            return
+    # Pengecualian mutlak diletakkan paling atas sebelum pemeriksaan path api lainnya
+    if request.path == "/api/proxy-stream":
+        return
 
+    if request.path.startswith("/api/"):
         origin = request.headers.get("Origin", "")
         referer = request.headers.get("Referer", "")
         
