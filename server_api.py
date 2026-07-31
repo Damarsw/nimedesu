@@ -1,5 +1,6 @@
-import base64
-import os
+import time
+import hmac
+import hashlib
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from supabase import create_client
@@ -12,11 +13,50 @@ SUPABASE_KEY = "sb_publishable_6zAs4KTrqGhcHf2fvcAlWw_IO7gkLsw"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# Kunci rahasia bersama antara frontend dan backend untuk validasi token
+SECRET_SERVER_KEY = "NimeDesuSecretKey2026"
+
+@app.before_request
+def security_validation():
+    # Lewatkan request OPTIONS untuk CORS preflight
+    if request.method == "OPTIONS":
+        return
+        
+    # Hanya amankan path yang berawalan /api/
+    if request.path.startswith("/api/"):
+        client_time = request.headers.get("X-Client-Time")
+        client_token = request.headers.get("X-Client-Token")
+        user_agent = request.headers.get("User-Agent", "").lower()
+
+        # 1. Blokir jika User-Agent kosong atau mencurigakan (headless browser/bot)
+        if not user_agent or any(bot in user_agent for bot in ["python-requests", "scrapy", "curl", "wget", "axios", "headless"]):
+            return jsonify({"error": "Access Denied: Invalid Agent"}), 403
+
+        if not client_time or not client_token:
+            return jsonify({"error": "Access Denied: Missing Security Headers"}), 403
+
+        try:
+            req_time = int(client_time)
+            current_time = int(time.time())
+            
+            # 2. Validasi Jendela Waktu (Maksimal selisih 30 detik untuk mencegah Replay Attack)
+            if abs(current_time - req_time) > 30:
+                return jsonify({"error": "Access Denied: Token Expired"}), 403
+
+            # 3. Validasi Keabsahan Token (HMAC-SHA256 sederhana berdasarkan timestamp)
+            expected_payload = f"{req_time}_{SECRET_SERVER_KEY}"
+            expected_token = hashlib.sha256(expected_payload.encode('utf-8')).hexdigest()
+
+            if not hmac.compare_digest(expected_token, client_token):
+                return jsonify({"error": "Access Denied: Invalid Signature"}), 403
+
+        except ValueError:
+            return jsonify({"error": "Access Denied: Malformed Request"}), 403
+
 @app.route("/")
 def home():
     return "NimeDesu Server API is Active!"
 
-# 1. Endpoint anime dengan Pagination & Search di Server
 @app.route("/api/anime", methods=["GET"])
 def api_anime():
     try:
@@ -43,8 +83,6 @@ def api_anime():
         total_records = response.count if response.count is not None else 0
         total_pages = -(-total_records // per_page) if total_records > 0 else 1
 
-        # Samakan nama field dengan yang dipakai frontend (index.html / stream.html
-        # mengharapkan "image_url", padahal kolom di DB namanya "img_url")
         data = response.data or []
         for item in data:
             item["image_url"] = item.get("img_url")
@@ -58,7 +96,6 @@ def api_anime():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# 2. Endpoint detail streaming (Menggunakan 2 tabel: anime & episodes dengan JSONB video_servers)
 @app.route("/api/anime-detail", methods=["GET"])
 def api_anime_detail():
     anime_url = request.args.get("url", "").strip()
@@ -66,7 +103,6 @@ def api_anime_detail():
         return jsonify({"error": "URL tidak valid"}), 400
 
     try:
-        # Cari data anime berdasarkan URL
         anime_res = supabase.table("anime").select("*").ilike("url", f"%{anime_url}%").execute()
 
         if not anime_res.data or len(anime_res.data) == 0:
@@ -75,8 +111,6 @@ def api_anime_detail():
         anime_item = anime_res.data[0]
         anime_id = anime_item.get("id")
 
-        # Ambil data episodes berdasarkan anime_id
-        # PENTING: nama tabel di Supabase adalah "episode" (tunggal), bukan "episodes"
         ep_res = supabase.table("episode").select("*").eq("anime_id", anime_id).order("id").execute()
         episodes_data = ep_res.data or []
 
@@ -87,15 +121,11 @@ def api_anime_detail():
             
             if isinstance(raw_servers, list):
                 for srv in raw_servers:
-                    # Di kolom jsonb "video_servers", key aslinya adalah "url"
-                    # (bukan "video_url"). Tetap cek "video_url" juga untuk jaga-jaga
-                    # kalau ada data lama dengan format berbeda.
                     original_url = srv.get("url") or srv.get("video_url", "")
                     encoded_url = ""
                     if original_url:
                         encoded_url = base64.b64encode(original_url.encode('utf-8')).decode('utf-8')
                     
-                    # Menangani berbagai kemungkinan nama key server dari hasil scraping
                     server_val = srv.get("server") or srv.get("server_name") or "1"
                     
                     video_servers.append({
