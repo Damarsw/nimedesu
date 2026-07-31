@@ -97,7 +97,6 @@ def security_validation():
     if request.method == "OPTIONS":
         return
         
-    # LEWATI SEMUA VALIDASI JIKA ENDPOINT ADALAH PROXY ATAU MEMILIKI TARGET PARAMETER
     if "proxy-stream" in request.path or "target" in request.args:
         return
 
@@ -134,7 +133,7 @@ def security_validation():
 
         except ValueError:
             return jsonify({"error": "Access Denied: Malformed Request"}), 403
-            
+
 @app.route("/")
 def home():
     return "NimeDesu Server API is Active!"
@@ -147,21 +146,38 @@ def proxy_stream():
         return "URL target tidak valid", 400
 
     try:
+        # Meniru header browser lengkap agar lolos dari proteksi server video sumber
         req_headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Referer": target_url
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Referer": target_url,
+            "Accept": "*/*",
+            "Accept-Encoding": "identity",
+            "Connection": "keep-alive"
         }
+
+        # Meneruskan header Range (penting agar video bisa di-seek / digeser durasinya)
+        range_header = request.headers.get("Range")
+        if range_header:
+            req_headers["Range"] = range_header
+
+        upstream_response = requests.get(target_url, headers=req_headers, stream=True, timeout=20)
         
-        upstream_response = requests.get(target_url, headers=req_headers, stream=True, timeout=15)
-        
+        excluded_headers = ["content-encoding", "content-length", "transfer-encoding", "connection"]
+        response_headers = [
+            (name, value) for name, value in upstream_response.raw.headers.items()
+            if name.lower() not in excluded_headers
+        ]
+
         def generate():
-            for chunk in upstream_response.iter_content(chunk_size=8192):
-                yield chunk
+            for chunk in upstream_response.iter_content(chunk_size=16384):
+                if chunk:
+                    yield chunk
 
         return Response(
             generate(),
             status=upstream_response.status_code,
-            content_type=upstream_response.headers.get("content-type", "video/mp4")
+            headers=response_headers,
+            direct_passthrough=True
         )
     except Exception as e:
         return f"Proxy Error: {str(e)}", 500
@@ -209,7 +225,7 @@ def api_anime():
 def api_anime_detail():
     anime_url = request.args.get("url", "").strip()
     if not anime_url:
-        return jsonify({"error": "URL tidak valid"}), 400
+        return jsonify({"error": "URL tidak valid"}}, 400
 
     try:
         anime_res = client_obj.table(X1).select("*").ilike(Y3, f"%{anime_url}%").execute()
@@ -252,12 +268,12 @@ def api_anime_detail():
         result_payload = {
             process_token("TVRrNU1EQTVNVEl5TURBNE1URXlNRFEwTWpZNU5qa3dNREF3TURFd01EQXdNREF3TURBd01EQXdNREF3TURBd01EQXdNREF3TURBd01EQXdNREF3TURBPS=="): anime_item.get(Y2, ""),
             process_token("TVRrNU1EQTVNVEl5TURBNE1URXlNRFEwTWpZNU5qa3dNREF3TURFd01EQXdNREF3TURBd01EQXdNREF3TURBd01EQXdNREF3TURBd01EQXdNREF3TURBPS=="): anime_item.get(Y3, ""),
-            process_token("TVRrNU1EQTVNVEl5TURBNE1URXlNRFEwTWpZNU5qa3dNREF3TURFd01EQXdNREF3TURBd01EQXdNREF3TURBd01EQXdNREF3TURBd01EQXdNREF3TURBPS=="): episodes_list
+            process_token("TVRrNU1EQTVNVEl5TURBNE1URXlNRFEwTWpZNU5qa3dNREF3TURBd01EQXdNREF3TURBd01EQXdNREF3TURBd01EQXdNREF3TURBd01EQXdNREF3TURBPS=="): episodes_list
         }
 
         return jsonify(result_payload)
 
-    except Exception as e:
+    `except Exception as e:`
         print(f"Error fetching data: {e}")
         return jsonify({"error": str(e)}), 500
 
