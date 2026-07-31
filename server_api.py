@@ -1,3 +1,5 @@
+import base64
+import os
 import time
 import hmac
 import hashlib
@@ -6,29 +8,33 @@ from flask_cors import CORS
 from supabase import create_client
 
 app = Flask(__name__)
-CORS(app)
+
+CORS(app, resources={r"/api/*": {"origins": "https://nimedesu.vercel.app"}})
 
 SUPABASE_URL = "https://yezdnsgypbjcgzoftgmz.supabase.co"
 SUPABASE_KEY = "sb_publishable_6zAs4KTrqGhcHf2fvcAlWw_IO7gkLsw"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-# Kunci rahasia bersama antara frontend dan backend untuk validasi token
 SECRET_SERVER_KEY = "NimeDesuSecretKey2026"
 
 @app.before_request
 def security_validation():
-    # Lewatkan request OPTIONS untuk CORS preflight
     if request.method == "OPTIONS":
         return
         
-    # Hanya amankan path yang berawalan /api/
     if request.path.startswith("/api/"):
+ 
+        origin = request.headers.get("Origin", "")
+        referer = request.headers.get("Referer", "")
+        
+        allowed_domain = "nimedesu.vercel.app"
+        if allowed_domain not in origin and allowed_domain not in referer:
+            return jsonify({"error": "Access Denied: Direct access is forbidden"}), 403
+
         client_time = request.headers.get("X-Client-Time")
         client_token = request.headers.get("X-Client-Token")
         user_agent = request.headers.get("User-Agent", "").lower()
 
-        # 1. Blokir jika User-Agent kosong atau mencurigakan (headless browser/bot)
         if not user_agent or any(bot in user_agent for bot in ["python-requests", "scrapy", "curl", "wget", "axios", "headless"]):
             return jsonify({"error": "Access Denied: Invalid Agent"}), 403
 
@@ -39,11 +45,9 @@ def security_validation():
             req_time = int(client_time)
             current_time = int(time.time())
             
-            # 2. Validasi Jendela Waktu (Maksimal selisih 30 detik untuk mencegah Replay Attack)
             if abs(current_time - req_time) > 30:
                 return jsonify({"error": "Access Denied: Token Expired"}), 403
 
-            # 3. Validasi Keabsahan Token (HMAC-SHA256 sederhana berdasarkan timestamp)
             expected_payload = f"{req_time}_{SECRET_SERVER_KEY}"
             expected_token = hashlib.sha256(expected_payload.encode('utf-8')).hexdigest()
 
