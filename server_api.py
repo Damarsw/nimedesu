@@ -28,25 +28,26 @@ client_obj = create_client(SUPABASE_URL, SUPABASE_KEY)
 TABLE_ANIME = "anime"
 TABLE_EPISODE = "episode"
 
-# anime table columns
-COL_ANIME_ID = "id"                # primary key of anime table
-COL_ANIME_TITLE = "title"          # TODO: confirm real column name
-COL_ANIME_URL = "url"              # TODO: confirm real column name (used to look up anime by slug/url)
-COL_ANIME_STATUS = "status"        # TODO: confirm real column name
-COL_ANIME_GENRE = "genre"          # TODO: confirm real column name
-COL_ANIME_IMAGE = "image_url"      # TODO: confirm real column name
+# anime table columns (confirmed from Supabase table editor)
+COL_ANIME_ID = "id"
+COL_ANIME_TITLE = "title"
+COL_ANIME_URL = "url"
+COL_ANIME_STATUS = "status"
+COL_ANIME_GENRE = "genre"
+COL_ANIME_IMAGE = "img_url"
 
-# episode table columns
-COL_EP_ANIME_ID = "anime_id"       # TODO: confirm real column name (FK to anime.id)
-COL_EP_TITLE = "episode_title"     # TODO: confirm real column name
-COL_EP_URL = "episode_url"         # TODO: confirm real column name
-COL_EP_VIDEO_SERVERS = "video_servers"  # confirmed from your screenshot (jsonb)
+# episode table columns (confirmed from Supabase table editor)
+COL_EP_ID = "id"
+COL_EP_ANIME_ID = "anime_id"
+COL_EP_TITLE = "episode_title"
+COL_EP_URL = "episode_url"
+COL_EP_VIDEO_SERVERS = "video_servers"  # jsonb
 
 # keys inside each object in the video_servers jsonb array
 SRV_KEY_URL = "url"                # confirmed from your data
-SRV_KEY_VURL = "vurl"              # TODO: confirm if this alt key actually exists
+SRV_KEY_VURL = "vurl"              # alt key, may not exist - harmless if absent
 SRV_KEY_LABEL = "keterangan"       # confirmed from your data (e.g. "MP4", "B-TUBE")
-SRV_KEY_SERVER_NAME = "server"     # TODO: confirm real key name if present
+SRV_KEY_SERVER_NAME = "server"     # alt key, may not exist - harmless if absent
 
 
 @app.before_request
@@ -200,7 +201,7 @@ def api_anime_detail():
         anime_item = anime_res.data[0]
         anime_id = anime_item.get(COL_ANIME_ID)
 
-        ep_res = client_obj.table(TABLE_EPISODE).select("*").eq(COL_EP_ANIME_ID, anime_id).order(COL_ANIME_ID).execute()
+        ep_res = client_obj.table(TABLE_EPISODE).select("*").eq(COL_EP_ANIME_ID, anime_id).order(COL_EP_ID).execute()
         episodes_data = ep_res.data or []
 
         episodes_list = []
