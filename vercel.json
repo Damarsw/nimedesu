@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/stream/:anime/:eps",
+      "destination": "/stream.html?url=:anime&eps=:eps"
+    },
+    {
       "source": "/api-backend/proxy-stream",
       "destination": "https://nimedesu.onrender.com/api/proxy-stream"
     },
