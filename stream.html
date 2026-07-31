@@ -635,8 +635,9 @@
                 } catch (e) {
                     finalUrl = videoUrl;
                 }
-                const encodedTargetForProxy = encodeURIComponent(finalUrl);
-                 iframe.src = `https://nimedesu.onrender.com/api/proxy-stream?target=${encodedTargetForProxy}`;
+                // Embed pages (mp4upload, xtwap, btube, etc.) are made to be iframed
+                // cross-origin directly - no proxy needed here.
+                iframe.src = finalUrl;
             }
         }
 
