@@ -97,8 +97,8 @@ def security_validation():
     if request.method == "OPTIONS":
         return
         
-    # PENGECAKUAN MUTLAK PALING ATAS
-    if "proxy-stream" in request.path:
+    # LEWATI SEMUA VALIDASI JIKA ENDPOINT ADALAH PROXY ATAU MEMILIKI TARGET PARAMETER
+    if "proxy-stream" in request.path or "target" in request.args:
         return
 
     if request.path.startswith("/api/"):
@@ -134,7 +134,7 @@ def security_validation():
 
         except ValueError:
             return jsonify({"error": "Access Denied: Malformed Request"}), 403
-
+            
 @app.route("/")
 def home():
     return "NimeDesu Server API is Active!"
