@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api-backend/proxy-stream",
+      "destination": "https://nimedesu.onrender.com/api/proxy-stream"
+    },
+    {
       "source": "/api-backend/:path*",
       "destination": "https://nimedesu.onrender.com/api/:path*"
     }
