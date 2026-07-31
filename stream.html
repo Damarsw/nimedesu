@@ -616,7 +616,7 @@
             }
         }
 
-        function selectServer(element, resolution, serverNum, videoUrl) {
+            function selectServer(element, resolution, serverNum, videoUrl) {
             document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
             document.querySelectorAll('.server-btn').forEach(btn => {
                 btn.className = "server-btn w-full text-left px-3 py-1.5 rounded text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-zinc-900 dark:text-white";
@@ -635,7 +635,8 @@
                 } catch (e) {
                     finalUrl = videoUrl;
                 }
-                iframe.src = finalUrl;
+                const encodedTargetForProxy = encodeURIComponent(finalUrl);
+                iframe.src = `${RENDER_API_URL}/proxy-stream?target=${encodedTargetForProxy}`;
             }
         }
 
