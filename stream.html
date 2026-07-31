@@ -162,7 +162,7 @@
     <script>
         document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
         
-        const RENDER_API_URL = "https://nimedesu.onrender.com";
+        const RENDER_API_URL = "/api-backend";
         let activeEpisodes = [];
         let activeEpisodeIndex = 0;
         let globalAnimeTitle = "Anime";
@@ -173,7 +173,6 @@
         const KEY_Y = "LayerY_Secret2026";
         const KEY_Z = "LayerZ_Secret2026";
 
-        // Fungsi Penghasil Token Keamanan Dinamis
         function generateSecurityToken() {
             const timestamp = Math.floor(Date.now() / 1000);
             const rawPayload = `${timestamp}_NimeDesuSecretKey2026`;
@@ -252,7 +251,7 @@
 
                 do {
                     const sec = generateSecurityToken();
-                    const res = await fetch(`${RENDER_API_URL}/api/anime?page=${page}&per_page=${perPage}`, {
+                    const res = await fetch(`${RENDER_API_URL}/anime?page=${page}&per_page=${perPage}`, {
                         headers: {
                             "X-Client-Token": sec.token,
                             "X-Client-Time": sec.time
@@ -348,7 +347,7 @@
                 }
 
                 const sec = generateSecurityToken();
-                const response = await fetch(`${RENDER_API_URL}/api/anime-detail?url=${encodeURIComponent(animeUrl)}`, {
+                const response = await fetch(`${RENDER_API_URL}/anime-detail?url=${encodeURIComponent(animeUrl)}`, {
                     headers: {
                         "X-Client-Token": sec.token,
                         "X-Client-Time": sec.time
