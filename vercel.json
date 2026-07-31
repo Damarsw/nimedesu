@@ -5,23 +5,8 @@
       "destination": "/stream.html?url=:anime&eps=:eps"
     },
     {
-      "source": "/api-backend/proxy-stream",
-      "destination": "https://nimedesu.onrender.com/api/proxy-stream"
-    },
-    {
       "source": "/api-backend/:path*",
       "destination": "https://nimedesu.onrender.com/api/:path*"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/(.*\\.json)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=86400, stale-while-revalidate=604800"
-        }
-      ]
     }
   ]
 }
