@@ -1,4 +1,10 @@
 {
+  "rewrites": [
+    {
+      "source": "/api-backend/:path*",
+      "destination": "https://nimedesu.onrender.com/api/:path*"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*\\.json)",
