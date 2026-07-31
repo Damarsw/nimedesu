@@ -5,7 +5,8 @@ import hashlib
 import base64
 import codecs
 import zlib
-from flask import Flask, jsonify, request
+import requests
+from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
 from supabase import create_client
 
@@ -133,6 +134,33 @@ def security_validation():
 @app.route("/")
 def home():
     return "NimeDesu Server API is Active!"
+
+# ===== TAMBAHAN ENDPOINT PROXY STREAM UNIVERSAL =====
+@app.route("/api/proxy-stream", methods=["GET"])
+def proxy_stream():
+    target_url = request.args.get("target", "").strip()
+    if not target_url:
+        return "URL target tidak valid", 400
+
+    try:
+        req_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Referer": target_url
+        }
+        
+        upstream_response = requests.get(target_url, headers=req_headers, stream=True, timeout=15)
+        
+        def generate():
+            for chunk in upstream_response.iter_content(chunk_size=8192):
+                yield chunk
+
+        return Response(
+            generate(),
+            status=upstream_response.status_code,
+            content_type=upstream_response.headers.get("content-type", "video/mp4")
+        )
+    except Exception as e:
+        return f"Proxy Error: {str(e)}", 500
 
 @app.route("/api/anime", methods=["GET"])
 def api_anime():
