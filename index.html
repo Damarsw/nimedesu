@@ -49,7 +49,6 @@
             transform: scale(1.08);
         }
 
-        /* Utility untuk menyembunyikan scrollbar namun tetap bisa digeser menyamping */
         .no-scrollbar::-webkit-scrollbar {
             display: none;
         }
@@ -61,7 +60,6 @@
 </head>
 <body class="bg-neon-lightBg text-black dark:bg-neon-darkBg dark:text-white transition-colors duration-300 min-h-screen flex flex-col">
 
-    <!-- HEADER -->
     <header id="mainHeader" class="fixed top-0 left-0 right-0 z-50 bg-[#F6BE00]/90 dark:bg-[#14130e]/90 backdrop-blur-md border-b border-neon-yellow/50 dark:border-neon-darkBorder shadow-sm dark:shadow-[0_4px_20px_rgba(217,155,0,0.15)] transition-transform duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-3">
@@ -88,7 +86,6 @@
         </div>
     </header>
 
-    <!-- SIDEBAR MENU -->
     <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 hidden transition-opacity" onclick="toggleSidebar()"></div>
     <div id="sidebarMenu" class="fixed top-0 left-0 bottom-0 w-72 bg-white dark:bg-[#14130e] border-r border-zinc-200 dark:border-neon-darkBorder z-50 transform -translate-x-full transition-transform duration-300 flex flex-col p-5 shadow-2xl">
         <div class="flex items-center justify-between mb-8 pb-3 border-b border-zinc-200 dark:border-zinc-800">
@@ -111,10 +108,8 @@
         </div>
     </div>
 
-    <!-- MAIN CONTAINER -->
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full mt-16 text-black dark:text-white">
 
-        <!-- SEARCH BAR -->
         <div id="searchContainer" class="hidden relative mb-8 transition-all duration-300 z-40">
             <div id="searchBoxWrapper" class="relative max-w-xl mx-auto flex items-center bg-white dark:bg-zinc-900 rounded-full border-2 border-neon-yellow shadow-glow-yellow overflow-hidden">
                 <input type="text" id="searchField" placeholder="Ketik nama anime disini" oninput="liveSearchAnime()" onkeypress="if(event.key === 'Enter') searchAnime()" class="w-full bg-transparent text-sm pl-6 pr-4 py-3.5 focus:outline-none placeholder:text-zinc-400 font-medium text-black dark:text-white">
@@ -125,9 +120,7 @@
             <div id="searchSuggestions" class="hidden absolute left-1/2 -translate-x-1/2 mt-2 w-full max-w-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-h-80 overflow-y-auto p-2 z-50"></div>
         </div>
 
-    
         <div id="homeView">
-         
             <div id="historySection" class="mb-10 hidden">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-lg sm:text-xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-black dark:text-white flex items-center gap-2">
@@ -135,7 +128,6 @@
                     </h2>
                     <button onclick="clearHistory()" class="text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-red-500 transition">Hapus Riwayat</button>
                 </div>
-             
                 <div id="historyGrid" class="flex gap-4 overflow-x-auto no-scrollbar scroll-smooth pb-2 pt-1"></div>
             </div>
 
@@ -171,7 +163,6 @@
             <div id="paginationBox" class="flex justify-center items-center space-x-1.5 sm:space-x-2 mt-8 flex-wrap gap-y-2"></div>
         </div>
 
-        <!-- VIEW 2: DETAIL -->
         <div id="detailView" class="hidden">
             <div class="flex flex-col sm:flex-row gap-5 items-center sm:items-start mb-8 bg-neon-lightCard dark:bg-neon-darkCard p-5 rounded-2xl border border-neon-yellow dark:border-neon-darkBorder shadow-sm">
                 <div class="w-32 sm:w-36 aspect-[3/4] rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-darkBorder bg-zinc-200 dark:bg-zinc-800 shadow-md shrink-0">
@@ -237,7 +228,6 @@
             </div>
         </div>
 
-        <!-- VIEW 3: DMCA -->
         <div id="dmcaView" class="hidden max-w-3xl mx-auto bg-neon-lightCard dark:bg-neon-darkCard p-6 sm:p-8 rounded-2xl border border-neon-yellow dark:border-neon-darkBorder shadow-sm space-y-4 text-xs sm:text-sm leading-relaxed text-zinc-700 dark:text-white">
             <h2 class="text-xl font-bold border-l-4 border-neon-yellow pl-3 text-black dark:text-white">PEMBERITAHUAN KEPADA PENGUNJUNG</h2>
             <p>Diberitahukan kepada seluruh pengunjung situs ini,<br>Perlu kami sampaikan bahwa situs web ini murni dikembangkan secara mandiri dan tidak mengambil keuntungan finansial (tidak ada profit/komersil) sepeser pun dari penayangan konten yang ada di dalamnya.</p>
@@ -250,7 +240,6 @@
             </div>
         </div>
 
-        <!-- VIEW 4: LOGIN DENGAN COOKIES -->
         <div id="cookieLoginView" class="hidden max-w-xl mx-auto bg-neon-lightCard dark:bg-neon-darkCard p-6 sm:p-8 rounded-2xl border border-neon-yellow dark:border-neon-darkBorder shadow-sm space-y-6 text-black dark:text-white">
             <h2 class="text-xl font-bold border-l-4 border-neon-yellow pl-3 text-black dark:text-white flex items-center gap-2">
                 <i class="fa-solid fa-cookie-bite text-black dark:text-neon-yellow"></i> Login dengan Cookies
@@ -306,6 +295,17 @@
         const KEY_X = "LayerX_Secret2026";
         const KEY_Y = "LayerY_Secret2026";
         const KEY_Z = "LayerZ_Secret2026";
+
+        // Fungsi Penghasil Token Keamanan Dinamis untuk Mencegah Scraper
+        function generateSecurityToken() {
+            const timestamp = Math.floor(Date.now() / 1000);
+            const rawPayload = `${timestamp}_NimeDesuSecretKey2026`;
+            const token = CryptoJS.SHA256(rawPayload).toString(CryptoJS.enc.Hex);
+            return {
+                token: token,
+                time: timestamp.toString()
+            };
+        }
 
         function encryptTripleLayer(data) {
             const jsonString = JSON.stringify(data);
@@ -376,7 +376,13 @@
                 if (activeStatusFilter) fetchUrl += `&status=${encodeURIComponent(activeStatusFilter)}`;
                 if (activeGenreFilter) fetchUrl += `&genre=${encodeURIComponent(activeGenreFilter)}`;
 
-                const response = await fetch(fetchUrl);
+                const sec = generateSecurityToken();
+                const response = await fetch(fetchUrl, {
+                    headers: {
+                        "X-Client-Token": sec.token,
+                        "X-Client-Time": sec.time
+                    }
+                });
                 const result = await response.json();
 
                 currentData = (result.data || []).map((item, index) => ({
@@ -482,7 +488,13 @@
             }
 
             try {
-                const res = await fetch(`${RENDER_API_URL}/api/anime?q=${encodeURIComponent(query)}&per_page=6`);
+                const sec = generateSecurityToken();
+                const res = await fetch(`${RENDER_API_URL}/api/anime?q=${encodeURIComponent(query)}&per_page=6`, {
+                    headers: {
+                        "X-Client-Token": sec.token,
+                        "X-Client-Time": sec.time
+                    }
+                });
                 const result = await res.json();
                 const matched = result.data || [];
 
@@ -663,7 +675,6 @@
                                     <i class="fa-solid fa-play ml-0.5 text-base"></i>
                                 </div>
                             </div>
-                            <!-- Badge menampilkan nomor episode terakhir -->
                             <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">
                                 ${item.lastWatchedEpisode || 'Eps 1'}
                             </span>
