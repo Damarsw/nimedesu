@@ -98,7 +98,7 @@ def security_validation():
         return
         
     if request.path.startswith("/api/"):
-        # Pengecualian agar iframe dapat memuat proxy stream secara langsung tanpa header kustom
+        # Pengecualian diletakkan paling atas agar langsung lolos untuk iframe
         if request.path == "/api/proxy-stream":
             return
 
