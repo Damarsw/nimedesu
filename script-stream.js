@@ -401,7 +401,7 @@ function renderDynamicServers(servers) {
             else if (resLower.includes('1080')) qualityBadge = "FHD";
 
             htmlContent += `
-                <button onclick="selectServer(this, '${srv.resolution}', '${srv.server}', '${srv.video_url}')" class="server-btn w-full text-left px-3 py-1.5 rounded text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-zinc-900 dark:text-white">
+                <button onclick="(this, '${srv.resolution}', '${srv.server}', '${srv.video_url}')" class="server-btn w-full text-left px-3 py-1.5 rounded text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-zinc-900 dark:text-white">
                     <span>${srv.resolution} (${srv.server})</span>
                     <span class="text-[9px] opacity-75">${qualityBadge}</span>
                 </button>
@@ -469,11 +469,16 @@ function selectServer(element, resolution, serverNum, videoUrl) {
     if (videoUrl) {
         let finalUrl = videoUrl;
         try {
-            finalUrl = atob(videoUrl);
+            // Coba decode base64, jika hasilnya valid gunakan, jika tidak pakai original
+            let decoded = atob(videoUrl);
+            if (decoded && decoded.startsWith('http')) {
+                finalUrl = decoded;
+            }
         } catch (e) {
             finalUrl = videoUrl;
         }
 
+        console.log("Loading streaming URL:", finalUrl);
         iframe.src = finalUrl;
     }
 }
