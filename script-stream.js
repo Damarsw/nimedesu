@@ -373,48 +373,27 @@ function renderDynamicServers(servers) {
         return;
     }
 
-    const grouped = {};
-    servers.forEach(s => {
-        const res = s.resolution || "Mirror 360p";
-        if(!grouped[res]) grouped[res] = [];
-        grouped[res].push(s);
-    });
-
     let htmlContent = '';
     let isFirst = true;
 
-    for(const [resText, srvList] of Object.entries(grouped)) {
-        const groupId = 'group' + resText.replace(/[^a-zA-Z0-9]/g, '');
+    servers.forEach((srv, index) => {
+        const videoUrl = srv.url || srv.video_url || "";
+        const serverName = `Server ${index + 1}`;
+        const resolution = "MP4";
+
         htmlContent += `
-            <div class="rounded-lg bg-neon-lightBg dark:bg-neon-darkBg border border-neon-lightBorder dark:border-neon-darkBorder overflow-hidden">
-                <div class="flex justify-between items-center px-3 py-2.5 cursor-pointer text-xs font-semibold select-none" onclick="toggleSubserverGroup('${groupId}')">
-                    <span class="flex items-center gap-2"><i class="fa-solid fa-video text-neon-yellow text-[10px]"></i> ${resText}</span>
-                    <i id="arrow${groupId}" class="fa-solid fa-chevron-down text-[10px] text-zinc-500 transition-transform duration-300"></i>
-                </div>
-                <div id="${groupId}" class="hidden px-3 pb-2.5 pt-1 space-y-1.5 border-t border-neon-lightBorder dark:border-neon-darkBorder">
+            <button onclick="selectServer(this, '${resolution}', '${serverName}', '${videoUrl}')" class="server-btn w-full text-left px-3 py-2 rounded text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder">
+                <span><i class="fa-solid fa-play text-neon-yellow mr-2"></i> ${serverName}</span>
+                <span class="text-[9px] px-1.5 py-0.5 rounded bg-neon-yellow text-black font-bold">HD</span>
+            </button>
         `;
 
-        srvList.forEach(srv => {
-            let qualityBadge = "SD";
-            let resLower = srv.resolution.toLowerCase();
-            if (resLower.includes('720')) qualityBadge = "HD";
-            else if (resLower.includes('1080')) qualityBadge = "FHD";
+        if(isFirst) {
+            setTimeout(() => selectServer(null, resolution, serverName, videoUrl), 100);
+            isFirst = false;
+        }
+    });
 
-            htmlContent += `
-                <button onclick="(this, '${srv.resolution}', '${srv.server}', '${srv.video_url}')" class="server-btn w-full text-left px-3 py-1.5 rounded text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-zinc-900 dark:text-white">
-                    <span>${srv.resolution} (${srv.server})</span>
-                    <span class="text-[9px] opacity-75">${qualityBadge}</span>
-                </button>
-            `;
-
-            if(isFirst) {
-                setTimeout(() => selectServer(null, srv.resolution, srv.server, srv.video_url), 100);
-                isFirst = false;
-            }
-        });
-
-        htmlContent += `</div></div>`;
-    }
     mainContainer.innerHTML = htmlContent;
 }
 
@@ -427,18 +406,6 @@ function toggleMainServerBox() {
     } else {
         container.classList.add('hidden');
         arrow.style.transform = 'rotate(-90deg)';
-    }
-}
-
-function toggleSubserverGroup(groupId) {
-    const group = document.getElementById(groupId);
-    const arrow = document.getElementById('arrow' + groupId);
-    if(group.classList.contains('hidden')) {
-        group.classList.remove('hidden');
-        arrow.style.transform = 'rotate(180deg)';
-    } else {
-        group.classList.add('hidden');
-        arrow.style.transform = 'rotate(0deg)';
     }
 }
 
@@ -457,30 +424,32 @@ function toggleEpisodeBox() {
 function selectServer(element, resolution, serverNum, videoUrl) {
     document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
     document.querySelectorAll('.server-btn').forEach(btn => {
-        btn.className = "server-btn w-full text-left px-3 py-1.5 rounded text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-zinc-900 dark:text-white";
+        btn.className = "server-btn w-full text-left px-3 py-2 rounded text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder";
     });
     if(element) {
-        element.className = "server-btn w-full text-left px-3 py-1.5 rounded text-xs bg-neon-yellow text-white font-bold shadow-glow-yellow transition flex justify-between items-center";
+        element.className = "server-btn w-full text-left px-3 py-2 rounded text-xs bg-neon-yellow text-white font-bold shadow-glow-yellow transition flex justify-between items-center";
     }
     document.getElementById('mainServerContainer').classList.add('hidden');
     document.getElementById('mainServerArrow').style.transform = 'rotate(-90deg)';
 
     const iframe = document.getElementById('videoIframe');
-    if (videoUrl) {
-        let finalUrl = videoUrl;
-        try {
-            // Coba decode base64, jika hasilnya valid gunakan, jika tidak pakai original
-            let decoded = atob(videoUrl);
-            if (decoded && decoded.startsWith('http')) {
-                finalUrl = decoded;
-            }
-        } catch (e) {
-            finalUrl = videoUrl;
-        }
-
-        console.log("Loading streaming URL:", finalUrl);
-        iframe.src = finalUrl;
+    
+    if (!videoUrl || videoUrl === 'undefined' || videoUrl === 'null') {
+        iframe.src = "about:blank";
+        return;
     }
+
+    let finalUrl = videoUrl;
+    try {
+        let decoded = atob(videoUrl);
+        if (decoded && decoded.startsWith('http')) {
+            finalUrl = decoded;
+        }
+    } catch (e) {
+        finalUrl = videoUrl;
+    }
+
+    iframe.src = finalUrl;
 }
 
 function toggleTheme() {
