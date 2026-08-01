@@ -1,0 +1,11 @@
+{
+  "name": "nimedesu-frontend",
+  "version": "1.0.0",
+  "description": "Frontend NimeDesu dengan Build-Time Obfuscation",
+  "scripts": {
+    "build": "node obfuscate.js"
+  },
+  "devDependencies": {
+    "javascript-obfuscator": "^4.1.0"
+  }
+}
