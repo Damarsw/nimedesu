@@ -334,8 +334,6 @@ function searchAnime() {
     activeGenreFilter = "";
     document.getElementById('sectionHeader').innerText = query ? `Hasil Pencarian: "${query}"` : "Semua Daftar Anime";
     
-    switchView('home');
-    loadAnimeDatabase(1);
 }
 
 function viewDetails(id) {
