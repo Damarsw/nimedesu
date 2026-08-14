@@ -12,7 +12,7 @@ let activeGenreFilter = "";
 
 const RENDER_API_URL = "/api-backend";
 
-// KEY DENGAN FUNGSI SECURITY TOKEN BACKEND RENDER
+// KEY UNTUK DEKRIPSI HISTORY LAMA (AGAR TIDAK HILANG)
 const KEY_X = "LayerX_Secret2026";
 const KEY_Y = "LayerY_Secret2026";
 const KEY_Z = "LayerZ_Secret2026";
@@ -27,10 +27,30 @@ function generateSecurityToken() {
     };
 }
 
+function decryptTripleLayer(ciphertext) {
+    try {
+        const bytesZ = CryptoJS.TripleDES.decrypt(ciphertext, KEY_Z);
+        const layer2 = bytesZ.toString(CryptoJS.enc.Utf8);
+        if (!layer2) return null;
+
+        const bytesY = CryptoJS.Rabbit.decrypt(layer2, KEY_Y);
+        const layer1 = bytesY.toString(CryptoJS.enc.Utf8);
+        if (!layer1) return null;
+
+        const bytesX = CryptoJS.AES.decrypt(layer1, KEY_X);
+        const decryptedString = bytesX.toString(CryptoJS.enc.Utf8);
+        if (!decryptedString) return null;
+
+        return JSON.parse(decryptedString);
+    } catch (e) {
+        return null;
+    }
+}
+
 /* =========================================================
    INTEGRASI ANILIST OAUTH2 LOGIN & USER SYNC
    ========================================================= */
-const ANILIST_CLIENT_ID = "48567"; // Client ID AniList resmi kamu
+const ANILIST_CLIENT_ID = "48567";
 
 function handleAniListOAuthCallback() {
     const hash = window.location.hash;
@@ -39,8 +59,6 @@ function handleAniListOAuthCallback() {
         const accessToken = tokenParams.get('access_token');
         if (accessToken) {
             localStorage.setItem('anilist_token', accessToken);
-            
-            // Bersihkan hash URL agar tidak mengganggu parameter pencarian API backend
             history.replaceState(null, document.title, window.location.pathname + window.location.search);
         }
     }
@@ -479,13 +497,16 @@ function viewDetails(id) {
     }
 }
 
+/* =========================================================
+   SISTEM MEMUAT RIWAYAT DENGAN AUTO-MIGRASI DATA LAMA
+   ========================================================= */
 async function renderHistory() {
     const historySection = document.getElementById('historySection');
     const historyGrid = document.getElementById('historyGrid');
 
     const token = localStorage.getItem('anilist_token');
 
-    // MENGAMBIL HISTORY DARI ANILIST JIKA USER SUDAH LOGIN
+    // 1. JIKA LOGIN ANILIST: LOAD DARI ANILIST
     if (token) {
         const query = `
         query {
@@ -550,8 +571,22 @@ async function renderHistory() {
         }
     }
 
-    // FALLBACK KE LOCAL STORAGE JIKA BELUM LOGIN ANILIST
+    // 2. FALLBACK LOKAL DENGAN AUTO-MIGRASI DATA ENKRIPSI LAMA
     let history = JSON.parse(localStorage.getItem('nimedesu_history_local') || '[]');
+
+    // Jika history lokal masih kosong, coba ekstrak dari data terenkripsi lama (nimedesu_history_triple)
+    if (history.length === 0) {
+        let encryptedOldData = localStorage.getItem('nimedesu_history_triple');
+        if (encryptedOldData) {
+            let decryptedHistory = decryptTripleLayer(encryptedOldData);
+            if (decryptedHistory && Array.isArray(decryptedHistory) && decryptedHistory.length > 0) {
+                history = decryptedHistory;
+                // Simpan ke format lokal baru
+                localStorage.setItem('nimedesu_history_local', JSON.stringify(history));
+            }
+        }
+    }
+
     if (history.length === 0) {
         historySection.classList.add('hidden');
         return;
@@ -580,6 +615,7 @@ async function renderHistory() {
 
 function clearHistory() {
     localStorage.removeItem('nimedesu_history_local');
+    localStorage.removeItem('nimedesu_history_triple');
     document.getElementById('historySection').classList.add('hidden');
 }
 
@@ -844,25 +880,19 @@ function renderInfoPagination(type, page, totalPageCount, paginationEl) {
 }
 
 window.onload = function() {
-    // 1. Tangani callback OAuth AniList untuk membersihkan hash URL
     handleAniListOAuthCallback();
-    
-    // 2. Cek status Login AniList
     checkAniListAuthStatus();
 
-    // 3. Set style tombol tab utama
     const defaultBtn = document.getElementById('btnSemua');
     if(defaultBtn) {
         defaultBtn.classList.remove('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
         defaultBtn.classList.add('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
     }
     
-    // 4. Reset variabel pencarian ke kosong bersih
     activeSearchQuery = "";
     activeGenreFilter = "";
     activeStatusFilter = "";
 
-    // 5. Muat history & database anime dari Render Backend
     renderHistory();
     loadAnimeDatabase(1);
 };
