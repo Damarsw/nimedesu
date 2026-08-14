@@ -126,7 +126,7 @@ async function checkAniListAuthStatus() {
             localStorage.setItem('anilist_user', JSON.stringify(user));
 
             if (headerAuthContainer) {
-                // UPDATE STYLING DI MODE TERANG & GELAP AGAR BACKGROUND PUTIH & IKON KELUAR HITAM DI MODE TERANG
+                // MODIFIKASI BACKGROUND PUTIH & TEKS/IKON HITAM DI MODE TERANG
                 headerAuthContainer.innerHTML = `
                     <div class="flex items-center gap-2 bg-white dark:bg-zinc-800/90 p-1 pr-3 rounded-full border border-neon-yellow shadow-xs">
                         <img src="${user.avatar.medium}" class="w-6 h-6 rounded-full object-cover">
@@ -231,6 +231,56 @@ async function updateAniListProgress(animeMediaId, episodeNumber) {
         console.log(`[AniList Sync] Episode ${episodeNumber} berhasil disinkronisasi ke AniList.`);
     } catch (err) {
         console.error("Gagal sync ke AniList:", err);
+    }
+}
+
+/* =========================================================
+   CROSS-CHECK JUDUL ANILIST KE BACKEND RENDER DENGAN ILIKE
+   ========================================================= */
+async function openDetailFromAniListTitle(title) {
+    if (!title) return;
+    try {
+        const sec = generateSecurityToken();
+        const fetchUrl = `${RENDER_API_URL}/anime?q=${encodeURIComponent(title)}&per_page=1`;
+        
+        const res = await fetch(fetchUrl, {
+            headers: {
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            }
+        });
+        const result = await res.json();
+        const matched = result.data || [];
+
+        if (matched.length > 0) {
+            const anime = matched[0];
+            const animeObj = {
+                id: anime.id,
+                title: anime.title || title,
+                url: anime.url ? anime.url.trim() : "",
+                status: anime.status || "Ongoing",
+                genres: anime.genre ? anime.genre.split(',').map(g => g.trim()) : [],
+                synopsis: anime.sinopsis || "Sinopsis belum tersedia.",
+                thumbnail: anime.image_url || "https://placehold.co/400x600?text=No+Image",
+                japanese: anime.japanese || "-",
+                skor: anime.score || "-",
+                statusText: anime.status || "-",
+                totalEpisode: anime.total_episodes || "-",
+                durasi: anime.duration || "-",
+                tanggalRilis: anime.release_date || "-",
+                studio: anime.studio || "-"
+            };
+
+            const exists = currentData.some(a => a.id == animeObj.id);
+            if (!exists) currentData.push(animeObj);
+
+            viewDetails(animeObj.id);
+        } else {
+            alert(`Anime "${title}" belum tersedia di database server NimeDesu.`);
+        }
+    } catch (err) {
+        console.error("Gagal mencari anime di backend Render:", err);
+        alert("Gagal menghubungkan ke server NimeDesu.");
     }
 }
 
@@ -825,10 +875,18 @@ async function fetchAniListData(type, page, loadingEl, podiumEl, gridEl, paginat
 function renderPodiumData(top3) {
     // Rank #1
     const r1 = top3[0];
-    document.getElementById('podium1Title').innerText = r1.title?.userPreferred || r1.title?.romaji || 'Tanpa Judul';
+    const title1 = r1.title?.userPreferred || r1.title?.romaji || r1.title?.english || 'Tanpa Judul';
+    document.getElementById('podium1Title').innerText = title1;
     document.getElementById('podium1Img').src = r1.coverImage?.extraLarge || r1.coverImage?.large;
     document.getElementById('podium1Score').innerHTML = `<i class="fa-solid fa-star text-[10px]"></i> ${r1.averageScore ? (r1.averageScore / 10).toFixed(1) : 'N/A'}`;
     document.getElementById('podium1Pop').innerHTML = `<i class="fa-solid fa-bookmark text-[10px]"></i> ${formatNumberShort(r1.popularity)}`;
+    
+    // SETUP CLICK AREA KE DETAIL BACKEND RENDER DENGAN PENCARIAN ILIKE
+    const area1 = document.getElementById('podium1ClickArea');
+    const titleEl1 = document.getElementById('podium1Title');
+    if(area1) area1.onclick = () => openDetailFromAniListTitle(title1);
+    if(titleEl1) titleEl1.onclick = () => openDetailFromAniListTitle(title1);
+
     const btn1 = document.getElementById('podium1BookmarkBtn');
     if (btn1) {
         btn1.onclick = function(e) {
@@ -839,10 +897,17 @@ function renderPodiumData(top3) {
 
     // Rank #2
     const r2 = top3[1];
-    document.getElementById('podium2Title').innerText = r2.title?.userPreferred || r2.title?.romaji || 'Tanpa Judul';
+    const title2 = r2.title?.userPreferred || r2.title?.romaji || r2.title?.english || 'Tanpa Judul';
+    document.getElementById('podium2Title').innerText = title2;
     document.getElementById('podium2Img').src = r2.coverImage?.extraLarge || r2.coverImage?.large;
     document.getElementById('podium2Score').innerHTML = `<i class="fa-solid fa-star text-[10px]"></i> ${r2.averageScore ? (r2.averageScore / 10).toFixed(1) : 'N/A'}`;
     document.getElementById('podium2Pop').innerHTML = `<i class="fa-solid fa-bookmark text-[10px]"></i> ${formatNumberShort(r2.popularity)}`;
+    
+    const area2 = document.getElementById('podium2ClickArea');
+    const titleEl2 = document.getElementById('podium2Title');
+    if(area2) area2.onclick = () => openDetailFromAniListTitle(title2);
+    if(titleEl2) titleEl2.onclick = () => openDetailFromAniListTitle(title2);
+
     const btn2 = document.getElementById('podium2BookmarkBtn');
     if (btn2) {
         btn2.onclick = function(e) {
@@ -853,10 +918,17 @@ function renderPodiumData(top3) {
 
     // Rank #3
     const r3 = top3[2];
-    document.getElementById('podium3Title').innerText = r3.title?.userPreferred || r3.title?.romaji || 'Tanpa Judul';
+    const title3 = r3.title?.userPreferred || r3.title?.romaji || r3.title?.english || 'Tanpa Judul';
+    document.getElementById('podium3Title').innerText = title3;
     document.getElementById('podium3Img').src = r3.coverImage?.extraLarge || r3.coverImage?.large;
     document.getElementById('podium3Score').innerHTML = `<i class="fa-solid fa-star text-[10px]"></i> ${r3.averageScore ? (r3.averageScore / 10).toFixed(1) : 'N/A'}`;
     document.getElementById('podium3Pop').innerHTML = `<i class="fa-solid fa-bookmark text-[10px]"></i> ${formatNumberShort(r3.popularity)}`;
+    
+    const area3 = document.getElementById('podium3ClickArea');
+    const titleEl3 = document.getElementById('podium3Title');
+    if(area3) area3.onclick = () => openDetailFromAniListTitle(title3);
+    if(titleEl3) titleEl3.onclick = () => openDetailFromAniListTitle(title3);
+
     const btn3 = document.getElementById('podium3BookmarkBtn');
     if (btn3) {
         btn3.onclick = function(e) {
@@ -871,17 +943,20 @@ function renderRankListItem(anime, rankNumber) {
     const img = anime.coverImage?.extraLarge || anime.coverImage?.large || 'https://placehold.co/150x200?text=No+Image';
     const score = anime.averageScore ? (anime.averageScore / 10).toFixed(1) : 'N/A';
     const pop = formatNumberShort(anime.popularity);
+    const escapedTitle = title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
     return `
         <div class="bg-neon-lightCard dark:bg-neon-darkCard border border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow rounded-xl p-3 flex items-center gap-3.5 transition shadow-xs">
             <span class="font-extrabold text-sm sm:text-base text-zinc-400 dark:text-zinc-500 w-7 text-center shrink-0">#${rankNumber}</span>
-            <img src="${img}" alt="${title}" class="w-12 h-16 object-cover rounded-lg shrink-0 bg-zinc-800">
-            <div class="flex-grow min-w-0">
-                <h4 class="font-bold text-black dark:text-white text-xs sm:text-sm truncate">${title}</h4>
-                <div class="flex items-center gap-2 mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-                    <span class="flex items-center gap-1 text-neon-yellow font-semibold"><i class="fa-solid fa-star text-[10px]"></i> ${score}</span>
-                    <span>•</span>
-                    <span><i class="fa-solid fa-bookmark text-[10px]"></i> ${pop} members</span>
+            <div onclick="openDetailFromAniListTitle('${escapedTitle}')" class="flex items-center gap-3.5 flex-grow min-w-0 cursor-pointer group">
+                <img src="${img}" alt="${title}" class="w-12 h-16 object-cover rounded-lg shrink-0 bg-zinc-800 group-hover:scale-105 transition duration-200">
+                <div class="flex-grow min-w-0">
+                    <h4 class="font-bold text-black dark:text-white text-xs sm:text-sm truncate group-hover:text-neon-yellow transition">${title}</h4>
+                    <div class="flex items-center gap-2 mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                        <span class="flex items-center gap-1 text-neon-yellow font-semibold"><i class="fa-solid fa-star text-[10px]"></i> ${score}</span>
+                        <span>•</span>
+                        <span><i class="fa-solid fa-bookmark text-[10px]"></i> ${pop} members</span>
+                    </div>
                 </div>
             </div>
             <button onclick="addAniListBookmark(${anime.id}, this)" title="Tambah ke Bookmark AniList" class="p-2 text-zinc-400 hover:text-neon-yellow transition shrink-0">
