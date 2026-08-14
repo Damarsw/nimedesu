@@ -542,74 +542,12 @@ function toggleTheme() {
 }
 
 /* =========================================================
-   FITUR ANILIST API (UPCOMING BEBAS FILTER, POPULARITY & FAVORITE DENGAN MATCH)
+   FITUR ANILIST API (UPCOMING, POPULARITY & FAVORITE MURNI ANILIST)
    ========================================================= */
 
 let currentInfoType = 'upcoming';
 let currentInfoPage = 1;
 const infoItemsPerPage = 12;
-
-function normalizeTitle(str) {
-    if (!str) return "";
-    return str.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-async function handleInformationClick(encodedTitle) {
-    const title = decodeURIComponent(encodedTitle);
-    const normalizedTarget = normalizeTitle(title);
-
-    let match = currentData.find(a => {
-        const t1 = normalizeTitle(a.title);
-        return t1.includes(normalizedTarget) || normalizedTarget.includes(t1);
-    });
-
-    if (match) {
-        viewDetails(match.id);
-        return;
-    }
-
-    try {
-        const sec = generateSecurityToken();
-        const res = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(title)}&per_page=5`, {
-            headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
-            }
-        });
-        const result = await res.json();
-        const apiData = result.data || [];
-
-        if (apiData.length > 0) {
-            const found = apiData[0];
-            const formatted = {
-                id: found.id,
-                title: found.title || "Tanpa Judul",
-                url: found.url ? found.url.trim() : "",
-                status: found.status || "Ongoing",
-                genres: found.genre ? found.genre.split(',').map(g => g.trim()) : [],
-                synopsis: found.sinopsis || "Sinopsis belum tersedia.",
-                thumbnail: found.image_url || "https://placehold.co/400x600?text=No+Image",
-                japanese: found.japanese || "-",
-                skor: found.score || "-",
-                statusText: found.status || "-",
-                totalEpisode: found.total_episodes || "-",
-                durasi: found.duration || "-",
-                tanggalRilis: found.release_date || "-",
-                studio: found.studio || "-"
-            };
-            
-            const exists = currentData.some(a => a.id == formatted.id);
-            if (!exists) currentData.push(formatted);
-            
-            viewDetails(formatted.id);
-            return;
-        }
-    } catch (e) {
-        console.error("Match Search Error:", e);
-    }
-
-    alert(`Anime "${title}" belum tersedia di database NimeDesu.`);
-}
 
 function openInformation(type, page = 1) {
     currentInfoType = type;
@@ -639,10 +577,10 @@ function openInformation(type, page = 1) {
         descEl.innerText = 'Daftar anime yang akan datang berdasarkan database AniList.';
     } else if (type === 'bypopularity') {
         headerEl.innerText = 'Anime Terpopuler';
-        descEl.innerText = 'Daftar anime terpopuler yang ada di NimeDesu.';
+        descEl.innerText = 'Daftar anime terpopuler berdasarkan database AniList.';
     } else if (type === 'favorite') {
         headerEl.innerText = 'Anime Favorit';
-        descEl.innerText = 'Daftar anime favorit yang ada di NimeDesu.';
+        descEl.innerText = 'Daftar anime favorit berdasarkan database AniList.';
     }
     
     const loadingEl = document.getElementById('informationLoading');
@@ -653,16 +591,22 @@ function openInformation(type, page = 1) {
     gridEl.innerHTML = '';
     paginationEl.innerHTML = '';
     
-    if (type === 'upcoming') {
-        fetchAniListUpcomingData(page, loadingEl, gridEl, paginationEl);
-    } else {
-        fetchFilteredAniListData(type, page, loadingEl, gridEl, paginationEl);
-    }
+    fetchAniListData(type, page, loadingEl, gridEl, paginationEl);
+    
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-/* KHUSUS UPCOMING: MURNI ANILIST BIAR LENGKAP */
-async function fetchAniListUpcomingData(page, loadingEl, gridEl, paginationEl) {
+/* FETCH DATA MURNI ANILIST (UPCOMING, POPULARITY, FAVORITE) */
+async function fetchAniListData(type, page, loadingEl, gridEl, paginationEl) {
+    let sortQuery = 'POPULARITY_DESC';
+    let statusQuery = '';
+
+    if (type === 'upcoming') {
+        statusQuery = ', status: NOT_YET_RELEASED';
+    } else if (type === 'favorite') {
+        sortQuery = 'FAVOURITES_DESC';
+    }
+
     const query = `
     query {
         Page(page: ${page}, perPage: ${infoItemsPerPage}) {
@@ -672,7 +616,7 @@ async function fetchAniListUpcomingData(page, loadingEl, gridEl, paginationEl) {
                 lastPage
                 hasNextPage
             }
-            media(type: ANIME, sort: POPULARITY_DESC, status: NOT_YET_RELEASED) {
+            media(type: ANIME, sort: ${sortQuery}${statusQuery}) {
                 id
                 title {
                     romaji
@@ -706,7 +650,7 @@ async function fetchAniListUpcomingData(page, loadingEl, gridEl, paginationEl) {
 
         if (rawData.length === 0 && page > 1) {
             const validPage = pageInfo.lastPage && pageInfo.lastPage < page ? pageInfo.lastPage : page - 1;
-            return openInformation('upcoming', validPage);
+            return openInformation(type, validPage);
         }
 
         loadingEl.classList.add('hidden');
@@ -721,161 +665,12 @@ async function fetchAniListUpcomingData(page, loadingEl, gridEl, paginationEl) {
             const title = anime.title?.userPreferred || anime.title?.romaji || anime.title?.english || 'Tanpa Judul';
             const img = anime.coverImage?.extraLarge || anime.coverImage?.large || 'https://placehold.co/400x600?text=No+Image';
             const score = anime.averageScore ? (anime.averageScore / 10).toFixed(1) : 'N/A';
-            const safeTitle = encodeURIComponent(title).replace(/'/g, "%27");
+            const statusText = anime.status ? anime.status.replace(/_/g, ' ') : 'INFO';
 
             return `
-                <div onclick="handleInformationClick('${safeTitle}')" class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer">
-                    <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
-                        <img src="${img}" alt="${title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
-                        <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
-                            <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
-                                <i class="fa-solid fa-circle-info ml-0.5 text-base"></i>
-                            </div>
-                        </div>
-                        <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">Upcoming</span>
-                        <span class="absolute bottom-2 right-2 bg-neon-yellow text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow">⭐ ${score}</span>
-                    </div>
-                    <div class="p-3 flex flex-col justify-between flex-grow">
-                        <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${title}</h4>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        let totalPagesUpcoming = pageInfo.lastPage || 1;
-        renderInfoPagination('upcoming', page, totalPagesUpcoming, paginationEl);
-
-    } catch (err) {
-        console.error("AniList Upcoming Error:", err);
-        loadingEl.classList.add('hidden');
-        gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat data upcoming.</p>`;
-    }
-}
-
-/* KHUSUS BY POPULARITY & FAVORITE: MATCHING DENGAN DATABASE NIMEDESU */
-async function fetchFilteredAniListData(type, page, loadingEl, gridEl, paginationEl) {
-    try {
-        const sec = generateSecurityToken();
-        const renderRes = await fetch(`${RENDER_API_URL}/anime?per_page=1000`, {
-            headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
-            }
-        });
-        const renderResult = await renderRes.json();
-        const myDatabaseAnimes = renderResult.data || [];
-
-        if (myDatabaseAnimes.length === 0) {
-            loadingEl.classList.add('hidden');
-            gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Database NimeDesu masih kosong.</p>`;
-            return;
-        }
-
-        myDatabaseAnimes.forEach(item => {
-            const formatted = {
-                id: item.id,
-                title: item.title || "Tanpa Judul",
-                url: item.url ? item.url.trim() : "",
-                status: item.status || "Ongoing",
-                genres: item.genre ? item.genre.split(',').map(g => g.trim()) : [],
-                synopsis: item.sinopsis || "Sinopsis belum tersedia.",
-                thumbnail: item.image_url || "https://placehold.co/400x600?text=No+Image",
-                japanese: item.japanese || "-",
-                skor: item.score || "-",
-                statusText: item.status || "-",
-                totalEpisode: item.total_episodes || "-",
-                durasi: item.duration || "-",
-                tanggalRilis: item.release_date || "-",
-                studio: item.studio || "-"
-            };
-            if (!currentData.some(a => a.id == formatted.id)) {
-                currentData.push(formatted);
-            }
-        });
-
-        let sortQuery = 'POPULARITY_DESC';
-        if (type === 'favorite') sortQuery = 'FAVOURITES_DESC';
-
-        const query = `
-        query {
-            Page(page: 1, perPage: 100) {
-                media(type: ANIME, sort: ${sortQuery}) {
-                    id
-                    title {
-                        romaji
-                        english
-                        userPreferred
-                    }
-                    coverImage {
-                        extraLarge
-                        large
-                    }
-                    averageScore
-                    status
-                }
-            }
-        }
-        `;
-
-        const aniRes = await fetch('https://graphql.anilist.co', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({ query: query })
-        });
-
-        const aniJson = await aniRes.json();
-        const aniListMedia = aniJson?.data?.Page?.media || [];
-
-        const matchedAnime = [];
-        aniListMedia.forEach(ani => {
-            const aniTitle = normalizeTitle(ani.title?.userPreferred || ani.title?.romaji || ani.title?.english);
-            
-            const foundInDb = myDatabaseAnimes.find(db => {
-                const dbTitle = normalizeTitle(db.title);
-                return dbTitle.includes(aniTitle) || aniTitle.includes(dbTitle);
-            });
-
-            if (foundInDb) {
-                matchedAnime.push({
-                    aniData: ani,
-                    dbData: foundInDb
-                });
-            }
-        });
-
-        loadingEl.classList.add('hidden');
-
-        if (matchedAnime.length === 0) {
-            gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Tidak ada anime ${type} yang cocok dengan database NimeDesu.</p>`;
-            paginationEl.innerHTML = '';
-            return;
-        }
-
-        const totalMatchedPages = Math.ceil(matchedAnime.length / infoItemsPerPage);
-        const startIndex = (page - 1) * infoItemsPerPage;
-        const pageItems = matchedAnime.slice(startIndex, startIndex + infoItemsPerPage);
-
-        gridEl.innerHTML = pageItems.map(item => {
-            const ani = item.aniData;
-            const db = item.dbData;
-
-            const title = db.title || ani.title?.userPreferred || "Tanpa Judul";
-            const img = db.image_url || ani.coverImage?.extraLarge || ani.coverImage?.large;
-            const score = db.score || (ani.averageScore ? (ani.averageScore / 10).toFixed(1) : 'N/A');
-            const statusText = db.status || 'Ongoing';
-
-            return `
-                <div onclick="viewDetails('${db.id}')" class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer">
-                    <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
-                        <img src="${img}" alt="${title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
-                        <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
-                            <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
-                                <i class="fa-solid fa-circle-info ml-0.5 text-base"></i>
-                            </div>
-                        </div>
+                <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 transition-all duration-200 shadow-sm flex flex-col cursor-default">
+                    <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800">
+                        <img src="${img}" alt="${title}" loading="lazy" class="w-full h-full object-cover">
                         <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${statusText}</span>
                         <span class="absolute bottom-2 right-2 bg-neon-yellow text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow">⭐ ${score}</span>
                     </div>
@@ -886,17 +681,13 @@ async function fetchFilteredAniListData(type, page, loadingEl, gridEl, paginatio
             `;
         }).join('');
 
-        renderInfoPagination(type, page, totalMatchedPages, paginationEl);
+        let totalPages = pageInfo.lastPage || 1;
+        renderInfoPagination(type, page, totalPages, paginationEl);
 
     } catch (err) {
-        console.error("Database Information Error:", err);
+        console.error("AniList Error:", err);
         loadingEl.classList.add('hidden');
-        gridEl.innerHTML = `
-            <div class="col-span-full text-center py-10 space-y-3">
-                <p class="text-zinc-600 dark:text-zinc-400 font-medium">Gagal memuat data dari database NimeDesu.</p>
-                <button onclick="openInformation('${type}', ${page})" class="px-4 py-2 bg-neon-yellow text-black text-xs font-bold rounded-xl shadow-glow-yellow hover:bg-yellow-600 transition">Muat Ulang</button>
-            </div>
-        `;
+        gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat data AniList.</p>`;
     }
 }
 
