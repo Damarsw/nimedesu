@@ -10,7 +10,7 @@ let activeSearchQuery = "";
 let activeStatusFilter = "";
 let activeGenreFilter = "";
 
-const RENDER_API_URL = "/api";
+const RENDER_API_URL = "/api-backend";
 
 const KEY_X = "LayerX_Secret2026";
 const KEY_Y = "LayerY_Secret2026";
@@ -55,7 +55,7 @@ function decryptTripleLayer(ciphertext) {
 }
 
 function switchView(viewName) {
-    const views = ['homeView', 'detailView', 'dmcaView', 'cookieLoginView', 'informationView'];
+    const views = ['homeView', 'detailView', 'dmcaView', 'cookieLoginView'];
     views.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.add('hidden');
@@ -75,9 +75,6 @@ function switchView(viewName) {
         const cookieLogin = document.getElementById('cookieLoginView');
         if (cookieLogin) cookieLogin.classList.remove('hidden');
         loadCookiesIntoTextarea();
-    } else if (viewName === 'information') {
-        const information = document.getElementById('informationView');
-        if (information) information.classList.remove('hidden');
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -91,19 +88,6 @@ function toggleSidebar() {
     } else {
         sidebar.classList.add('-translate-x-full');
         overlay.classList.add('hidden');
-    }
-}
-
-function toggleInformationSubmenu(e) {
-    if(e) e.stopPropagation();
-    const submenu = document.getElementById('informationSubmenu');
-    const icon = document.getElementById('informationMenuIcon');
-    if (submenu.classList.contains('hidden')) {
-        submenu.classList.remove('hidden');
-        icon.classList.add('rotate-180');
-    } else {
-        submenu.classList.add('hidden');
-        icon.classList.remove('rotate-180');
     }
 }
 
@@ -171,7 +155,6 @@ function displayAnimeWithPagination() {
                     </div>
                 </div>
                 <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${item.status}</span>
-                <span class="absolute bottom-2 right-2 bg-neon-yellow text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow">⭐ ${item.skor}</span>
             </div>
             <div class="p-3">
                 <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
@@ -538,246 +521,6 @@ function toggleTheme() {
     } else {
         html.classList.add('dark');
         icon.classList.replace('fa-sun', 'fa-moon');
-    }
-}
-
-/* =========================================================
-   FITUR ANILIST API GRAPHQL + MATCH DATABASE RENDER
-   ========================================================= */
-
-let currentInfoType = 'upcoming';
-let currentInfoPage = 1;
-const infoItemsPerPage = 12;
-
-function normalizeTitle(str) {
-    if (!str) return "";
-    return str.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-function openInformation(type, page = 1) {
-    currentInfoType = type;
-    currentInfoPage = page;
-    
-    switchView('information');
-    
-    document.querySelectorAll('.info-tab-btn').forEach(b => {
-        b.classList.remove('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
-        b.classList.add('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
-    });
-    
-    let activeBtnId = 'infoBtnUpcoming';
-    if (type === 'bypopularity') activeBtnId = 'infoBtnPopularity';
-    if (type === 'favorite') activeBtnId = 'infoBtnFavorite';
-    
-    const activeBtn = document.getElementById(activeBtnId);
-    if (activeBtn) {
-        activeBtn.classList.remove('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
-        activeBtn.classList.add('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
-    }
-    
-    const headerEl = document.getElementById('informationHeader');
-    const descEl = document.getElementById('informationDescription');
-    if (type === 'upcoming') {
-        headerEl.innerText = 'Upcoming Anime';
-        descEl.innerText = 'Daftar anime yang akan datang berdasarkan AniList (Global).';
-    } else if (type === 'bypopularity') {
-        headerEl.innerText = 'Anime Terpopuler';
-        descEl.innerText = 'Daftar anime terpopuler dari AniList yang ada di NimeDesu.';
-    } else if (type === 'favorite') {
-        headerEl.innerText = 'Anime Favorit';
-        descEl.innerText = 'Daftar anime paling favorit dari AniList yang ada di NimeDesu.';
-    }
-    
-    const loadingEl = document.getElementById('informationLoading');
-    const gridEl = document.getElementById('informationGrid');
-    const paginationEl = document.getElementById('informationPagination');
-    
-    loadingEl.classList.remove('hidden');
-    gridEl.innerHTML = '';
-    paginationEl.innerHTML = '';
-    
-    fetchAniListGraphqlData(type, page, loadingEl, gridEl, paginationEl);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-async function fetchAniListGraphqlData(type, page, loadingEl, gridEl, paginationEl) {
-    try {
-        // 1. Dapatkan database anime lokal dari backend Render
-        const sec = generateSecurityToken();
-        const renderRes = await fetch(`${RENDER_API_URL}/anime?per_page=1000`, {
-            headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
-            }
-        });
-        const renderResult = await renderRes.json();
-        const myDatabaseAnimes = renderResult.data || [];
-
-        // Simpan database lokal ke memory currentData
-        myDatabaseAnimes.forEach(item => {
-            const formatted = {
-                id: item.id,
-                title: item.title || "Tanpa Judul",
-                url: item.url ? item.url.trim() : "",
-                status: item.status || "Ongoing",
-                genres: item.genre ? item.genre.split(',').map(g => g.trim()) : [],
-                synopsis: item.sinopsis || "Sinopsis belum tersedia.",
-                thumbnail: item.image_url || "https://placehold.co/400x600?text=No+Image",
-                japanese: item.japanese || "-",
-                skor: item.score || "-",
-                statusText: item.status || "-",
-                totalEpisode: item.total_episodes || "-",
-                durasi: item.duration || "-",
-                tanggalRilis: item.release_date || "-",
-                studio: item.studio || "-"
-            };
-            if (!currentData.some(a => a.id == formatted.id)) {
-                currentData.push(formatted);
-            }
-        });
-
-        // 2. Fetch ke GraphQL AniList API
-        let sortQuery = 'POPULARITY_DESC';
-        let statusFilter = '';
-        
-        if (type === 'upcoming') {
-            sortQuery = 'POPULARITY_DESC';
-            statusFilter = ', status: NOT_YET_RELEASED';
-        } else if (type === 'bypopularity') {
-            sortQuery = 'POPULARITY_DESC';
-        } else if (type === 'favorite') {
-            sortQuery = 'FAVOURITES_DESC';
-        }
-
-        const query = `
-        query {
-            Page(page: 1, perPage: 100) {
-                media(type: ANIME, sort: ${sortQuery}${statusFilter}) {
-                    id
-                    title {
-                        romaji
-                        english
-                        userPreferred
-                    }
-                    coverImage {
-                        extraLarge
-                        large
-                    }
-                    averageScore
-                    status
-                }
-            }
-        }
-        `;
-
-        const aniRes = await fetch('https://graphql.anilist.co', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({ query: query })
-        });
-
-        const aniJson = await aniRes.json();
-        const aniListMedia = aniJson?.data?.Page?.media || [];
-
-        // 3. Logika Pemilahan: UPCOMING murni AniList, POPULARITY & FAVORITE difilter berdasarkan database kamu
-        let displayList = [];
-
-        if (type === 'upcoming') {
-            displayList = aniListMedia.map(ani => ({
-                aniData: ani,
-                dbData: myDatabaseAnimes.find(db => normalizeTitle(db.title).includes(normalizeTitle(ani.title?.userPreferred || ani.title?.romaji))) || null
-            }));
-        } else {
-            aniListMedia.forEach(ani => {
-                const aniTitle = normalizeTitle(ani.title?.userPreferred || ani.title?.romaji || ani.title?.english);
-                const foundInDb = myDatabaseAnimes.find(db => {
-                    const dbTitle = normalizeTitle(db.title);
-                    return dbTitle.includes(aniTitle) || aniTitle.includes(dbTitle);
-                });
-
-                if (foundInDb) {
-                    displayList.push({
-                        aniData: ani,
-                        dbData: foundInDb
-                    });
-                }
-            });
-        }
-
-        loadingEl.classList.add('hidden');
-
-        if (displayList.length === 0) {
-            gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Tidak ada anime yang cocok ditemukan.</p>`;
-            paginationEl.innerHTML = '';
-            return;
-        }
-
-        // 4. Pagination per page
-        const totalInfoPages = Math.ceil(displayList.length / infoItemsPerPage);
-        const startIndex = (page - 1) * infoItemsPerPage;
-        const pageItems = displayList.slice(startIndex, startIndex + infoItemsPerPage);
-
-        gridEl.innerHTML = pageItems.map(item => {
-            const ani = item.aniData;
-            const db = item.dbData;
-
-            const title = db ? db.title : (ani.title?.userPreferred || ani.title?.romaji || "Tanpa Judul");
-            const img = db ? db.image_url : (ani.coverImage?.extraLarge || ani.coverImage?.large);
-            const score = db ? db.score : (ani.averageScore ? (ani.averageScore / 10).toFixed(1) : 'N/A');
-            const statusText = db ? db.status : (ani.status === 'NOT_YET_RELEASED' ? 'Upcoming' : 'Ongoing');
-
-            const clickAction = db ? `onclick="viewDetails('${db.id}')"` : `onclick="alert('Anime ${title} belum rilis / belum tersedia di server NimeDesu.')"`;
-
-            return `
-                <div ${clickAction} class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer">
-                    <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
-                        <img src="${img}" alt="${title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
-                        <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
-                            <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
-                                <i class="fa-solid fa-circle-info ml-0.5 text-base"></i>
-                            </div>
-                        </div>
-                        <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${statusText}</span>
-                        <span class="absolute bottom-2 right-2 bg-neon-yellow text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow">⭐ ${score}</span>
-                    </div>
-                    <div class="p-3 flex flex-col justify-between flex-grow">
-                        <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${title}</h4>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        // 5. Render Tombol Pagination (Tanpa '<<' dan '>>')
-        let pagHTML = '';
-        const baseBtn = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow transition shadow-xs';
-        const disBtn = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border-zinc-200 dark:border-zinc-800 cursor-not-allowed';
-        
-        pagHTML += `<button class="${page > 1 ? baseBtn : disBtn}" ${page <= 1 ? 'disabled' : ''} onclick="openInformation('${type}', ${page - 1})">&lsaquo;</button>`;
-        
-        let sPage = Math.max(1, page - 2);
-        let ePage = Math.min(totalInfoPages, page + 2);
-        
-        for (let i = sPage; i <= ePage; i++) {
-            let actClass = i === page ? 'bg-neon-yellow text-black font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder shadow-xs';
-            pagHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${actClass} transition" onclick="openInformation('${type}', ${i})">${i}</button>`;
-        }
-        
-        pagHTML += `<button class="${page < totalInfoPages ? baseBtn : disBtn}" ${page >= totalInfoPages ? 'disabled' : ''} onclick="openInformation('${type}', ${page + 1})">&rsaquo;</button>`;
-        
-        paginationEl.innerHTML = pagHTML;
-
-    } catch (err) {
-        console.error("AniList Fetch Error:", err);
-        loadingEl.classList.add('hidden');
-        gridEl.innerHTML = `
-            <div class="col-span-full text-center py-10 space-y-3">
-                <p class="text-zinc-600 dark:text-zinc-400 font-medium">Gagal memuat data dari AniList API.</p>
-                <button onclick="openInformation('${type}', ${page})" class="px-4 py-2 bg-neon-yellow text-black text-xs font-bold rounded-xl shadow-glow-yellow hover:bg-yellow-600 transition">Muat Ulang</button>
-            </div>
-        `;
     }
 }
 
