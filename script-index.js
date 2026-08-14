@@ -55,20 +55,25 @@ function decryptTripleLayer(ciphertext) {
 }
 
 function switchView(viewName) {
-    document.getElementById('homeView').classList.add('hidden');
-    document.getElementById('detailView').classList.add('hidden');
-    document.getElementById('dmcaView').classList.add('hidden');
-    document.getElementById('cookieLoginView').classList.add('hidden');
+    const views = ['homeView', 'detailView', 'dmcaView', 'cookieLoginView'];
+    views.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+    });
 
     if (viewName === 'home') {
-        document.getElementById('homeView').classList.remove('hidden');
+        const home = document.getElementById('homeView');
+        if (home) home.classList.remove('hidden');
         renderHistory();
     } else if (viewName === 'detail') {
-        document.getElementById('detailView').classList.remove('hidden');
+        const detail = document.getElementById('detailView');
+        if (detail) detail.classList.remove('hidden');
     } else if (viewName === 'dmca') {
-        document.getElementById('dmcaView').classList.remove('hidden');
+        const dmca = document.getElementById('dmcaView');
+        if (dmca) dmca.classList.remove('hidden');
     } else if (viewName === 'cookieLogin') {
-        document.getElementById('cookieLoginView').classList.remove('hidden');
+        const cookieLogin = document.getElementById('cookieLoginView');
+        if (cookieLogin) cookieLogin.classList.remove('hidden');
         loadCookiesIntoTextarea();
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -334,6 +339,8 @@ function searchAnime() {
     activeGenreFilter = "";
     document.getElementById('sectionHeader').innerText = query ? `Hasil Pencarian: "${query}"` : "Semua Daftar Anime";
     
+    switchView('home');
+    loadAnimeDatabase(1);
 }
 
 function viewDetails(id) {
