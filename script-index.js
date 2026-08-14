@@ -519,6 +519,52 @@ function toggleTheme() {
     }
 }
 
+async function loadDynamicGenres() {
+    try {
+        const perPage = 1000;
+        let page = 1;
+        let allGenres = new Set();
+        let totalPages = 1;
+
+        do {
+            const sec = generateSecurityToken();
+            const res = await fetch(`${RENDER_API_URL}/anime?page=${page}&per_page=${perPage}`, {
+                headers: {
+                    "X-Client-Token": sec.token,
+                    "X-Client-Time": sec.time
+                }
+            });
+            const result = await res.json();
+            const data = result.data || [];
+            
+            data.forEach(anime => {
+                if (anime.genre) {
+                    anime.genre.split(',').forEach(g => {
+                        const cleanGenre = g.trim();
+                        if (cleanGenre) allGenres.add(cleanGenre);
+                    });
+                }
+            });
+
+            totalPages = result.total_pages || 1;
+            page++;
+        } while (page <= totalPages);
+
+        const sortedGenres = Array.from(allGenres).sort();
+        const dropdown = document.getElementById('genreDropdown');
+        
+        if (dropdown && sortedGenres.length > 0) {
+            dropdown.innerHTML = sortedGenres.map(genre => `
+                <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('${genre}')">${genre}</button>
+            `).join('');
+        } else if (dropdown) {
+            dropdown.innerHTML = `<p class="text-xs text-center text-zinc-500 p-2">Tidak ada genre</p>`;
+        }
+    } catch (e) {
+        console.error("Gagal memuat daftar genre dinamis:", e);
+    }
+}
+
 window.onload = function() {
     const defaultBtn = document.getElementById('btnSemua');
     if(defaultBtn) {
@@ -528,4 +574,5 @@ window.onload = function() {
     
     renderHistory();
     loadAnimeDatabase(1);
+    loadDynamicGenres();
 };
