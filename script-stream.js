@@ -228,11 +228,7 @@ async function initStream() {
             renderDynamicEpisodes();
 
             try {
-                if (currentAnimeInfo) {
-                    renderRecommendations(currentAnimeInfo);
-                } else {
-                    document.getElementById('recommendationSlider').innerHTML = '<p class="text-xs text-zinc-500">Tidak ada anime serupa ditemukan.</p>';
-                }
+                renderMixedGenreRecommendations();
             } catch (recError) {
                 console.error('Gagal memuat rekomendasi:', recError);
                 document.getElementById('recommendationSlider').innerHTML = '<p class="text-xs text-zinc-500">Gagal memuat rekomendasi.</p>';
@@ -258,32 +254,37 @@ function scrollSlider(direction) {
     slider.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
 }
 
-function renderRecommendations(currentAnime) {
+function renderMixedGenreRecommendations() {
     const recSlider = document.getElementById('recommendationSlider');
-    const rawGenre = currentAnime.genre || currentAnime.Genre;
-    if (!rawGenre) {
-        recSlider.innerHTML = '<p class="text-xs text-zinc-500">Tidak ada rekomendasi tersedia.</p>';
+    if (!allAnimeList || allAnimeList.length === 0) {
+        recSlider.innerHTML = '<p class="text-xs text-zinc-500">Daftar anime belum dimuat.</p>';
         return;
     }
 
-    const currentGenres = rawGenre.split(',').map(g => g.trim().toLowerCase());
-    
-    const recommendations = allAnimeList.filter(a => {
-        const aUrl = a.url ? a.url.trim() : "";
-        const currentUrl = currentAnime.url ? currentAnime.url.trim() : "";
-        const itemGenre = a.genre || a.Genre;
-        if (aUrl === currentUrl || !itemGenre) return false;
+    const targetGenres = ['horror', 'supernatural', 'mecha'];
+    let selectedRecommendations = [];
 
-        const aGenres = itemGenre.split(',').map(g => g.trim().toLowerCase());
-        return currentGenres.some(g => aGenres.includes(g));
-    }).slice(0, 10);
+    targetGenres.forEach(genre => {
+        const filtered = allAnimeList.filter(a => {
+            const itemGenre = a.genre || a.Genre || "";
+            return itemGenre.toLowerCase().includes(genre);
+        });
 
-    if (recommendations.length === 0) {
-        recSlider.innerHTML = '<p class="text-xs text-zinc-500">Tidak ada anime serupa ditemukan.</p>';
+        // Mengambil secara acak (random) sebanyak 4 anime per genre
+        const shuffled = filtered.sort(() => 0.5 - Math.random());
+        const sliced = shuffled.slice(0, 4);
+        selectedRecommendations = selectedRecommendations.concat(sliced);
+    });
+
+    // Acak kembali gabungan keseluruhan hasil agar tampilannya bervariasi
+    selectedRecommendations.sort(() => 0.5 - Math.random());
+
+    if (selectedRecommendations.length === 0) {
+        recSlider.innerHTML = '<p class="text-xs text-zinc-500">Tidak ada rekomendasi anime dengan genre tersebut.</p>';
         return;
     }
 
-    recSlider.innerHTML = recommendations.map(rec => {
+    recSlider.innerHTML = selectedRecommendations.map(rec => {
         const title = rec.title || rec.Judul || "Tanpa Judul";
         const thumb = rec.image_url || rec.thumbnail || "https://placehold.co/300x400?text=No+Image";
         const recUrl = rec.url ? rec.url.trim() : "";
