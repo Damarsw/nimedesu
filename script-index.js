@@ -10,7 +10,8 @@ let activeSearchQuery = "";
 let activeStatusFilter = "";
 let activeGenreFilter = "";
 
-const RENDER_API_URL = "/api";
+// GANTI URL DI BAWAH INI DENGAN DOMAIN RENDER KAMU YANG SEBENARNYA!
+const RENDER_API_URL = "https://nimedesu-backend.onrender.com/api";
 
 const KEY_X = "LayerX_Secret2026";
 const KEY_Y = "LayerY_Secret2026";
@@ -161,7 +162,6 @@ function displayAnimeWithPagination() {
         return;
     }
 
-    // RATING DIHILANGKAN DARI POSTER BERANDA
     container.innerHTML = currentData.map(item => `
         <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="viewDetails('${item.id}')">
             <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
@@ -577,10 +577,10 @@ function openInformation(type, page = 1) {
         descEl.innerText = 'Daftar anime yang akan datang dari AniList (Global).';
     } else if (type === 'bypopularity') {
         headerEl.innerText = 'Anime Terpopuler';
-        descEl.innerText = 'Daftar anime terpopuler yang ada di NimeDesu.';
+        descEl.innerText = 'Daftar anime paling populer di NimeDesu.';
     } else if (type === 'favorite') {
         headerEl.innerText = 'Anime Favorit';
-        descEl.innerText = 'Daftar anime favorit yang ada di NimeDesu.';
+        descEl.innerText = 'Daftar anime favorit pilihan pengguna NimeDesu.';
     }
     
     const loadingEl = document.getElementById('informationLoading');
@@ -679,7 +679,7 @@ async function fetchInformationFromBackend(type, page, loadingEl, gridEl, pagina
             `;
         }).join('');
 
-        // PAGINATION KHUSUS (TANPA TOMBOL '<<' DAN '>>')
+        // PAGINATION KHUSUS TANPA TOMBOL '<<' DAN '>>'
         let pagHTML = '';
         const baseBtn = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow transition shadow-xs';
         const disBtn = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border-zinc-200 dark:border-zinc-800 cursor-not-allowed';
