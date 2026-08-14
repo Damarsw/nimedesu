@@ -99,6 +99,28 @@
             <button onclick="switchView('home'); toggleSidebar();" class="flex items-center gap-3 p-3 rounded-xl hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left">
                 <i class="fa-solid fa-house text-black dark:text-neon-yellow w-5 text-center"></i> Beranda
             </button>
+
+            <div>
+                <button id="btnInformationMenu" onclick="toggleInformationSubmenu(event)" class="w-full flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left">
+                    <span class="flex items-center gap-3">
+                        <i class="fa-solid fa-circle-info text-black dark:text-neon-yellow w-5 text-center"></i> Informasi
+                    </span>
+                    <i id="informationMenuIcon" class="fa-solid fa-chevron-down text-[11px] transition-transform"></i>
+                </button>
+
+                <div id="informationSubmenu" class="hidden ml-3 mt-1 pl-5 border-l border-neon-yellow/30 space-y-1">
+                    <button onclick="openInformation('upcoming'); toggleSidebar();" class="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left text-xs">
+                        <i class="fa-solid fa-calendar-days text-black dark:text-neon-yellow w-4 text-center"></i> Upcoming
+                    </button>
+                    <button onclick="openInformation('bypopularity'); toggleSidebar();" class="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left text-xs">
+                        <i class="fa-solid fa-fire text-black dark:text-neon-yellow w-4 text-center"></i> By Popularity
+                    </button>
+                    <button onclick="openInformation('favorite'); toggleSidebar();" class="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left text-xs">
+                        <i class="fa-solid fa-heart text-black dark:text-neon-yellow w-4 text-center"></i> Favorite
+                    </button>
+                </div>
+            </div>
+
             <button onclick="switchView('dmca'); toggleSidebar();" class="flex items-center gap-3 p-3 rounded-xl hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left">
                 <i class="fa-solid fa-lock text-black dark:text-neon-yellow w-5 text-center"></i> DMCA
             </button>
@@ -120,7 +142,7 @@
             <div id="searchSuggestions" class="hidden absolute left-1/2 -translate-x-1/2 mt-2 w-full max-w-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-h-80 overflow-y-auto p-2 z-50"></div>
         </div>
 
-        <!-- HOME VIEW (Dibungkus agar bisa disembunyikan secara utuh) -->
+        <!-- HOME VIEW -->
         <div id="homeView">
             <div id="historySection" class="mb-10 hidden">
                 <div class="flex items-center justify-between mb-4">
@@ -248,9 +270,43 @@
             <div id="paginationBox" class="flex justify-center items-center space-x-1.5 sm:space-x-2 mt-8 flex-wrap gap-y-2"></div>
         </div>
 
+        <!-- INFORMATION VIEW -->
+        <div id="informationView" class="hidden">
+            <div class="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+                <div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neon-yellow text-black text-[10px] font-bold uppercase tracking-wider">
+                            <i class="fa-solid fa-bolt text-xs"></i> Database NimeDesu
+                        </span>
+                    </div>
+                    <h2 id="informationHeader" class="text-xl sm:text-2xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-black dark:text-white">Upcoming Anime</h2>
+                    <p id="informationDescription" class="text-xs text-zinc-600 dark:text-zinc-400 mt-2 pl-4">Daftar anime yang cocok dengan database NimeDesu.</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 mb-6 flex-wrap">
+                <button id="infoBtnUpcoming" onclick="openInformation('upcoming')" class="info-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs">
+                    <i class="fa-solid fa-calendar-days mr-1"></i> Upcoming
+                </button>
+                <button id="infoBtnPopularity" onclick="openInformation('bypopularity')" class="info-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs">
+                    <i class="fa-solid fa-fire mr-1"></i> By Popularity
+                </button>
+                <button id="infoBtnFavorite" onclick="openInformation('favorite')" class="info-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs">
+                    <i class="fa-solid fa-heart mr-1"></i> Favorite
+                </button>
+            </div>
+
+            <div id="informationLoading" class="hidden col-span-full flex flex-col items-center justify-center py-16 space-y-3">
+                <i class="fa-solid fa-spinner fa-spin text-2xl text-black dark:text-neon-yellow"></i>
+                <p class="text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-300">Memuat informasi anime...</p>
+            </div>
+
+            <div id="informationGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 sm:gap-5"></div>
+            <div id="informationPagination" class="flex justify-center items-center space-x-1.5 sm:space-x-2 mt-8 flex-wrap gap-y-2"></div>
+        </div>
+
         <!-- DETAIL VIEW -->
         <div id="detailView" class="hidden">
-            <!-- Tombol kembali ke Beranda (Opsional tapi berguna) -->
             <div class="mb-6">
                 <button onclick="switchView('home')" class="px-4 py-2 rounded-xl text-xs font-bold bg-neon-lightCard dark:bg-neon-darkCard border border-neon-yellow text-black dark:text-white hover:bg-neon-yellow hover:text-black transition flex items-center gap-2 cursor-pointer shadow-xs">
                     <i class="fa-solid fa-arrow-left"></i> Kembali ke Beranda
@@ -275,7 +331,7 @@
                         <span class="py-2 px-4 rounded-xl text-xs font-bold bg-neon-yellow text-black shadow-glow-yellow flex items-center gap-2">
                             <i class="fa-solid fa-circle-info"></i> Detail & Sinopsis
                         </span>
-                        <button onclick="openStreamingTab()" class="py-2 px-4 rounded-xl text-xs font-bold bg-neon-lightBg dark:bg-neon-darkBg text-black dark:text-white border border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow transition flex items-center gap-2 cursor-pointer">
+                        <button id="streamingBtn" onclick="openStreamingTab()" class="py-2 px-4 rounded-xl text-xs font-bold bg-neon-lightBg dark:bg-neon-darkBg text-black dark:text-white border border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow transition flex items-center gap-2 cursor-pointer">
                             <i class="fa-solid fa-play"></i> Streaming <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
                         </button>
                     </div>
@@ -342,7 +398,7 @@
             
             <div class="space-y-2">
                 <label class="block text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">Upload File Cookies (.json):</label>
-                <input type="file" id="cookieFileल्तान" accept=".json" onchange="handleFileUpload(event)" class="w-full text-xs text-zinc-700 dark:text-zinc-300 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-neon-yellow file:text-black hover:file:bg-yellow-600 file:cursor-pointer cursor-pointer border border-zinc-300 dark:border-zinc-700 rounded-xl p-2 bg-white dark:bg-zinc-900">
+                <input type="file" id="cookieFile" accept=".json" onchange="handleFileUpload(event)" class="w-full text-xs text-zinc-700 dark:text-zinc-300 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-neon-yellow file:text-black hover:file:bg-yellow-600 file:cursor-pointer cursor-pointer border border-zinc-300 dark:border-zinc-700 rounded-xl p-2 bg-white dark:bg-zinc-900">
             </div>
 
             <div class="space-y-2">
@@ -372,7 +428,6 @@
         <p class="mt-1">Butuh bantuan atau kirim masukan? <a href="mailto:damdesu@proton.me" class="text-black dark:text-neon-yellow underline font-medium">Hubungi saya</a></p>
     </footer>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="script-index.js"></script>
 </body>
 </html>
