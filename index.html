@@ -16,7 +16,7 @@
                         neon: {
                             lightBg: '#F8F9FA',        
                             lightCard: '#FFFFFF',      
-                            lightBorder: '#E5E7EB',    
+                            lightBorder: '#d99b00',    
                             darkBg: '#0f0e0a',         
                             darkCard: '#1a1912',       
                             darkBorder: '#33311f',     
@@ -33,7 +33,7 @@
     </script>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style> 
         body { font-family: 'Inter', sans-serif; -webkit-user-select: none; user-select: none; } 
@@ -56,6 +56,87 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
+
+        @property --angle {
+            syntax: '<angle>';
+            initial-value: 0deg;
+            inherits: false;
+        }
+
+        @keyframes rotateBeam {
+            to {
+                --angle: 360deg;
+            }
+        }
+
+        @keyframes pulseGold {
+            0%, 100% { box-shadow: 0 0 12px rgba(217, 155, 0, 0.4), inset 0 0 4px rgba(217, 155, 0, 0.2); }
+            50% { box-shadow: 0 0 25px rgba(255, 215, 0, 0.9), inset 0 0 8px rgba(255, 215, 0, 0.4); }
+        }
+
+        @keyframes pulseSilver {
+            0%, 100% { box-shadow: 0 0 10px rgba(161, 161, 170, 0.3), inset 0 0 3px rgba(161, 161, 170, 0.15); }
+            50% { box-shadow: 0 0 22px rgba(228, 228, 231, 0.85), inset 0 0 6px rgba(228, 228, 231, 0.35); }
+        }
+
+        @keyframes pulseBronze {
+            0%, 100% { box-shadow: 0 0 10px rgba(180, 83, 9, 0.3), inset 0 0 3px rgba(180, 83, 9, 0.15); }
+            50% { box-shadow: 0 0 22px rgba(245, 158, 11, 0.85), inset 0 0 6px rgba(245, 158, 11, 0.35); }
+        }
+
+        .podium-card-neon {
+            position: relative;
+            z-index: 0;
+        }
+
+        .podium-neon-border {
+            position: absolute;
+            inset: 0;
+            border-radius: 1rem;
+            overflow: hidden;
+            z-index: -1;
+        }
+
+        .podium-neon-border::before {
+            content: '';
+            position: absolute;
+            inset: -60%;
+            z-index: -2;
+        }
+
+        .podium-neon-border::after {
+            content: '';
+            position: absolute;
+            inset: 2px;
+            border-radius: 0.9rem;
+            z-index: -1;
+            background: inherit;
+        }
+
+        /* Rank 1, 2, 3 Color Gradients */
+        .podium-gold-glow {
+            animation: pulseGold 2s infinite ease-in-out;
+        }
+        .podium-gold-glow .podium-neon-border::before {
+            background: conic-gradient(from var(--angle), transparent 35%, #d99b00 45%, #ffe066 48%, #ffffff 50%, transparent 85%, #d99b00 95%, #ffe066 98%, #ffffff 100%);
+            animation: rotateBeam 2.5s linear infinite;
+        }
+
+        .podium-silver-glow {
+            animation: pulseSilver 2.6s infinite ease-in-out 0.6s;
+        }
+        .podium-silver-glow .podium-neon-border::before {
+            background: conic-gradient(from var(--angle), transparent 35%, #71717a 45%, #e4e4e7 48%, #ffffff 50%, transparent 85%, #71717a 95%, #e4e4e7 98%, #ffffff 100%);
+            animation: rotateBeam 3.1s linear infinite 0.6s;
+        }
+
+        .podium-bronze-glow {
+            animation: pulseBronze 3.2s infinite ease-in-out 1.2s;
+        }
+        .podium-bronze-glow .podium-neon-border::before {
+            background: conic-gradient(from var(--angle), transparent 35%, #b45309 45%, #f59e0b 48%, #ffffff 50%, transparent 85%, #b45309 95%, #f59e0b 98%, #ffffff 100%);
+            animation: rotateBeam 3.7s linear infinite 1.2s;
+        }
     </style>
 </head>
 <body class="bg-neon-lightBg text-black dark:bg-neon-darkBg dark:text-white transition-colors duration-300 min-h-screen flex flex-col">
@@ -72,10 +153,17 @@
             </div>
 
             <div class="hidden md:flex items-center space-x-6 text-sm font-medium">
-                <span class="text-xs text-zinc-600 dark:text-zinc-300">Selamat Datang di Situs NimeDesu</span>
+                <span class="text-xs text-zinc-600 dark:text-zinc-300">Selamat Datang di Indeks Peringkat NimeDesu</span>
             </div>
 
             <div class="flex items-center space-x-2">
+                <!-- User Profile / AniList Login Header Button -->
+                <div id="headerAuthContainer">
+                    <button onclick="loginAniList()" class="px-3 py-1.5 rounded-full bg-zinc-900 text-white dark:bg-neon-yellow dark:text-black font-bold text-xs flex items-center gap-1.5 hover:opacity-90 transition">
+                        <i class="fa-solid fa-user text-xs"></i> Login AniList
+                    </button>
+                </div>
+
                 <button id="btnSearchToggle" onclick="toggleSearchInput(event)" class="p-2.5 rounded-full bg-transparent hover:bg-black/10 dark:hover:bg-yellow-500/25 transition text-black dark:text-neon-yellow" title="Cari Anime">
                     <i class="fa-solid fa-magnifying-glass text-sm"></i>
                 </button>
@@ -103,7 +191,7 @@
             <div>
                 <button id="btnInformationMenu" onclick="toggleInformationSubmenu(event)" class="w-full flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left">
                     <span class="flex items-center gap-3">
-                        <i class="fa-solid fa-circle-info text-black dark:text-neon-yellow w-5 text-center"></i> Informasi
+                        <i class="fa-solid fa-circle-info text-black dark:text-neon-yellow w-5 text-center"></i> Informasi & Peringkat
                     </span>
                     <i id="informationMenuIcon" class="fa-solid fa-chevron-down text-[11px] transition-transform"></i>
                 </button>
@@ -124,9 +212,12 @@
             <button onclick="switchView('dmca'); toggleSidebar();" class="flex items-center gap-3 p-3 rounded-xl hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left">
                 <i class="fa-solid fa-lock text-black dark:text-neon-yellow w-5 text-center"></i> DMCA
             </button>
-            <button onclick="switchView('cookieLogin'); toggleSidebar();" class="flex items-center gap-3 p-3 rounded-xl hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left">
-                <i class="fa-solid fa-cookie-bite text-black dark:text-neon-yellow w-5 text-center"></i> Login dengan Cookies
-            </button>
+
+            <div id="sidebarAuthBtn">
+                <button onclick="loginAniList()" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left">
+                    <i class="fa-solid fa-right-to-bracket text-black dark:text-neon-yellow w-5 text-center"></i> Login AniList
+                </button>
+            </div>
         </div>
     </div>
 
@@ -142,7 +233,6 @@
             <div id="searchSuggestions" class="hidden absolute left-1/2 -translate-x-1/2 mt-2 w-full max-w-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-h-80 overflow-y-auto p-2 z-50"></div>
         </div>
 
-        <!-- HOME VIEW -->
         <div id="homeView">
             <div id="historySection" class="mb-10 hidden">
                 <div class="flex items-center justify-between mb-4">
@@ -270,7 +360,6 @@
             <div id="paginationBox" class="flex justify-center items-center space-x-1.5 sm:space-x-2 mt-8 flex-wrap gap-y-2"></div>
         </div>
 
-        <!-- INFORMATION VIEW -->
         <div id="informationView" class="hidden">
             <div class="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
                 <div>
@@ -279,33 +368,91 @@
                             <i class="fa-solid fa-server text-xs"></i> Server NimeDesu
                         </span>
                     </div>
-                    <h2 id="informationHeader" class="text-xl sm:text-2xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-black dark:text-white">Upcoming Anime</h2>
-                    <p id="informationDescription" class="text-xs text-zinc-600 dark:text-zinc-400 mt-2 pl-4">Daftar anime berdasarkan database server NimeDesu.</p>
+                    <h2 id="informationHeader" class="text-xl sm:text-2xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-black dark:text-white">Peringkat & Informasi Anime</h2>
+                    <p id="informationDescription" class="text-xs text-zinc-600 dark:text-zinc-400 mt-2 pl-4">Daftar anime dengan nilai dan popularitas tertinggi berdasarkan database AniList.</p>
                 </div>
             </div>
 
-            <div class="flex items-center gap-2 mb-6 flex-wrap">
-                <button id="infoBtnUpcoming" onclick="openInformation('upcoming')" class="info-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs">
-                    <i class="fa-solid fa-calendar-days mr-1"></i> Upcoming
+
+            <div class="flex items-center justify-start gap-2 mb-8">
+                <button id="infoBtnUpcoming" onclick="openInformation('upcoming')" class="info-tab-btn px-4 py-2 rounded-full bg-neon-lightCard dark:bg-neon-darkCard text-xs font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs">
+                    <i class="fa-solid fa-calendar-days mr-1.5 text-neon-yellow"></i> Upcoming
                 </button>
-                <button id="infoBtnPopularity" onclick="openInformation('bypopularity')" class="info-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs">
-                    <i class="fa-solid fa-fire mr-1"></i> By Popularity
+                <button id="infoBtnPopularity" onclick="openInformation('bypopularity')" class="info-tab-btn px-4 py-2 rounded-full bg-neon-lightCard dark:bg-neon-darkCard text-xs font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs">
+                    <i class="fa-solid fa-fire mr-1.5 text-neon-yellow"></i> Top Trending
                 </button>
-                <button id="infoBtnFavorite" onclick="openInformation('favorite')" class="info-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs">
-                    <i class="fa-solid fa-heart mr-1"></i> Favorite
+                <button id="infoBtnFavorite" onclick="openInformation('favorite')" class="info-tab-btn px-4 py-2 rounded-full bg-neon-lightCard dark:bg-neon-darkCard text-xs font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs">
+                    <i class="fa-solid fa-heart mr-1.5 text-neon-yellow"></i> Highest Rated
                 </button>
             </div>
 
             <div id="informationLoading" class="hidden col-span-full flex flex-col items-center justify-center py-16 space-y-3">
                 <i class="fa-solid fa-spinner fa-spin text-2xl text-black dark:text-neon-yellow"></i>
-                <p class="text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-300">Memuat informasi anime...</p>
+                <p class="text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-300">Memuat data peringkat anime...</p>
             </div>
 
-            <div id="informationGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 sm:gap-5"></div>
+
+            <div id="podiumSection" class="grid grid-cols-3 gap-3 sm:gap-6 items-end mb-10 max-w-3xl mx-auto pt-6">
+                
+                <div class="podium-card-neon podium-silver-glow relative bg-neon-lightCard dark:bg-neon-darkCard rounded-2xl p-2.5 sm:p-3 flex flex-col items-center">
+                    <div class="podium-neon-border bg-neon-lightCard dark:bg-neon-darkCard"></div>
+
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 bg-zinc-700 text-white font-bold rounded-full flex items-center justify-center text-xs sm:text-sm border-2 border-zinc-400 -mt-6 sm:-mt-7 mb-2 shadow-md z-10">
+                        #2
+                    </div>
+                    <div class="w-full aspect-[3/4] rounded-xl overflow-hidden mb-2 relative group bg-zinc-800 z-10">
+                        <img id="podium2Img" src="https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80" alt="Rank 2" class="w-full h-full object-cover">
+                    </div>
+                    <h3 id="podium2Title" class="font-bold text-xs sm:text-sm text-center text-black dark:text-white truncate w-full z-10">Hunter × Hunter</h3>
+                    <div class="flex items-center gap-2 mt-1.5 text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 z-10">
+                        <span id="podium2Score" class="flex items-center gap-1 text-neon-yellow font-semibold"><i class="fa-solid fa-star text-[10px]"></i> 8.9</span>
+                        <span id="podium2Pop" class="flex items-center gap-1"><i class="fa-solid fa-bookmark text-[10px]"></i> 2.1M</span>
+                    </div>
+                </div>
+
+                <div class="podium-card-neon podium-gold-glow relative bg-neon-lightCard dark:bg-neon-darkCard rounded-2xl p-3 sm:p-4 flex flex-col items-center -translate-y-3">
+                    <div class="podium-neon-border bg-neon-lightCard dark:bg-neon-darkCard"></div>
+
+                    <div class="absolute -top-7 flex flex-col items-center z-10">
+                        <i class="fa-solid fa-crown text-neon-yellow text-sm -mb-1 drop-shadow-md"></i>
+                        <div class="w-8 h-8 sm:w-9 sm:h-9 bg-neon-yellow text-black font-extrabold rounded-full flex items-center justify-center text-sm sm:text-base border-2 border-yellow-200 shadow-lg">
+                            #1
+                        </div>
+                    </div>
+                    <div class="w-full aspect-[3/4] rounded-xl overflow-hidden mb-2.5 mt-3 relative bg-zinc-800 z-10">
+                        <img id="podium1Img" src="https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80" alt="Rank 1" class="w-full h-full object-cover">
+                    </div>
+                    <h3 id="podium1Title" class="font-bold text-xs sm:text-base text-center text-neon-yellow truncate w-full z-10">One Piece</h3>
+                    <div class="flex items-center gap-2 sm:gap-3 mt-1.5 text-[10px] sm:text-xs text-zinc-600 dark:text-zinc-300 z-10">
+                        <span id="podium1Score" class="flex items-center gap-1 text-neon-yellow font-bold"><i class="fa-solid fa-star text-[10px]"></i> 9.1</span>
+                        <span id="podium1Pop" class="flex items-center gap-1"><i class="fa-solid fa-bookmark text-[10px]"></i> 2.5M</span>
+                    </div>
+                </div>
+
+         
+                <div class="podium-card-neon podium-bronze-glow relative bg-neon-lightCard dark:bg-neon-darkCard rounded-2xl p-2.5 sm:p-3 flex flex-col items-center">
+                    <div class="podium-neon-border bg-neon-lightCard dark:bg-neon-darkCard"></div>
+
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 bg-amber-800 text-amber-100 font-bold rounded-full flex items-center justify-center text-xs sm:text-sm border-2 border-amber-600 -mt-6 sm:-mt-7 mb-2 shadow-md z-10">
+                        #3
+                    </div>
+                    <div class="w-full aspect-[3/4] rounded-xl overflow-hidden mb-2 relative group bg-zinc-800 z-10">
+                        <img id="podium3Img" src="https://images.unsplash.com/photo-1534447677768-be436bb09401?w=400&q=80" alt="Rank 3" class="w-full h-full object-cover">
+                    </div>
+                    <h3 id="podium3Title" class="font-bold text-xs sm:text-sm text-center text-black dark:text-white truncate w-full z-10">Shingeki no Kyojin</h3>
+                    <div class="flex items-center gap-2 mt-1.5 text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 z-10">
+                        <span id="podium3Score" class="flex items-center gap-1 text-neon-yellow font-semibold"><i class="fa-solid fa-star text-[10px]"></i> 8.8</span>
+                        <span id="podium3Pop" class="flex items-center gap-1"><i class="fa-solid fa-bookmark text-[10px]"></i> 2.3M</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <div id="informationGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3.5"></div>
+
             <div id="informationPagination" class="flex justify-center items-center space-x-1.5 sm:space-x-2 mt-8 flex-wrap gap-y-2"></div>
         </div>
 
-        <!-- DETAIL VIEW -->
         <div id="detailView" class="hidden">
             <div class="mb-6">
                 <button onclick="switchView('home')" class="px-4 py-2 rounded-xl text-xs font-bold bg-neon-lightCard dark:bg-neon-darkCard border border-neon-yellow text-black dark:text-white hover:bg-neon-yellow hover:text-black transition flex items-center gap-2 cursor-pointer shadow-xs">
@@ -377,7 +524,6 @@
             </div>
         </div>
 
-        <!-- DMCA VIEW -->
         <div id="dmcaView" class="hidden max-w-3xl mx-auto bg-neon-lightCard dark:bg-neon-darkCard p-6 sm:p-8 rounded-2xl border border-neon-yellow dark:border-neon-darkBorder shadow-sm space-y-4 text-xs sm:text-sm leading-relaxed text-zinc-700 dark:text-white">
             <h2 class="text-xl font-bold border-l-4 border-neon-yellow pl-3 text-black dark:text-white">PEMBERITAHUAN KEPADA PENGUNJUNG</h2>
             <p>Diberitahukan kepada seluruh pengunjung situs ini,<br>Perlu kami sampaikan bahwa situs web ini murni dikembangkan secara mandiri dan tidak mengambil keuntungan finansial (tidak ada profit/komersil) sepeser pun dari penayangan konten yang ada di dalamnya.</p>
@@ -387,37 +533,6 @@
             <div class="pt-6 font-semibold space-y-2 text-black dark:text-white">
                 <p>Hormat kami,</p>
                 <p class="mt-4 text-black dark:text-neon-yellow">Pengelola Situs</p>
-            </div>
-        </div>
-
-        <!-- COOKIE LOGIN VIEW -->
-        <div id="cookieLoginView" class="hidden max-w-xl mx-auto bg-neon-lightCard dark:bg-neon-darkCard p-6 sm:p-8 rounded-2xl border border-neon-yellow dark:border-neon-darkBorder shadow-sm space-y-6 text-black dark:text-white">
-            <h2 class="text-xl font-bold border-l-4 border-neon-yellow pl-3 text-black dark:text-white flex items-center gap-2">
-                <i class="fa-solid fa-cookie-bite text-black dark:text-neon-yellow"></i> Login dengan Cookies
-            </h2>
-            
-            <div class="space-y-2">
-                <label class="block text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">Upload File Cookies (.json):</label>
-                <input type="file" id="cookieFile" accept=".json" onchange="handleFileUpload(event)" class="w-full text-xs text-zinc-700 dark:text-zinc-300 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-neon-yellow file:text-black hover:file:bg-yellow-600 file:cursor-pointer cursor-pointer border border-zinc-300 dark:border-zinc-700 rounded-xl p-2 bg-white dark:bg-zinc-900">
-            </div>
-
-            <div class="space-y-2">
-                <label class="block text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">Atau Tempelkan cookies (Format JSON):</label>
-                <textarea id="cookieInputArea" rows="5" placeholder="Paste isi cookies JSON di sini..." class="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl p-3 text-xs font-mono text-black dark:text-white focus:outline-none focus:border-neon-yellow"></textarea>
-                <button onclick="saveCookiesFromInput()" class="w-full py-3 bg-neon-yellow hover:bg-yellow-600 text-black font-bold rounded-xl transition text-xs shadow-glow-yellow">Simpan & Terapkan Cookies</button>
-            </div>
-
-            <div class="border-t border-zinc-200 dark:border-zinc-800 pt-6 space-y-3 text-center">
-                <label class="block text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">Backup Data Cookies:</label>
-                <button id="btnDownloadCookies" onclick="downloadCookiesJson()" class="px-5 py-2.5 bg-neon-lightBg dark:bg-neon-darkBg text-black dark:text-white border border-neon-yellow hover:bg-neon-yellow hover:text-black font-semibold rounded-xl transition text-xs shadow-xs">
-                    <i class="fa-solid fa-download mr-1.5"></i> Download cookies Anda (JSON)
-                </button>
-            </div>
-
-            <div class="p-4 bg-yellow-500/10 border border-neon-yellow/30 rounded-xl text-center">
-                <p class="text-[11px] text-zinc-700 dark:text-zinc-300 italic">
-                    Note: Download cookies anda untuk menyimpan fitur "Terakhir ditonton". Jika mau melanjutkan progres "Terakhir ditonton" cukup upload atau tempel cookies (file yang didownload). Admin tidak menyimpan info login pengguna, jadi simpan sendiri ya.
-                </p>
             </div>
         </div>
 
