@@ -12,10 +12,25 @@ let activeGenreFilter = "";
 
 const RENDER_API_URL = "/api-backend";
 
+// KEY DENGAN FUNGSI SECURITY TOKEN BACKEND RENDER
+const KEY_X = "LayerX_Secret2026";
+const KEY_Y = "LayerY_Secret2026";
+const KEY_Z = "LayerZ_Secret2026";
+
+function generateSecurityToken() {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const rawPayload = `${timestamp}_NimeDesuSecretKey2026`;
+    const token = CryptoJS.SHA256(rawPayload).toString(CryptoJS.enc.Hex);
+    return {
+        token: token,
+        time: timestamp.toString()
+    };
+}
+
 /* =========================================================
    INTEGRASI ANILIST OAUTH2 LOGIN & USER SYNC
    ========================================================= */
-const ANILIST_CLIENT_ID = "48567"; // Client ID AniList resmi milikmu
+const ANILIST_CLIENT_ID = "48567"; // Client ID AniList resmi kamu
 
 function handleAniListOAuthCallback() {
     const hash = window.location.hash;
@@ -25,7 +40,7 @@ function handleAniListOAuthCallback() {
         if (accessToken) {
             localStorage.setItem('anilist_token', accessToken);
             
-            // Bersihkan hash URL agar tidak merusak query string API backend Render
+            // Bersihkan hash URL agar tidak mengganggu parameter pencarian API backend
             history.replaceState(null, document.title, window.location.pathname + window.location.search);
         }
     }
@@ -94,7 +109,6 @@ async function checkAniListAuthStatus() {
     }
 }
 
-/* API BANTUAN UNTUK MEMPERBARUI PROGRESS DI ANILIST */
 async function updateAniListProgress(animeMediaId, episodeNumber) {
     const token = localStorage.getItem('anilist_token');
     if (!token || !animeMediaId) return;
@@ -130,7 +144,7 @@ async function updateAniListProgress(animeMediaId, episodeNumber) {
 }
 
 /* =========================================================
-   SEKMEN UTILITAS / CORE NIMEDESU
+   SEKMEN UTILITAS / CORE NIMEDESU BACKEND RENDER
    ========================================================= */
 
 function switchView(viewName) {
@@ -191,7 +205,13 @@ async function loadAnimeDatabase(page = 1) {
         if (activeStatusFilter) fetchUrl += `&status=${encodeURIComponent(activeStatusFilter)}`;
         if (activeGenreFilter) fetchUrl += `&genre=${encodeURIComponent(activeGenreFilter)}`;
 
-        const response = await fetch(fetchUrl);
+        const sec = generateSecurityToken();
+        const response = await fetch(fetchUrl, {
+            headers: {
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            }
+        });
         const result = await response.json();
 
         currentData = (result.data || []).map((item, index) => ({
@@ -298,7 +318,13 @@ async function liveSearchAnime() {
     }
 
     try {
-        const res = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(query)}&per_page=6`);
+        const sec = generateSecurityToken();
+        const res = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(query)}&per_page=6`, {
+            headers: {
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            }
+        });
         const result = await res.json();
         const matched = result.data || [];
 
@@ -818,7 +844,7 @@ function renderInfoPagination(type, page, totalPageCount, paginationEl) {
 }
 
 window.onload = function() {
-    // 1. Tangani callback OAuth AniList dulu untuk membersihkan hash URL
+    // 1. Tangani callback OAuth AniList untuk membersihkan hash URL
     handleAniListOAuthCallback();
     
     // 2. Cek status Login AniList
@@ -836,7 +862,7 @@ window.onload = function() {
     activeGenreFilter = "";
     activeStatusFilter = "";
 
-    // 5. Muat history & database anime
+    // 5. Muat history & database anime dari Render Backend
     renderHistory();
     loadAnimeDatabase(1);
 };
