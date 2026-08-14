@@ -10,7 +10,7 @@ let activeSearchQuery = "";
 let activeStatusFilter = "";
 let activeGenreFilter = "";
 
-const RENDER_API_URL = "/api-backend";
+const RENDER_API_URL = "/api";
 
 const KEY_X = "LayerX_Secret2026";
 const KEY_Y = "LayerY_Secret2026";
@@ -55,7 +55,7 @@ function decryptTripleLayer(ciphertext) {
 }
 
 function switchView(viewName) {
-    const views = ['homeView', 'detailView', 'dmcaView', 'cookieLoginView'];
+    const views = ['homeView', 'detailView', 'dmcaView', 'cookieLoginView', 'informationView'];
     views.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.add('hidden');
@@ -75,6 +75,9 @@ function switchView(viewName) {
         const cookieLogin = document.getElementById('cookieLoginView');
         if (cookieLogin) cookieLogin.classList.remove('hidden');
         loadCookiesIntoTextarea();
+    } else if (viewName === 'information') {
+        const information = document.getElementById('informationView');
+        if (information) information.classList.remove('hidden');
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -88,6 +91,19 @@ function toggleSidebar() {
     } else {
         sidebar.classList.add('-translate-x-full');
         overlay.classList.add('hidden');
+    }
+}
+
+function toggleInformationSubmenu(e) {
+    if(e) e.stopPropagation();
+    const submenu = document.getElementById('informationSubmenu');
+    const icon = document.getElementById('informationMenuIcon');
+    if (submenu.classList.contains('hidden')) {
+        submenu.classList.remove('hidden');
+        icon.classList.add('rotate-180');
+    } else {
+        submenu.classList.add('hidden');
+        icon.classList.remove('rotate-180');
     }
 }
 
@@ -145,6 +161,7 @@ function displayAnimeWithPagination() {
         return;
     }
 
+    // RATING DIHILANGKAN DARI POSTER BERANDA
     container.innerHTML = currentData.map(item => `
         <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="viewDetails('${item.id}')">
             <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
@@ -521,6 +538,175 @@ function toggleTheme() {
     } else {
         html.classList.add('dark');
         icon.classList.replace('fa-sun', 'fa-moon');
+    }
+}
+
+/* =========================================================
+   FITUR INFORMASI MENGGUNAKAN SERVER BACKEND FLASK NIMEDESU
+   ========================================================= */
+
+let currentInfoType = 'upcoming';
+let currentInfoPage = 1;
+const infoItemsPerPage = 12;
+
+function openInformation(type, page = 1) {
+    currentInfoType = type;
+    currentInfoPage = page;
+    
+    switchView('information');
+    
+    document.querySelectorAll('.info-tab-btn').forEach(b => {
+        b.classList.remove('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
+        b.classList.add('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
+    });
+    
+    let activeBtnId = 'infoBtnUpcoming';
+    if (type === 'bypopularity') activeBtnId = 'infoBtnPopularity';
+    if (type === 'favorite') activeBtnId = 'infoBtnFavorite';
+    
+    const activeBtn = document.getElementById(activeBtnId);
+    if (activeBtn) {
+        activeBtn.classList.remove('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
+        activeBtn.classList.add('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
+    }
+    
+    const headerEl = document.getElementById('informationHeader');
+    const descEl = document.getElementById('informationDescription');
+    if (type === 'upcoming') {
+        headerEl.innerText = 'Upcoming Anime';
+        descEl.innerText = 'Daftar anime yang akan datang dari AniList (Global).';
+    } else if (type === 'bypopularity') {
+        headerEl.innerText = 'Anime Terpopuler';
+        descEl.innerText = 'Daftar anime terpopuler yang ada di NimeDesu.';
+    } else if (type === 'favorite') {
+        headerEl.innerText = 'Anime Favorit';
+        descEl.innerText = 'Daftar anime favorit yang ada di NimeDesu.';
+    }
+    
+    const loadingEl = document.getElementById('informationLoading');
+    const gridEl = document.getElementById('informationGrid');
+    const paginationEl = document.getElementById('informationPagination');
+    
+    loadingEl.classList.remove('hidden');
+    gridEl.innerHTML = '';
+    paginationEl.innerHTML = '';
+    
+    fetchInformationFromBackend(type, page, loadingEl, gridEl, paginationEl);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function fetchInformationFromBackend(type, page, loadingEl, gridEl, paginationEl) {
+    try {
+        const sec = generateSecurityToken();
+        const fetchUrl = `${RENDER_API_URL}/information?type=${encodeURIComponent(type)}&page=${page}&per_page=${infoItemsPerPage}`;
+
+        const response = await fetch(fetchUrl, {
+            headers: {
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            }
+        });
+
+        const result = await response.json();
+        const rawItems = result.data || [];
+        const infoTotalPages = result.total_pages || 1;
+
+        loadingEl.classList.add('hidden');
+
+        if (rawItems.length === 0) {
+            gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Tidak ada data informasi ditemukan.</p>`;
+            paginationEl.innerHTML = '';
+            return;
+        }
+
+        gridEl.innerHTML = rawItems.map(item => {
+            const ani = item.aniData || {};
+            const db = item.dbData || null;
+
+            let title = ani.title?.userPreferred || ani.title?.romaji || "Tanpa Judul";
+            let img = ani.coverImage?.extraLarge || ani.coverImage?.large || "https://placehold.co/400x600?text=No+Image";
+            let score = ani.averageScore ? (ani.averageScore / 10).toFixed(1) : 'N/A';
+            let statusText = ani.status === 'NOT_YET_RELEASED' ? 'Upcoming' : 'Ongoing';
+
+            let clickAction = `alert('Anime ${title} belum rilis / belum ada di server NimeDesu.')`;
+
+            if (db) {
+                title = db.title || title;
+                img = db.img_url || img;
+                score = db.score || score;
+                statusText = db.status || statusText;
+
+                const formattedLocal = {
+                    id: db.id,
+                    title: db.title || "Tanpa Judul",
+                    url: db.url ? db.url.trim() : "",
+                    status: db.status || "Ongoing",
+                    genres: db.genre ? db.genre.split(',').map(g => g.trim()) : [],
+                    synopsis: db.sinopsis || "Sinopsis belum tersedia.",
+                    thumbnail: db.img_url || "https://placehold.co/400x600?text=No+Image",
+                    japanese: db.japanese || "-",
+                    skor: db.score || "-",
+                    statusText: db.status || "-",
+                    totalEpisode: db.total_episodes || "-",
+                    durasi: db.duration || "-",
+                    tanggalRilis: db.release_date || "-",
+                    studio: db.studio || "-"
+                };
+
+                if (!currentData.some(a => a.id == formattedLocal.id)) {
+                    currentData.push(formattedLocal);
+                }
+
+                clickAction = `viewDetails('${db.id}')`;
+            }
+
+            return `
+                <div onclick="${clickAction}" class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer">
+                    <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
+                        <img src="${img}" alt="${title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
+                        <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
+                            <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
+                                <i class="fa-solid fa-circle-info ml-0.5 text-base"></i>
+                            </div>
+                        </div>
+                        <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${statusText}</span>
+                        <span class="absolute bottom-2 right-2 bg-neon-yellow text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow">⭐ ${score}</span>
+                    </div>
+                    <div class="p-3 flex flex-col justify-between flex-grow">
+                        <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${title}</h4>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // PAGINATION KHUSUS (TANPA TOMBOL '<<' DAN '>>')
+        let pagHTML = '';
+        const baseBtn = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow transition shadow-xs';
+        const disBtn = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border-zinc-200 dark:border-zinc-800 cursor-not-allowed';
+        
+        pagHTML += `<button class="${page > 1 ? baseBtn : disBtn}" ${page <= 1 ? 'disabled' : ''} onclick="openInformation('${type}', ${page - 1})">&lsaquo;</button>`;
+        
+        let sPage = Math.max(1, page - 2);
+        let ePage = Math.min(infoTotalPages, page + 2);
+        
+        for (let i = sPage; i <= ePage; i++) {
+            let actClass = i === page ? 'bg-neon-yellow text-black font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder shadow-xs';
+            pagHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${actClass} transition" onclick="openInformation('${type}', ${i})">${i}</button>`;
+        }
+        
+        pagHTML += `<button class="${page < infoTotalPages ? baseBtn : disBtn}" ${page >= infoTotalPages ? 'disabled' : ''} onclick="openInformation('${type}', ${page + 1})">&rsaquo;</button>`;
+        
+        paginationEl.innerHTML = pagHTML;
+
+    } catch (err) {
+        console.error("Backend Information Error:", err);
+        loadingEl.classList.add('hidden');
+        gridEl.innerHTML = `
+            <div class="col-span-full text-center py-10 space-y-3">
+                <p class="text-zinc-600 dark:text-zinc-400 font-medium">Gagal memuat data dari server.</p>
+                <button onclick="openInformation('${type}', ${page})" class="px-4 py-2 bg-neon-yellow text-black text-xs font-bold rounded-xl shadow-glow-yellow hover:bg-yellow-600 transition">Muat Ulang</button>
+            </div>
+        `;
     }
 }
 
