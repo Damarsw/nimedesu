@@ -12,7 +12,7 @@ let activeGenreFilter = "";
 
 const RENDER_API_URL = "/api-backend";
 
-// KUNCI DEKRIPSI BROWSER LOKAL (INTERNAL MEMORY ONLY)
+// KUNCI DEKRIPSI BROWSER LOKAL
 const KEY_X = "LayerX_Secret2026";
 const KEY_Y = "LayerY_Secret2026";
 const KEY_Z = "LayerZ_Secret2026";
@@ -59,7 +59,6 @@ function decryptTripleLayer(ciphertext) {
    INJEKSI COOKIES FAKE / DECOY UNTUK MENGECOH EXTENSION CHROME
    ========================================================= */
 function injectDecoyCookiesForScrapers() {
-    // Membuat cookies palsu di document.cookie agar extension / scraper hanya membaca data decoy ini
     const date = new Date();
     date.setTime(date.getTime() + (30 * 24 * 60 * 60 * 1000));
     const expires = "; expires=" + date.toUTCString();
@@ -146,6 +145,57 @@ async function checkAniListAuthStatus() {
         }
     } catch (err) {
         console.error("Auth check failed:", err);
+    }
+}
+
+/* API MUTATION: MENAMBAHKAN ANIME KE WATCHLIST / BOOKMARK ANILIST */
+async function addAniListBookmark(mediaId, buttonEl) {
+    const token = localStorage.getItem('anilist_token');
+    if (!token) {
+        alert("Silakan login dengan akun AniList terlebih dahulu untuk menyimpan bookmark!");
+        loginAniList();
+        return;
+    }
+
+    const query = `
+    mutation ($mediaId: Int, $status: MediaListStatus) {
+        SaveMediaListEntry (mediaId: $mediaId, status: $status) {
+            id status
+        }
+    }`;
+
+    try {
+        const response = await fetch('https://graphql.anilist.co', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+                query: query,
+                variables: {
+                    mediaId: parseInt(mediaId),
+                    status: 'PLANNING' // Menyimpan otomatis ke daftar "Planning / Rencana Nonton"
+                }
+            })
+        });
+
+        const result = await response.json();
+        if (result?.data?.SaveMediaListEntry) {
+            alert("Berhasil disimpan ke watchlist AniList kamu!");
+            if (buttonEl) {
+                const icon = buttonEl.querySelector('i');
+                if (icon) {
+                    icon.className = 'fa-solid fa-bookmark text-neon-yellow';
+                }
+            }
+        } else {
+            alert("Gagal menyimpan ke AniList.");
+        }
+    } catch (err) {
+        console.error("Gagal simpan bookmark ke AniList:", err);
+        alert("Terjadi kesalahan saat menyambungkan ke AniList.");
     }
 }
 
@@ -524,10 +574,7 @@ function viewDetails(id) {
    ========================================================= */
 
 function getLocalHistoryArray() {
-    // 1. Cek dari LocalStorage Biasa
     let history = JSON.parse(localStorage.getItem('nimedesu_history_local') || '[]');
-    
-    // 2. Cek dari LocalStorage Terenkripsi Lama
     if (history.length === 0) {
         let encryptedOldData = localStorage.getItem('nimedesu_history_triple');
         if (encryptedOldData) {
@@ -812,7 +859,7 @@ function renderRankListItem(anime, rankNumber) {
                     <span><i class="fa-solid fa-bookmark text-[10px]"></i> ${pop} members</span>
                 </div>
             </div>
-            <button onclick="updateAniListProgress(${anime.id}, 1)" title="Tandai Nonton di AniList" class="p-2 text-zinc-400 hover:text-neon-yellow transition shrink-0">
+            <button onclick="addAniListBookmark(${anime.id}, this)" title="Tambah ke Bookmark AniList" class="p-2 text-zinc-400 hover:text-neon-yellow transition shrink-0">
                 <i class="fa-regular fa-bookmark"></i>
             </button>
         </div>
@@ -840,14 +887,10 @@ function renderInfoPagination(type, page, totalPageCount, paginationEl) {
 }
 
 window.onload = function() {
-    // 1. Suntikkan cookies pancingan/decoy ke browser untuk mengecoh extension Chrome
     injectDecoyCookiesForScrapers();
-
-    // 2. Otorisasi AniList & callback
     handleAniListOAuthCallback();
     checkAniListAuthStatus();
 
-    // 3. Tab Default Styling
     const defaultBtn = document.getElementById('btnSemua');
     if(defaultBtn) {
         defaultBtn.classList.remove('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
@@ -858,7 +901,6 @@ window.onload = function() {
     activeGenreFilter = "";
     activeStatusFilter = "";
 
-    // 4. Render Riwayat Lokal & Muat Anime Database
     renderHistory();
     loadAnimeDatabase(1);
 };
