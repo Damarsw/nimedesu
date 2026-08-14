@@ -12,7 +12,7 @@ let activeGenreFilter = "";
 
 const RENDER_API_URL = "/api-backend";
 
-// KEY UNTUK DEKRIPSI HISTORY LAMA (AGAR TIDAK HILANG)
+// KUNCI DEKRIPSI BROWSER LOKAL (INTERNAL MEMORY ONLY)
 const KEY_X = "LayerX_Secret2026";
 const KEY_Y = "LayerY_Secret2026";
 const KEY_Z = "LayerZ_Secret2026";
@@ -25,6 +25,14 @@ function generateSecurityToken() {
         token: token,
         time: timestamp.toString()
     };
+}
+
+function encryptTripleLayer(data) {
+    const jsonString = JSON.stringify(data);
+    const layer1 = CryptoJS.AES.encrypt(jsonString, KEY_X).toString();
+    const layer2 = CryptoJS.Rabbit.encrypt(layer1, KEY_Y).toString();
+    const layer3 = CryptoJS.TripleDES.encrypt(layer2, KEY_Z).toString();
+    return layer3;
 }
 
 function decryptTripleLayer(ciphertext) {
@@ -45,6 +53,20 @@ function decryptTripleLayer(ciphertext) {
     } catch (e) {
         return null;
     }
+}
+
+/* =========================================================
+   INJEKSI COOKIES FAKE / DECOY UNTUK MENGECOH EXTENSION CHROME
+   ========================================================= */
+function injectDecoyCookiesForScrapers() {
+    // Membuat cookies palsu di document.cookie agar extension / scraper hanya membaca data decoy ini
+    const date = new Date();
+    date.setTime(date.getTime() + (30 * 24 * 60 * 60 * 1000));
+    const expires = "; expires=" + date.toUTCString();
+
+    document.cookie = "session_token=decoy_session_a8f9c118e9d2a01;" + expires + "; path=/; SameSite=Lax";
+    document.cookie = "user_auth_state=eyJhZG1pbiI6ZmFsc2UsInVzZXJfaWQiOjU1OTI1MX0=;" + expires + "; path=/; SameSite=Lax";
+    document.cookie = "nimedesu_history_decoy=P1e8X9aL3z0qW5y9N8m2K7vL1i3O0pQ4;" + expires + "; path=/; SameSite=Lax";
 }
 
 /* =========================================================
@@ -498,94 +520,32 @@ function viewDetails(id) {
 }
 
 /* =========================================================
-   SISTEM MEMUAT RIWAYAT DENGAN AUTO-MIGRASI DATA LAMA
+   SISTEM BACA RIWAYAT LOKAL AMAN & PASTI TAMPIL
    ========================================================= */
-async function renderHistory() {
-    const historySection = document.getElementById('historySection');
-    const historyGrid = document.getElementById('historyGrid');
 
-    const token = localStorage.getItem('anilist_token');
-
-    // 1. JIKA LOGIN ANILIST: LOAD DARI ANILIST
-    if (token) {
-        const query = `
-        query {
-            Viewer {
-                id
-            }
-            MediaListCollection(type: ANIME, status: CURRENT) {
-                lists {
-                    entries {
-                        progress
-                        media {
-                            id
-                            title { userPreferred romaji }
-                            coverImage { extraLarge large }
-                            siteUrl
-                        }
-                    }
-                }
-            }
-        }`;
-
-        try {
-            const res = await fetch('https://graphql.anilist.co', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + token,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({ query: query })
-            });
-            const json = await res.json();
-            const entries = json?.data?.MediaListCollection?.lists?.[0]?.entries || [];
-
-            if (entries.length === 0) {
-                historySection.classList.add('hidden');
-                return;
-            }
-
-            historySection.classList.remove('hidden');
-            historyGrid.innerHTML = entries.map(item => `
-                <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.open('${item.media.siteUrl}', '_blank')">
-                    <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
-                        <img src="${item.media.coverImage.extraLarge || item.media.coverImage.large}" alt="${item.media.title.userPreferred}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
-                        <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
-                            <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
-                                <i class="fa-solid fa-play ml-0.5 text-base"></i>
-                            </div>
-                        </div>
-                        <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">
-                            Eps ${item.progress || '1'}
-                        </span>
-                    </div>
-                    <div class="p-3">
-                        <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.media.title.userPreferred || item.media.title.romaji}</h4>
-                    </div>
-                </div>
-            `).join('');
-            return;
-        } catch (e) {
-            console.error("Gagal load history dari AniList:", e);
-        }
-    }
-
-    // 2. FALLBACK LOKAL DENGAN AUTO-MIGRASI DATA ENKRIPSI LAMA
+function getLocalHistoryArray() {
+    // 1. Cek dari LocalStorage Biasa
     let history = JSON.parse(localStorage.getItem('nimedesu_history_local') || '[]');
-
-    // Jika history lokal masih kosong, coba ekstrak dari data terenkripsi lama (nimedesu_history_triple)
+    
+    // 2. Cek dari LocalStorage Terenkripsi Lama
     if (history.length === 0) {
         let encryptedOldData = localStorage.getItem('nimedesu_history_triple');
         if (encryptedOldData) {
             let decryptedHistory = decryptTripleLayer(encryptedOldData);
             if (decryptedHistory && Array.isArray(decryptedHistory) && decryptedHistory.length > 0) {
                 history = decryptedHistory;
-                // Simpan ke format lokal baru
                 localStorage.setItem('nimedesu_history_local', JSON.stringify(history));
             }
         }
     }
+    return history;
+}
+
+async function renderHistory() {
+    const historySection = document.getElementById('historySection');
+    const historyGrid = document.getElementById('historyGrid');
+
+    let history = getLocalHistoryArray();
 
     if (history.length === 0) {
         historySection.classList.add('hidden');
@@ -880,9 +840,14 @@ function renderInfoPagination(type, page, totalPageCount, paginationEl) {
 }
 
 window.onload = function() {
+    // 1. Suntikkan cookies pancingan/decoy ke browser untuk mengecoh extension Chrome
+    injectDecoyCookiesForScrapers();
+
+    // 2. Otorisasi AniList & callback
     handleAniListOAuthCallback();
     checkAniListAuthStatus();
 
+    // 3. Tab Default Styling
     const defaultBtn = document.getElementById('btnSemua');
     if(defaultBtn) {
         defaultBtn.classList.remove('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
@@ -893,6 +858,7 @@ window.onload = function() {
     activeGenreFilter = "";
     activeStatusFilter = "";
 
+    // 4. Render Riwayat Lokal & Muat Anime Database
     renderHistory();
     loadAnimeDatabase(1);
 };
