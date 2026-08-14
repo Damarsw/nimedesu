@@ -359,13 +359,18 @@
                 <p class="text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-300">Memuat data peringkat anime...</p>
             </div>
 
+            <!-- PODIUM SECTION (TOP 3 RANK WITH DUAL RUNNING NEON BEAM & BOOKMARK BUTTON) -->
             <div id="podiumSection" class="grid grid-cols-3 gap-3 sm:gap-6 items-end mb-10 max-w-3xl mx-auto pt-6">
                 
+                <!-- RANK #2 (PERAK / SILVER) -->
                 <div class="podium-card-neon podium-silver-glow relative bg-neon-lightCard dark:bg-neon-darkCard rounded-2xl p-2.5 sm:p-3 flex flex-col items-center">
                     <div class="podium-neon-border bg-neon-lightCard dark:bg-neon-darkCard"></div>
                     <div class="w-7 h-7 sm:w-8 sm:h-8 bg-zinc-700 text-white font-bold rounded-full flex items-center justify-center text-xs sm:text-sm border-2 border-zinc-400 -mt-6 sm:-mt-7 mb-2 shadow-md z-10">#2</div>
                     <div class="w-full aspect-[3/4] rounded-xl overflow-hidden mb-2 relative group bg-zinc-800 z-10">
                         <img id="podium2Img" src="https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80" alt="Rank 2" class="w-full h-full object-cover">
+                        <button id="podium2BookmarkBtn" onclick="" title="Tambah ke Bookmark AniList" class="absolute bottom-2 right-2 p-1.5 rounded-full bg-black/60 backdrop-blur-md text-zinc-300 hover:text-neon-yellow transition z-20 shadow-md">
+                            <i class="fa-regular fa-bookmark text-xs"></i>
+                        </button>
                     </div>
                     <h3 id="podium2Title" class="font-bold text-xs sm:text-sm text-center text-black dark:text-white truncate w-full z-10">Hunter × Hunter</h3>
                     <div class="flex items-center gap-2 mt-1.5 text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 z-10">
@@ -374,6 +379,7 @@
                     </div>
                 </div>
 
+                <!-- RANK #1 (EMAS / GOLD) -->
                 <div class="podium-card-neon podium-gold-glow relative bg-neon-lightCard dark:bg-neon-darkCard rounded-2xl p-3 sm:p-4 flex flex-col items-center -translate-y-3">
                     <div class="podium-neon-border bg-neon-lightCard dark:bg-neon-darkCard"></div>
                     <div class="absolute -top-7 flex flex-col items-center z-10">
@@ -382,6 +388,9 @@
                     </div>
                     <div class="w-full aspect-[3/4] rounded-xl overflow-hidden mb-2.5 mt-3 relative bg-zinc-800 z-10">
                         <img id="podium1Img" src="https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80" alt="Rank 1" class="w-full h-full object-cover">
+                        <button id="podium1BookmarkBtn" onclick="" title="Tambah ke Bookmark AniList" class="absolute bottom-2 right-2 p-1.5 rounded-full bg-black/60 backdrop-blur-md text-zinc-300 hover:text-neon-yellow transition z-20 shadow-md">
+                            <i class="fa-regular fa-bookmark text-xs"></i>
+                        </button>
                     </div>
                     <h3 id="podium1Title" class="font-bold text-xs sm:text-base text-center text-neon-yellow truncate w-full z-10">One Piece</h3>
                     <div class="flex items-center gap-2 sm:gap-3 mt-1.5 text-[10px] sm:text-xs text-zinc-600 dark:text-zinc-300 z-10">
@@ -390,11 +399,15 @@
                     </div>
                 </div>
 
+                <!-- RANK #3 (PERUNGGU / BRONZE) -->
                 <div class="podium-card-neon podium-bronze-glow relative bg-neon-lightCard dark:bg-neon-darkCard rounded-2xl p-2.5 sm:p-3 flex flex-col items-center">
                     <div class="podium-neon-border bg-neon-lightCard dark:bg-neon-darkCard"></div>
                     <div class="w-7 h-7 sm:w-8 sm:h-8 bg-amber-800 text-amber-100 font-bold rounded-full flex items-center justify-center text-xs sm:text-sm border-2 border-amber-600 -mt-6 sm:-mt-7 mb-2 shadow-md z-10">#3</div>
                     <div class="w-full aspect-[3/4] rounded-xl overflow-hidden mb-2 relative group bg-zinc-800 z-10">
                         <img id="podium3Img" src="https://images.unsplash.com/photo-1534447677768-be436bb09401?w=400&q=80" alt="Rank 3" class="w-full h-full object-cover">
+                        <button id="podium3BookmarkBtn" onclick="" title="Tambah ke Bookmark AniList" class="absolute bottom-2 right-2 p-1.5 rounded-full bg-black/60 backdrop-blur-md text-zinc-300 hover:text-neon-yellow transition z-20 shadow-md">
+                            <i class="fa-regular fa-bookmark text-xs"></i>
+                        </button>
                     </div>
                     <h3 id="podium3Title" class="font-bold text-xs sm:text-sm text-center text-black dark:text-white truncate w-full z-10">Shingeki no Kyojin</h3>
                     <div class="flex items-center gap-2 mt-1.5 text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 z-10">
