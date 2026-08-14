@@ -12,7 +12,7 @@ app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "https://nimedesu.vercel.app"}})
 
 # ---------------------------------------------------------------------------
-# CONFIG - Diambil dari Environment Variables
+# CONFIG - Diambil dengan benar dari Environment Variables di Render
 # ---------------------------------------------------------------------------
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
@@ -46,12 +46,6 @@ SRV_KEY_URL = "url"
 SRV_KEY_VURL = "vurl"
 SRV_KEY_LABEL = "keterangan"
 SRV_KEY_SERVER_NAME = "server"
-
-
-def normalize_title(str_val):
-    if not str_val:
-        return ""
-    return "".join(e for e in str_val.lower() if e.isalnum())
 
 
 @app.before_request
@@ -243,94 +237,6 @@ def api_anime_detail():
         }
 
         return jsonify(result_payload)
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/information", methods=["GET"])
-def api_information():
-    info_type = request.args.get("type", "upcoming").strip()
-    page = int(request.args.get("page", 1))
-    per_page = int(request.args.get("per_page", 12))
-
-    sort_query = "POPULARITY_DESC"
-    status_filter = ""
-
-    if info_type == "upcoming":
-        status_filter = ", status: NOT_YET_RELEASED"
-    elif info_type == "favorite":
-        sort_query = "FAVOURITES_DESC"
-
-    anilist_query = f"""
-    query {{
-        Page(page: 1, perPage: 100) {{
-            media(type: ANIME, sort: {sort_query}{status_filter}) {{
-                id
-                title {{
-                    romaji
-                    english
-                    userPreferred
-                }}
-                coverImage {{
-                    extraLarge
-                    large
-                }}
-                averageScore
-                status
-            }}
-        }}
-    }}
-    """
-
-    try:
-        # Fetch AniList di Server-Side
-        ani_res = requests.post(
-            "https://graphql.anilist.co",
-            json={"query": anilist_query},
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
-            timeout=10
-        )
-        ani_json = ani_res.json()
-        ani_list_media = ani_json.get("data", {}).get("Page", {}).get("media", [])
-
-        # Ambil database lokal dari Supabase
-        db_res = client_obj.table(TABLE_ANIME).select("*").execute()
-        my_db_animes = db_res.data or []
-
-        display_list = []
-
-        if info_type == "upcoming":
-            for ani in ani_list_media:
-                ani_title_norm = normalize_title(ani.get("title", {}).get("userPreferred") or ani.get("title", {}).get("romaji"))
-                matched_db = next((db for db in my_db_animes if ani_title_norm in normalize_title(db.get(COL_ANIME_TITLE, ""))), None)
-                display_list.append({
-                    "aniData": ani,
-                    "dbData": matched_db
-                })
-        else:
-            for ani in ani_list_media:
-                ani_title_norm = normalize_title(ani.get("title", {}).get("userPreferred") or ani.get("title", {}).get("romaji"))
-                matched_db = next((db for db in my_db_animes if ani_title_norm in normalize_title(db.get(COL_ANIME_TITLE, "")) or normalize_title(db.get(COL_ANIME_TITLE, "")) in ani_title_norm), None)
-                if matched_db:
-                    display_list.append({
-                        "aniData": ani,
-                        "dbData": matched_db
-                    })
-
-        total_records = len(display_list)
-        total_pages = -(-total_records // per_page) if total_records > 0 else 1
-
-        start = (page - 1) * per_page
-        end = start + per_page
-        page_items = display_list[start:end]
-
-        return jsonify({
-            "data": page_items,
-            "total": total_records,
-            "page": page,
-            "total_pages": total_pages
-        })
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
