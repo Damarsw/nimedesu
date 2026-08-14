@@ -126,18 +126,19 @@ async function checkAniListAuthStatus() {
             localStorage.setItem('anilist_user', JSON.stringify(user));
 
             if (headerAuthContainer) {
+                // UPDATE STYLING DI MODE TERANG & GELAP AGAR BACKGROUND PUTIH & IKON KELUAR HITAM DI MODE TERANG
                 headerAuthContainer.innerHTML = `
-                    <div class="flex items-center gap-2 bg-zinc-800/80 p-1 pr-3 rounded-full border border-neon-yellow/40">
+                    <div class="flex items-center gap-2 bg-white dark:bg-zinc-800/90 p-1 pr-3 rounded-full border border-neon-yellow shadow-xs">
                         <img src="${user.avatar.medium}" class="w-6 h-6 rounded-full object-cover">
-                        <span class="text-xs font-bold text-neon-yellow max-w-[80px] truncate">${user.name}</span>
-                        <button onclick="logoutAniList()" class="ml-1 text-[10px] text-zinc-400 hover:text-red-400" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
+                        <span class="text-xs font-bold text-black dark:text-neon-yellow max-w-[80px] truncate">${user.name}</span>
+                        <button onclick="logoutAniList()" class="ml-1 text-[11px] text-black dark:text-zinc-400 hover:text-red-500 transition" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
                     </div>
                 `;
             }
 
             if (sidebarAuthBtn) {
                 sidebarAuthBtn.innerHTML = `
-                    <button onclick="logoutAniList()" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-500/20 text-red-400 transition text-left">
+                    <button onclick="logoutAniList()" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-500/20 text-red-500 transition text-left">
                         <i class="fa-solid fa-right-from-bracket w-5 text-center"></i> Logout (${user.name})
                     </button>
                 `;
@@ -176,7 +177,7 @@ async function addAniListBookmark(mediaId, buttonEl) {
                 query: query,
                 variables: {
                     mediaId: parseInt(mediaId),
-                    status: 'PLANNING' // Menyimpan otomatis ke daftar "Planning / Rencana Nonton"
+                    status: 'PLANNING'
                 }
             })
         });
@@ -822,23 +823,47 @@ async function fetchAniListData(type, page, loadingEl, podiumEl, gridEl, paginat
 }
 
 function renderPodiumData(top3) {
+    // Rank #1
     const r1 = top3[0];
     document.getElementById('podium1Title').innerText = r1.title?.userPreferred || r1.title?.romaji || 'Tanpa Judul';
     document.getElementById('podium1Img').src = r1.coverImage?.extraLarge || r1.coverImage?.large;
     document.getElementById('podium1Score').innerHTML = `<i class="fa-solid fa-star text-[10px]"></i> ${r1.averageScore ? (r1.averageScore / 10).toFixed(1) : 'N/A'}`;
     document.getElementById('podium1Pop').innerHTML = `<i class="fa-solid fa-bookmark text-[10px]"></i> ${formatNumberShort(r1.popularity)}`;
+    const btn1 = document.getElementById('podium1BookmarkBtn');
+    if (btn1) {
+        btn1.onclick = function(e) {
+            e.stopPropagation();
+            addAniListBookmark(r1.id, this);
+        };
+    }
 
+    // Rank #2
     const r2 = top3[1];
     document.getElementById('podium2Title').innerText = r2.title?.userPreferred || r2.title?.romaji || 'Tanpa Judul';
     document.getElementById('podium2Img').src = r2.coverImage?.extraLarge || r2.coverImage?.large;
     document.getElementById('podium2Score').innerHTML = `<i class="fa-solid fa-star text-[10px]"></i> ${r2.averageScore ? (r2.averageScore / 10).toFixed(1) : 'N/A'}`;
     document.getElementById('podium2Pop').innerHTML = `<i class="fa-solid fa-bookmark text-[10px]"></i> ${formatNumberShort(r2.popularity)}`;
+    const btn2 = document.getElementById('podium2BookmarkBtn');
+    if (btn2) {
+        btn2.onclick = function(e) {
+            e.stopPropagation();
+            addAniListBookmark(r2.id, this);
+        };
+    }
 
+    // Rank #3
     const r3 = top3[2];
     document.getElementById('podium3Title').innerText = r3.title?.userPreferred || r3.title?.romaji || 'Tanpa Judul';
     document.getElementById('podium3Img').src = r3.coverImage?.extraLarge || r3.coverImage?.large;
     document.getElementById('podium3Score').innerHTML = `<i class="fa-solid fa-star text-[10px]"></i> ${r3.averageScore ? (r3.averageScore / 10).toFixed(1) : 'N/A'}`;
     document.getElementById('podium3Pop').innerHTML = `<i class="fa-solid fa-bookmark text-[10px]"></i> ${formatNumberShort(r3.popularity)}`;
+    const btn3 = document.getElementById('podium3BookmarkBtn');
+    if (btn3) {
+        btn3.onclick = function(e) {
+            e.stopPropagation();
+            addAniListBookmark(r3.id, this);
+        };
+    }
 }
 
 function renderRankListItem(anime, rankNumber) {
