@@ -57,6 +57,9 @@
             scrollbar-width: none;
         }
 
+        /* =========================================================
+           DUAL NEON RUNNING BEAM (180 DEGRAJAT OPOSISI) & FIX BADGE KEPOTONG
+           ========================================================= */
         @property --angle {
             syntax: '<angle>';
             initial-value: 0deg;
@@ -213,6 +216,7 @@
                 <i class="fa-solid fa-lock text-black dark:text-neon-yellow w-5 text-center"></i> DMCA
             </button>
 
+            <!-- Login / Logout Sidebar Button -->
             <div id="sidebarAuthBtn">
                 <button onclick="loginAniList()" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left">
                     <i class="fa-solid fa-right-to-bracket text-black dark:text-neon-yellow w-5 text-center"></i> Login AniList
@@ -233,6 +237,7 @@
             <div id="searchSuggestions" class="hidden absolute left-1/2 -translate-x-1/2 mt-2 w-full max-w-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-h-80 overflow-y-auto p-2 z-50"></div>
         </div>
 
+        <!-- HOME VIEW -->
         <div id="homeView">
             <div id="historySection" class="mb-10 hidden">
                 <div class="flex items-center justify-between mb-4">
@@ -360,6 +365,7 @@
             <div id="paginationBox" class="flex justify-center items-center space-x-1.5 sm:space-x-2 mt-8 flex-wrap gap-y-2"></div>
         </div>
 
+        <!-- INFORMATION & RANKING VIEW -->
         <div id="informationView" class="hidden">
             <div class="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
                 <div>
@@ -373,7 +379,7 @@
                 </div>
             </div>
 
-
+            <!-- Tab Filter Peringkat -->
             <div class="flex items-center justify-start gap-2 mb-8">
                 <button id="infoBtnUpcoming" onclick="openInformation('upcoming')" class="info-tab-btn px-4 py-2 rounded-full bg-neon-lightCard dark:bg-neon-darkCard text-xs font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs">
                     <i class="fa-solid fa-calendar-days mr-1.5 text-neon-yellow"></i> Upcoming
@@ -391,9 +397,10 @@
                 <p class="text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-300">Memuat data peringkat anime...</p>
             </div>
 
-
+            <!-- PODIUM SECTION (TOP 3 RANK WITH DUAL RUNNING NEON BEAM) -->
             <div id="podiumSection" class="grid grid-cols-3 gap-3 sm:gap-6 items-end mb-10 max-w-3xl mx-auto pt-6">
                 
+                <!-- RANK #2 (PERAK / SILVER) -->
                 <div class="podium-card-neon podium-silver-glow relative bg-neon-lightCard dark:bg-neon-darkCard rounded-2xl p-2.5 sm:p-3 flex flex-col items-center">
                     <div class="podium-neon-border bg-neon-lightCard dark:bg-neon-darkCard"></div>
 
@@ -410,6 +417,7 @@
                     </div>
                 </div>
 
+                <!-- RANK #1 (EMAS / GOLD) -->
                 <div class="podium-card-neon podium-gold-glow relative bg-neon-lightCard dark:bg-neon-darkCard rounded-2xl p-3 sm:p-4 flex flex-col items-center -translate-y-3">
                     <div class="podium-neon-border bg-neon-lightCard dark:bg-neon-darkCard"></div>
 
@@ -429,7 +437,7 @@
                     </div>
                 </div>
 
-         
+                <!-- RANK #3 (PERUNGGU / BRONZE) -->
                 <div class="podium-card-neon podium-bronze-glow relative bg-neon-lightCard dark:bg-neon-darkCard rounded-2xl p-2.5 sm:p-3 flex flex-col items-center">
                     <div class="podium-neon-border bg-neon-lightCard dark:bg-neon-darkCard"></div>
 
@@ -448,11 +456,13 @@
 
             </div>
 
+            <!-- LIST PERINGKAT #4 KE ATAS (2 KOLOM) -->
             <div id="informationGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3.5"></div>
 
             <div id="informationPagination" class="flex justify-center items-center space-x-1.5 sm:space-x-2 mt-8 flex-wrap gap-y-2"></div>
         </div>
 
+        <!-- DETAIL VIEW -->
         <div id="detailView" class="hidden">
             <div class="mb-6">
                 <button onclick="switchView('home')" class="px-4 py-2 rounded-xl text-xs font-bold bg-neon-lightCard dark:bg-neon-darkCard border border-neon-yellow text-black dark:text-white hover:bg-neon-yellow hover:text-black transition flex items-center gap-2 cursor-pointer shadow-xs">
@@ -524,6 +534,7 @@
             </div>
         </div>
 
+        <!-- DMCA VIEW -->
         <div id="dmcaView" class="hidden max-w-3xl mx-auto bg-neon-lightCard dark:bg-neon-darkCard p-6 sm:p-8 rounded-2xl border border-neon-yellow dark:border-neon-darkBorder shadow-sm space-y-4 text-xs sm:text-sm leading-relaxed text-zinc-700 dark:text-white">
             <h2 class="text-xl font-bold border-l-4 border-neon-yellow pl-3 text-black dark:text-white">PEMBERITAHUAN KEPADA PENGUNJUNG</h2>
             <p>Diberitahukan kepada seluruh pengunjung situs ini,<br>Perlu kami sampaikan bahwa situs web ini murni dikembangkan secara mandiri dan tidak mengambil keuntungan finansial (tidak ada profit/komersil) sepeser pun dari penayangan konten yang ada di dalamnya.</p>
