@@ -15,6 +15,10 @@ let activeGenreFilter = "";
 let isBookmarkViewActive = false;
 let searchDebounceTimer = null;
 
+// State Informasi & Peringkat
+let currentInfoType = 'bypopularity'; // 'upcoming' | 'bypopularity' | 'favorite'
+let currentInfoPage = 1;
+
 // Cache bookmark & skor anime lokal
 let userBookmarksCache = [];
 let scoreLocalCache = {};
@@ -819,7 +823,7 @@ function toggleSearchInput(event) {
     }
 }
 
-// Tutup search bar dan dropdown jika klik di luar area, teks tetap tersimpan
+// Tutup search bar dan dropdown jika klik di luar area, teks tetap tersimpan di latar belakang
 document.addEventListener('click', function(e) {
     const container = document.getElementById('searchContainer');
     const searchBoxWrapper = document.getElementById('searchBoxWrapper');
@@ -999,14 +1003,15 @@ function searchAnime() {
     const suggestionsBox = document.getElementById('searchSuggestions');
     if (suggestionsBox) suggestionsBox.classList.add('hidden');
 
-    // JIKA SEDANG DI VIEW INFORMASI & PERINGKAT, TETAP DI VIEW INFORMASI
+    // JIKA SEDANG DI VIEW INFORMASI & PERINGKAT, TETAP DI KATEGORI INFORMASI AKTIF
     if (currentView === 'information') {
         activeInfoSearchQuery = query;
+        const targetType = currentInfoType || 'bypopularity';
         if (!query) {
-            openInformation(currentInfoType || 'bypopularity', 1);
+            openInformation(targetType, 1);
             return;
         }
-        searchInformationRanking(query, 1);
+        searchInformationRanking(query, targetType, 1);
         return;
     }
 
@@ -1069,18 +1074,9 @@ function toggleTheme() {
 }
 
 /* =========================================================
-   INFORMASI & PERINGKAT VIA BACKEND & ANILIST
+   SISTEM PERINGKAT & INFORMASI
    ========================================================= */
-let currentInfoType = 'bypopularity';
-let currentInfoPage = 1;
-
-function openInformation(type, page = 1) {
-    activeInfoSearchQuery = "";
-    currentInfoType = type;
-    currentInfoPage = page;
-    
-    switchView('information');
-    
+function setInfoTabActive(type) {
     document.querySelectorAll('.info-tab-btn').forEach(b => {
         b.className = 'info-tab-btn px-4 py-2 rounded-full bg-neon-lightCard dark:bg-neon-darkCard text-xs font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs';
         const icon = b.querySelector('i');
@@ -1103,6 +1099,48 @@ function openInformation(type, page = 1) {
             activeIcon.classList.add('text-black');
         }
     }
+}
+
+// Mengambil peringkat asli anime dari rankings AniList
+function getAnimeRealRank(anime, categoryType) {
+    if (!anime) return '-';
+    
+    if (anime.rankingPosition) return anime.rankingPosition;
+    if (anime.rank && typeof anime.rank === 'number') return anime.rank;
+
+    const rankings = anime.rankings;
+    if (Array.isArray(rankings) && rankings.length > 0) {
+        if (categoryType === 'favorite') {
+            const ratedAllTime = rankings.find(r => r.type === 'RATED' && r.allTime);
+            if (ratedAllTime && ratedAllTime.rank) return ratedAllTime.rank;
+
+            const ratedFormat = rankings.find(r => r.type === 'RATED');
+            if (ratedFormat && ratedFormat.rank) return ratedFormat.rank;
+        } else if (categoryType === 'bypopularity') {
+            const popAllTime = rankings.find(r => r.type === 'POPULAR' && r.allTime);
+            if (popAllTime && popAllTime.rank) return popAllTime.rank;
+
+            const popFormat = rankings.find(r => r.type === 'POPULAR');
+            if (popFormat && popFormat.rank) return popFormat.rank;
+        } else if (categoryType === 'upcoming') {
+            const popRank = rankings.find(r => r.type === 'POPULAR');
+            if (popRank && popRank.rank) return popRank.rank;
+        }
+
+        const anyRank = rankings.find(r => r.rank);
+        if (anyRank && anyRank.rank) return anyRank.rank;
+    }
+    
+    return '-';
+}
+
+function openInformation(type, page = 1) {
+    activeInfoSearchQuery = "";
+    currentInfoType = type;
+    currentInfoPage = page;
+    
+    switchView('information');
+    setInfoTabActive(type);
     
     const headerEl = document.getElementById('informationHeader');
     const descEl = document.getElementById('informationDescription');
@@ -1132,28 +1170,29 @@ function openInformation(type, page = 1) {
 }
 
 /* =========================================================
-   PENCARIAN KHUSUS DALAM VIEW INFORMASI & PERINGKAT
+   PENCARIAN SESUAI KATEGORI AKTIF DENGAN REAL RANK
    ========================================================= */
-async function searchInformationRanking(query, page = 1) {
+async function searchInformationRanking(query, type = (currentInfoType || 'bypopularity'), page = 1) {
     activeInfoSearchQuery = query;
+    currentInfoType = type;
     currentInfoPage = page;
     
     switchView('information');
-    
-    // Matikan highlight pada tombol kategori
-    document.querySelectorAll('.info-tab-btn').forEach(b => {
-        b.className = 'info-tab-btn px-4 py-2 rounded-full bg-neon-lightCard dark:bg-neon-darkCard text-xs font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs';
-        const icon = b.querySelector('i');
-        if (icon) {
-            icon.classList.remove('text-black');
-            icon.classList.add('text-neon-yellow');
-        }
-    });
+    setInfoTabActive(type);
 
     const headerEl = document.getElementById('informationHeader');
     const descEl = document.getElementById('informationDescription');
-    if (headerEl) headerEl.innerText = `Hasil Pencarian: "${query}"`;
-    if (descEl) descEl.innerText = `Menampilkan hasil pencarian peringkat anime untuk "${query}"`;
+    
+    if (type === 'upcoming') {
+        if (headerEl) headerEl.innerText = `Hasil Pencarian Upcoming: "${query}"`;
+        if (descEl) descEl.innerText = `Menampilkan anime mendatang untuk pencarian "${query}".`;
+    } else if (type === 'favorite') {
+        if (headerEl) headerEl.innerText = `Hasil Pencarian Highest Rated: "${query}"`;
+        if (descEl) descEl.innerText = `Menampilkan peringkat evaluasi tertinggi untuk pencarian "${query}".`;
+    } else {
+        if (headerEl) headerEl.innerText = `Hasil Pencarian Top Trending: "${query}"`;
+        if (descEl) descEl.innerText = `Menampilkan peringkat popularitas anime untuk pencarian "${query}".`;
+    }
 
     const loadingEl = document.getElementById('informationLoading');
     const podiumEl = document.getElementById('podiumSection');
@@ -1167,8 +1206,20 @@ async function searchInformationRanking(query, page = 1) {
 
     const perPage = 12;
 
+    let sortParam = ["POPULARITY_DESC"];
+    let statusParam = undefined;
+
+    if (type === 'upcoming') {
+        statusParam = "NOT_YET_RELEASED";
+        sortParam = ["POPULARITY_DESC"];
+    } else if (type === 'favorite') {
+        sortParam = ["SCORE_DESC", "POPULARITY_DESC"];
+    } else {
+        sortParam = ["POPULARITY_DESC"];
+    }
+
     const gqlQuery = `
-        query ($search: String, $page: Int, $perPage: Int) {
+        query ($search: String, $page: Int, $perPage: Int, $sort: [MediaSort], $status: MediaStatus) {
             Page (page: $page, perPage: $perPage) {
                 pageInfo {
                     total
@@ -1176,7 +1227,7 @@ async function searchInformationRanking(query, page = 1) {
                     lastPage
                     hasNextPage
                 }
-                media (search: $search, type: ANIME, sort: [POPULARITY_DESC, SCORE_DESC]) {
+                media (search: $search, type: ANIME, sort: $sort, status: $status) {
                     id
                     title {
                         userPreferred
@@ -1191,10 +1242,30 @@ async function searchInformationRanking(query, page = 1) {
                     popularity
                     status
                     genres
+                    rankings {
+                        id
+                        rank
+                        type
+                        format
+                        year
+                        season
+                        allTime
+                        context
+                    }
                 }
             }
         }
     `;
+
+    const variables = {
+        search: query,
+        page: page,
+        perPage: perPage,
+        sort: sortParam
+    };
+    if (statusParam) {
+        variables.status = statusParam;
+    }
 
     try {
         const response = await fetch('https://graphql.anilist.co', {
@@ -1202,7 +1273,7 @@ async function searchInformationRanking(query, page = 1) {
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify({
                 query: gqlQuery,
-                variables: { search: query, page: page, perPage: perPage }
+                variables: variables
             })
         });
         const result = await response.json();
@@ -1213,16 +1284,18 @@ async function searchInformationRanking(query, page = 1) {
         if (loadingEl) loadingEl.classList.add('hidden');
 
         if (listData.length === 0) {
-            if (gridEl) gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Anime "${query}" tidak ditemukan di informasi & peringkat.</p>`;
+            if (gridEl) gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Anime "${query}" tidak ditemukan pada kategori ${type}.</p>`;
             return;
         }
 
-        const startRankOffset = (page - 1) * perPage + 1;
         if (gridEl) {
-            gridEl.innerHTML = listData.map((anime, idx) => renderRankListItem(anime, startRankOffset + idx)).join('');
+            gridEl.innerHTML = listData.map(anime => {
+                const realRank = getAnimeRealRank(anime, type);
+                return renderRankListItem(anime, realRank);
+            }).join('');
         }
 
-        renderSearchInfoPagination(query, page, lastPage, paginationEl);
+        renderSearchInfoPagination(query, type, page, lastPage, paginationEl);
 
     } catch (err) {
         console.error("Gagal search di AniList, mencoba fallback ke database lokal:", err);
@@ -1245,11 +1318,13 @@ async function searchInformationRanking(query, page = 1) {
                 return;
             }
 
-            const startRankOffset = (page - 1) * perPage + 1;
             if (gridEl) {
-                gridEl.innerHTML = items.map((anime, idx) => renderRankListItem(anime, startRankOffset + idx)).join('');
+                gridEl.innerHTML = items.map(anime => {
+                    const realRank = anime.score ? `⭐ ${anime.score}` : '-';
+                    return renderRankListItem(anime, realRank);
+                }).join('');
             }
-            renderSearchInfoPagination(query, page, lastPage, paginationEl);
+            renderSearchInfoPagination(query, type, page, lastPage, paginationEl);
         } catch (fallbackErr) {
             if (loadingEl) loadingEl.classList.add('hidden');
             if (gridEl) gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat hasil pencarian peringkat.</p>`;
@@ -1258,7 +1333,7 @@ async function searchInformationRanking(query, page = 1) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function renderSearchInfoPagination(query, page, totalPageCount, paginationEl) {
+function renderSearchInfoPagination(query, type, page, totalPageCount, paginationEl) {
     if (!paginationEl || totalPageCount <= 1) {
         if (paginationEl) paginationEl.innerHTML = '';
         return;
@@ -1268,17 +1343,17 @@ function renderSearchInfoPagination(query, page, totalPageCount, paginationEl) {
     const disBtn = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border-zinc-200 dark:border-zinc-800 cursor-not-allowed';
     const escapedQuery = query.replace(/'/g, "\\'");
 
-    pagHTML += `<button class="${page > 1 ? baseBtn : disBtn}" ${page <= 1 ? 'disabled' : ''} onclick="searchInformationRanking('${escapedQuery}', ${page - 1})">&lsaquo;</button>`;
+    pagHTML += `<button class="${page > 1 ? baseBtn : disBtn}" ${page <= 1 ? 'disabled' : ''} onclick="searchInformationRanking('${escapedQuery}', '${type}', ${page - 1})">&lsaquo;</button>`;
     
     let sPage = Math.max(1, page - 2);
     let ePage = Math.min(totalPageCount, page + 2);
     
     for (let i = sPage; i <= ePage; i++) {
         let actClass = i === page ? 'bg-neon-yellow text-black font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder shadow-xs';
-        pagHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${actClass} transition" onclick="searchInformationRanking('${escapedQuery}', ${i})">${i}</button>`;
+        pagHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${actClass} transition" onclick="searchInformationRanking('${escapedQuery}', '${type}', ${i})">${i}</button>`;
     }
     
-    pagHTML += `<button class="${page < totalPageCount ? baseBtn : disBtn}" ${page >= totalPageCount ? 'disabled' : ''} onclick="searchInformationRanking('${escapedQuery}', ${page + 1})">&rsaquo;</button>`;
+    pagHTML += `<button class="${page < totalPageCount ? baseBtn : disBtn}" ${page >= totalPageCount ? 'disabled' : ''} onclick="searchInformationRanking('${escapedQuery}', '${type}', ${page + 1})">&rsaquo;</button>`;
     
     paginationEl.innerHTML = pagHTML;
 }
@@ -1366,9 +1441,19 @@ function renderRankListItem(anime, rankNumber) {
 
     const isBookmarked = isAnimeBookmarked(anime);
 
+    // Format badge peringkat
+    let rankDisplay = "";
+    if (typeof rankNumber === 'number') {
+        rankDisplay = `#${rankNumber}`;
+    } else if (typeof rankNumber === 'string') {
+        rankDisplay = rankNumber.startsWith('#') ? rankNumber : (rankNumber === '-' || rankNumber === 'N/A' ? '#-' : `#${rankNumber}`);
+    } else {
+        rankDisplay = '#-';
+    }
+
     return `
         <div class="bg-neon-lightCard dark:bg-neon-darkCard border border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow rounded-xl p-3 flex items-center gap-3.5 transition shadow-xs">
-            <span class="font-extrabold text-sm sm:text-base text-zinc-400 dark:text-zinc-500 w-7 text-center shrink-0">#${rankNumber}</span>
+            <span class="font-extrabold text-xs sm:text-sm text-zinc-400 dark:text-zinc-500 w-9 text-center shrink-0">${rankDisplay}</span>
             <div onclick="openDetailFromAniListTitle('${escapedTitle}')" class="flex items-center gap-3.5 flex-grow min-w-0 cursor-pointer group">
                 <img src="${img}" alt="${title}" class="w-12 h-16 object-cover rounded-lg shrink-0 bg-zinc-800 group-hover:scale-105 transition duration-200">
                 <div class="flex-grow min-w-0">
@@ -1421,7 +1506,6 @@ window.onload = async function() {
     activeGenreFilter = "";
     activeStatusFilter = "";
 
-    // Tangkap query URL dari halaman lain jika ada (misal dari stream.html)
     const urlParams = new URLSearchParams(window.location.search);
     const queryParam = urlParams.get('q');
     if (queryParam) {
