@@ -126,7 +126,7 @@ async function checkAniListAuthStatus() {
             localStorage.setItem('anilist_user', JSON.stringify(user));
 
             if (headerAuthContainer) {
-                // MODIFIKASI BACKGROUND PUTIH & TEKS/IKON HITAM DI MODE TERANG
+                // PROFILE HEADER WITH WHITE BG AND BLACK LOGOUT ICON IN LIGHT MODE
                 headerAuthContainer.innerHTML = `
                     <div class="flex items-center gap-2 bg-white dark:bg-zinc-800/90 p-1 pr-3 rounded-full border border-neon-yellow shadow-xs">
                         <img src="${user.avatar.medium}" class="w-6 h-6 rounded-full object-cover">
@@ -253,33 +253,36 @@ async function openDetailFromAniListTitle(title) {
         const matched = result.data || [];
 
         if (matched.length > 0) {
-            const anime = matched[0];
+            const item = matched[0];
+            
+            // 100% DATA DETAIL DIAMBIL MURNI DARI DATABASE KAMU
             const animeObj = {
-                id: anime.id,
-                title: anime.title || title,
-                url: anime.url ? anime.url.trim() : "",
-                status: anime.status || "Ongoing",
-                genres: anime.genre ? anime.genre.split(',').map(g => g.trim()) : [],
-                synopsis: anime.sinopsis || "Sinopsis belum tersedia.",
-                thumbnail: anime.image_url || "https://placehold.co/400x600?text=No+Image",
-                japanese: anime.japanese || "-",
-                skor: anime.score || "-",
-                statusText: anime.status || "-",
-                totalEpisode: anime.total_episodes || "-",
-                durasi: anime.duration || "-",
-                tanggalRilis: anime.release_date || "-",
-                studio: anime.studio || "-"
+                id: item.id,
+                title: item.title || "Tanpa Judul",
+                url: item.url ? item.url.trim() : "",
+                status: item.status || "Ongoing",
+                genres: item.genre ? item.genre.split(',').map(g => g.trim()) : [],
+                synopsis: item.sinopsis || "Sinopsis belum tersedia.",
+                thumbnail: item.img_url || item.image_url || "https://placehold.co/400x600?text=No+Image", // img_url DB Supabase
+                japanese: item.japanese || "-",
+                skor: item.score || "-",
+                statusText: item.status || "-",
+                totalEpisode: item.total_episodes || "-",
+                durasi: item.duration || "-",
+                tanggalRilis: item.release_date || "-",
+                studio: item.studio || "-"
             };
 
             const exists = currentData.some(a => a.id == animeObj.id);
             if (!exists) currentData.push(animeObj);
 
+            // Beralih ke halaman detail menggunakan data database kamu
             viewDetails(animeObj.id);
         } else {
-            alert(`Anime "${title}" belum tersedia di database server NimeDesu.`);
+            alert(`Anime "${title}" belum tersedia di database NimeDesu.`);
         }
     } catch (err) {
-        console.error("Gagal mencari anime di backend Render:", err);
+        console.error("Gagal mencocokkan judul dengan backend Render:", err);
         alert("Gagal menghubungkan ke server NimeDesu.");
     }
 }
@@ -362,7 +365,7 @@ async function loadAnimeDatabase(page = 1) {
             status: item.status || "Ongoing",
             genres: item.genre ? item.genre.split(',').map(g => g.trim()) : [],
             synopsis: item.sinopsis || "Sinopsis belum tersedia.",
-            thumbnail: item.image_url || "https://placehold.co/400x600?text=No+Image",
+            thumbnail: item.img_url || item.image_url || "https://placehold.co/400x600?text=No+Image",
             japanese: item.japanese || "-",
             skor: item.score || "-",
             statusText: item.status || "-",
@@ -477,7 +480,7 @@ async function liveSearchAnime() {
 
         suggestionsBox.innerHTML = matched.map(anime => {
             const genres = anime.genre ? anime.genre.split(',').map(g => g.trim()).join(', ') : '-';
-            const img = anime.image_url || "https://placehold.co/100x150?text=No+Image";
+            const img = anime.img_url || anime.image_url || "https://placehold.co/100x150?text=No+Image";
             
             const animeData = JSON.stringify({
                 id: anime.id,
@@ -486,7 +489,7 @@ async function liveSearchAnime() {
                 status: anime.status || "Ongoing",
                 genres: anime.genre ? anime.genre.split(',').map(g => g.trim()) : [],
                 synopsis: anime.sinopsis || "Sinopsis belum tersedia.",
-                thumbnail: anime.image_url || "https://placehold.co/400x600?text=No+Image",
+                thumbnail: img,
                 japanese: anime.japanese || "-",
                 skor: anime.score || "-",
                 statusText: anime.status || "-",
@@ -881,7 +884,6 @@ function renderPodiumData(top3) {
     document.getElementById('podium1Score').innerHTML = `<i class="fa-solid fa-star text-[10px]"></i> ${r1.averageScore ? (r1.averageScore / 10).toFixed(1) : 'N/A'}`;
     document.getElementById('podium1Pop').innerHTML = `<i class="fa-solid fa-bookmark text-[10px]"></i> ${formatNumberShort(r1.popularity)}`;
     
-    // SETUP CLICK AREA KE DETAIL BACKEND RENDER DENGAN PENCARIAN ILIKE
     const area1 = document.getElementById('podium1ClickArea');
     const titleEl1 = document.getElementById('podium1Title');
     if(area1) area1.onclick = () => openDetailFromAniListTitle(title1);
