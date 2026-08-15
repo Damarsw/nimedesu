@@ -12,7 +12,17 @@ let activeGenreFilter = "";
 
 const RENDER_API_URL = "/api-backend";
 
-// KUNCI DEKRIPSI BROWSER LOKAL
+/* =========================================================
+   KONFIGURASI SUPABASE DATABASE
+   ========================================================= */
+const SUPABASE_URL = "https://yezdnsgypbjogzoftgmz.supabase.co";
+const SUPABASE_ANON_KEY = "MASUKKAN_ANON_KEY_SUPABASE_DI_SINI";
+
+const supabaseClient = (typeof window.supabase !== 'undefined' && window.supabase.createClient)
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
+
+// KUNCI KEAMANAN LOKAL
 const KEY_X = "LayerX_Secret2026";
 const KEY_Y = "LayerY_Secret2026";
 const KEY_Z = "LayerZ_Secret2026";
@@ -27,51 +37,86 @@ function generateSecurityToken() {
     };
 }
 
-function encryptTripleLayer(data) {
-    const jsonString = JSON.stringify(data);
-    const layer1 = CryptoJS.AES.encrypt(jsonString, KEY_X).toString();
-    const layer2 = CryptoJS.Rabbit.encrypt(layer1, KEY_Y).toString();
-    const layer3 = CryptoJS.TripleDES.encrypt(layer2, KEY_Z).toString();
-    return layer3;
-}
-
-function decryptTripleLayer(ciphertext) {
+/* =========================================================
+   HELPER SUPABASE: FETCH & UPDATE USER DATA (TABLE: login)
+   Kolom 'cookies' (jsonb) menyimpan format: { history: [], bookmarks: [] }
+   ========================================================= */
+async function getSupabaseUserData(anilistId) {
+    if (!supabaseClient || !anilistId) return { history: [], bookmarks: [] };
     try {
-        const bytesZ = CryptoJS.TripleDES.decrypt(ciphertext, KEY_Z);
-        const layer2 = bytesZ.toString(CryptoJS.enc.Utf8);
-        if (!layer2) return null;
+        const { data, error } = await supabaseClient
+            .from('login')
+            .select('cookies')
+            .eq('anilist_id', String(anilistId))
+            .maybeSingle();
 
-        const bytesY = CryptoJS.Rabbit.decrypt(layer2, KEY_Y);
-        const layer1 = bytesY.toString(CryptoJS.enc.Utf8);
-        if (!layer1) return null;
+        if (error) {
+            console.error("Error fetching Supabase data:", error);
+            return { history: [], bookmarks: [] };
+        }
 
-        const bytesX = CryptoJS.AES.decrypt(layer1, KEY_X);
-        const decryptedString = bytesX.toString(CryptoJS.enc.Utf8);
-        if (!decryptedString) return null;
-
-        return JSON.parse(decryptedString);
-    } catch (e) {
-        return null;
+        if (!data || !data.cookies) return { history: [], bookmarks: [] };
+        
+        let parsed = data.cookies;
+        if (typeof parsed === 'string') {
+            try { parsed = JSON.parse(parsed); } catch (e) { parsed = {}; }
+        }
+        return {
+            history: Array.isArray(parsed.history) ? parsed.history : [],
+            bookmarks: Array.isArray(parsed.bookmarks) ? parsed.bookmarks : []
+        };
+    } catch (err) {
+        console.error("Supabase user data error:", err);
+        return { history: [], bookmarks: [] };
     }
 }
 
-/* =========================================================
-   INJEKSI COOKIES FAKE / DECOY UNTUK MENGECOH EXTENSION CHROME
-   ========================================================= */
-function injectDecoyCookiesForScrapers() {
-    const date = new Date();
-    date.setTime(date.getTime() + (30 * 24 * 60 * 60 * 1000));
-    const expires = "; expires=" + date.toUTCString();
+async function saveSupabaseUserData(anilistId, payload) {
+    if (!supabaseClient || !anilistId) return false;
+    try {
+        const { data: existing } = await supabaseClient
+            .from('login')
+            .select('id')
+            .eq('anilist_id', String(anilistId))
+            .maybeSingle();
 
-    document.cookie = "session_token=decoy_session_a8f9c118e9d2a01;" + expires + "; path=/; SameSite=Lax";
-    document.cookie = "user_auth_state=eyJhZG1pbiI6ZmFsc2UsInVzZXJfaWQiOjU1OTI1MX0=;" + expires + "; path=/; SameSite=Lax";
-    document.cookie = "nimedesu_history_decoy=P1e8X9aL3z0qW5y9N8m2K7vL1i3O0pQ4;" + expires + "; path=/; SameSite=Lax";
+        if (existing && existing.id) {
+            const { error } = await supabaseClient
+                .from('login')
+                .update({ cookies: payload })
+                .eq('anilist_id', String(anilistId));
+            if (error) throw error;
+        } else {
+            const { error } = await supabaseClient
+                .from('login')
+                .insert({
+                    anilist_id: String(anilistId),
+                    cookies: payload
+                });
+            if (error) throw error;
+        }
+        return true;
+    } catch (err) {
+        console.error("Gagal menyimpan ke Supabase:", err);
+        return false;
+    }
 }
 
 /* =========================================================
    INTEGRASI ANILIST OAUTH2 LOGIN & USER SYNC
    ========================================================= */
 const ANILIST_CLIENT_ID = "48567";
+
+function getLoggedInUser() {
+    const userStr = localStorage.getItem('anilist_user');
+    const token = localStorage.getItem('anilist_token');
+    if (!token || !userStr) return null;
+    try {
+        return JSON.parse(userStr);
+    } catch (e) {
+        return null;
+    }
+}
 
 function handleAniListOAuthCallback() {
     const hash = window.location.hash;
@@ -87,7 +132,7 @@ function handleAniListOAuthCallback() {
 
 function loginAniList() {
     if (!ANILIST_CLIENT_ID || ANILIST_CLIENT_ID === "YOUR_ANILIST_CLIENT_ID") {
-        alert("Client ID AniList belum diatur. Silakan set Client ID di script-index.js");
+        alert("Client ID AniList belum diatur.");
         return;
     }
     const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${ANILIST_CLIENT_ID}&response_type=token`;
@@ -97,7 +142,7 @@ function loginAniList() {
 function logoutAniList() {
     localStorage.removeItem('anilist_token');
     localStorage.removeItem('anilist_user');
-    alert("Berhasil logout!");
+    alert("Berhasil logout! Sesi lokal ditutup.");
     location.reload();
 }
 
@@ -142,69 +187,206 @@ async function checkAniListAuthStatus() {
                     </button>
                 `;
             }
+
+            // Muat ulang riwayat dari database saat status auth aktif
+            renderHistory();
         }
     } catch (err) {
         console.error("Auth check failed:", err);
     }
 }
 
-async function addAniListBookmark(mediaId, buttonEl) {
-    const token = localStorage.getItem('anilist_token');
-    if (!token) {
-        alert("Silakan login dengan akun AniList terlebih dahulu untuk menyimpan bookmark!");
+/* =========================================================
+   BOOKMARK SINKRONISASI SUPABASE (HANYA AKTIF JIKA LOGIN)
+   ========================================================= */
+async function addAniListBookmark(animeOrMediaId, buttonEl) {
+    const user = getLoggedInUser();
+    if (!user) {
+        alert("Silakan login dengan akun AniList terlebih dahulu untuk menyimpan bookmark ke database!");
         loginAniList();
         return;
     }
 
-    const query = `
-    mutation ($mediaId: Int, $status: MediaListStatus) {
-        SaveMediaListEntry (mediaId: $mediaId, status: $status) {
-            id status
-        }
-    }`;
-
     try {
-        const response = await fetch('https://graphql.anilist.co', {
-            method: 'POST',
-            headers: {
-                'Authorization': 'Bearer ' + token,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({
-                query: query,
-                variables: {
-                    mediaId: parseInt(mediaId),
-                    status: 'PLANNING'
-                }
-            })
-        });
+        const userData = await getSupabaseUserData(user.id);
+        let bookmarks = userData.bookmarks || [];
 
-        const result = await response.json();
-        if (result?.data?.SaveMediaListEntry) {
-            alert("Berhasil disimpan ke watchlist AniList kamu!");
+        let animeObj = null;
+        if (typeof animeOrMediaId === 'object') {
+            animeObj = animeOrMediaId;
+        } else {
+            animeObj = currentData.find(a => a.id == animeOrMediaId);
+        }
+
+        const bookmarkItem = {
+            id: animeObj ? animeObj.id : animeOrMediaId,
+            title: animeObj ? (animeObj.title?.userPreferred || animeObj.title || "Anime") : "Anime",
+            thumbnail: animeObj ? (animeObj.coverImage?.extraLarge || animeObj.thumbnail || "https://placehold.co/150x200") : "https://placehold.co/150x200",
+            score: animeObj ? (animeObj.averageScore ? (animeObj.averageScore / 10).toFixed(1) : animeObj.skor || "-") : "-",
+            popularity: animeObj ? (animeObj.popularity ? formatNumberShort(animeObj.popularity) : "-") : "-",
+            addedAt: new Date().toISOString()
+        };
+
+        const existsIndex = bookmarks.findIndex(b => String(b.id) === String(bookmarkItem.id));
+        if (existsIndex > -1) {
+            bookmarks.splice(existsIndex, 1);
+            alert("Dihapus dari Bookmark!");
             if (buttonEl) {
                 const icon = buttonEl.querySelector('i');
-                if (icon) {
-                    icon.className = 'fa-solid fa-bookmark text-neon-yellow';
-                }
+                if (icon) icon.className = 'fa-regular fa-bookmark';
             }
         } else {
-            alert("Gagal menyimpan ke AniList.");
+            bookmarks.unshift(bookmarkItem);
+            alert("Berhasil disimpan ke Bookmark di Database!");
+            if (buttonEl) {
+                const icon = buttonEl.querySelector('i');
+                if (icon) icon.className = 'fa-solid fa-bookmark text-neon-yellow';
+            }
+        }
+
+        userData.bookmarks = bookmarks;
+        await saveSupabaseUserData(user.id, userData);
+
+        if (currentInfoType === 'bookmark') {
+            openInformation('bookmark', currentInfoPage);
         }
     } catch (err) {
-        console.error("Gagal simpan bookmark ke AniList:", err);
-        alert("Terjadi kesalahan saat menyambungkan ke AniList.");
+        console.error("Gagal sinkron bookmark ke Supabase:", err);
+        alert("Terjadi kesalahan saat menyinkronkan bookmark.");
+    }
+}
+
+async function fetchAniListBookmarks(page, loadingEl, podiumEl, gridEl, paginationEl) {
+    const user = getLoggedInUser();
+
+    if (!user) {
+        loadingEl.classList.add('hidden');
+        gridEl.innerHTML = `
+            <div class="col-span-full flex flex-col items-center justify-center py-16 space-y-4 text-center">
+                <i class="fa-regular fa-bookmark text-3xl text-neon-yellow"></i>
+                <p class="text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-300 max-w-xs">Fitur Bookmark terkunci. Silakan login terlebih dahulu untuk mengakses bookmark tersimpan Anda di database.</p>
+                <button onclick="loginAniList()" class="px-4 py-2 rounded-full bg-neon-yellow text-black text-xs font-bold shadow-glow-yellow transition hover:opacity-90">Login AniList</button>
+            </div>`;
+        return;
+    }
+
+    try {
+        const userData = await getSupabaseUserData(user.id);
+        const entries = userData.bookmarks || [];
+
+        loadingEl.classList.add('hidden');
+
+        if (entries.length === 0) {
+            gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Belum ada anime yang Anda bookmark di database. Tekan ikon <i class="fa-regular fa-bookmark"></i> pada poster anime untuk menambahkan.</p>`;
+            return;
+        }
+
+        const perPage = 12;
+        const totalPageCount = Math.max(1, Math.ceil(entries.length / perPage));
+        const pageEntries = entries.slice((page - 1) * perPage, page * perPage);
+
+        gridEl.innerHTML = pageEntries.map((bItem, idx) => {
+            const rankNum = (page - 1) * perPage + idx + 1;
+            const escapedTitle = bItem.title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            return `
+                <div class="bg-neon-lightCard dark:bg-neon-darkCard border border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow rounded-xl p-3 flex items-center gap-3.5 transition shadow-xs">
+                    <span class="font-extrabold text-sm sm:text-base text-zinc-400 dark:text-zinc-500 w-7 text-center shrink-0">#${rankNum}</span>
+                    <div onclick="openDetailFromAniListTitle('${escapedTitle}')" class="flex items-center gap-3.5 flex-grow min-w-0 cursor-pointer group">
+                        <img src="${bItem.thumbnail}" alt="${bItem.title}" class="w-12 h-16 object-cover rounded-lg shrink-0 bg-zinc-800 group-hover:scale-105 transition duration-200">
+                        <div class="flex-grow min-w-0">
+                            <h4 class="font-bold text-black dark:text-white text-xs sm:text-sm truncate group-hover:text-neon-yellow transition">${bItem.title}</h4>
+                            <div class="flex items-center gap-2 mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                                <span class="flex items-center gap-1 text-neon-yellow font-semibold"><i class="fa-solid fa-star text-[10px]"></i> ${bItem.score}</span>
+                                <span>•</span>
+                                <span><i class="fa-solid fa-bookmark text-[10px]"></i> ${bItem.popularity}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="addAniListBookmark('${bItem.id}', this)" title="Hapus dari Bookmark" class="p-2 text-neon-yellow hover:text-red-500 transition shrink-0">
+                        <i class="fa-solid fa-bookmark"></i>
+                    </button>
+                </div>
+            `;
+        }).join('');
+
+        renderInfoPagination('bookmark', page, totalPageCount, paginationEl);
+
+    } catch (err) {
+        console.error("Gagal memuat bookmark Supabase:", err);
+        loadingEl.classList.add('hidden');
+        gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat bookmark dari database.</p>`;
     }
 }
 
 /* =========================================================
-   FETCH SCORE DARI ANILIST UNTUK DITAMPILKAN DI POSTER BERANDA
+   SISTEM RIWAYAT TONTONAN DARI SUPABASE (WAJIB LOGIN)
+   ========================================================= */
+async function renderHistory() {
+    const historySection = document.getElementById('historySection');
+    const historyGrid = document.getElementById('historyGrid');
+
+    const user = getLoggedInUser();
+
+    // JIKA TIDAK LOGIN, RIWAYAT SEMBUNYI TOTAL
+    if (!user) {
+        historySection.classList.add('hidden');
+        return;
+    }
+
+    try {
+        const userData = await getSupabaseUserData(user.id);
+        const history = userData.history || [];
+
+        if (history.length === 0) {
+            historySection.classList.add('hidden');
+            return;
+        }
+
+        historySection.classList.remove('hidden');
+        historyGrid.innerHTML = history.map(item => `
+            <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?url=${encodeURIComponent(item.url)}&eps=${item.lastEpisodeIndex || 0}'">
+                <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
+                    <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
+                    <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
+                        <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
+                            <i class="fa-solid fa-play ml-0.5 text-base"></i>
+                        </div>
+                    </div>
+                    <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">
+                        ${item.lastWatchedEpisode || 'Eps 1'}
+                    </span>
+                </div>
+                <div class="p-3">
+                    <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
+                </div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error("Gagal mengambil riwayat dari Supabase:", err);
+    }
+}
+
+async function clearHistory() {
+    const user = getLoggedInUser();
+    if (!user) return;
+
+    if (!confirm("Apakah Anda yakin ingin menghapus seluruh riwayat tontonan di database?")) return;
+
+    try {
+        const userData = await getSupabaseUserData(user.id);
+        userData.history = [];
+        await saveSupabaseUserData(user.id, userData);
+        document.getElementById('historySection').classList.add('hidden');
+    } catch (err) {
+        console.error("Gagal menghapus riwayat di Supabase:", err);
+    }
+}
+
+/* =========================================================
+   SKOR ANILIST & PENCARIAN
    ========================================================= */
 async function fetchAniListScoreForCard(animeTitle, elementId) {
     if (!animeTitle) return;
-    
-    // Normalisasi judul pencarian (misal HUNTERxHUNTER -> HUNTER X HUNTER)
     let cleanTitle = animeTitle.replace(/([a-zA-Z0-9])x([a-zA-Z0-9])/gi, '$1 x $2').trim();
 
     const query = `
@@ -217,38 +399,23 @@ async function fetchAniListScoreForCard(animeTitle, elementId) {
     try {
         const response = await fetch('https://graphql.anilist.co', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({
-                query: query,
-                variables: { search: cleanTitle }
-            })
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ query: query, variables: { search: cleanTitle } })
         });
-
         const result = await response.json();
         const score = result?.data?.Media?.averageScore;
         const targetEl = document.getElementById(elementId);
-
         if (score && targetEl) {
-            const formattedScore = (score / 10).toFixed(1);
-            targetEl.innerHTML = `⭐ ${formattedScore}`;
+            targetEl.innerHTML = `⭐ ${(score / 10).toFixed(1)}`;
         }
-    } catch (err) {
-        // Jika eror atau rate limit AniList, biarkan skor dari DB lokal
-    }
+    } catch (err) {}
 }
 
-/* =========================================================
-   SMART CROSS-CHECK JUDUL ANILIST KE DATABASE RENDER / SUPABASE
-   ========================================================= */
 async function openDetailFromAniListTitle(title) {
     if (!title) return;
     try {
         const sec = generateSecurityToken();
         let searchQuery = title.replace(/([a-zA-Z0-9])x([a-zA-Z0-9])/gi, '$1 x $2').trim();
-        
         const fetchUrl = `${RENDER_API_URL}/anime?q=${encodeURIComponent(searchQuery)}&per_page=10`;
         
         const res = await fetch(fetchUrl, {
@@ -266,20 +433,14 @@ async function openDetailFromAniListTitle(title) {
             const cleanTarget = normalize(title);
 
             matchedItem = matchedList.find(item => normalize(item.title) === cleanTarget);
-
             if (!matchedItem) {
                 matchedItem = matchedList.find(item => {
                     const itemTitleClean = normalize(item.title);
-                    if (cleanTarget === "naruto" && itemTitleClean.includes("boruto")) {
-                        return false;
-                    }
+                    if (cleanTarget === "naruto" && itemTitleClean.includes("boruto")) return false;
                     return true;
                 });
             }
-
-            if (!matchedItem) {
-                matchedItem = matchedList[0];
-            }
+            if (!matchedItem) matchedItem = matchedList[0];
 
             const animeObj = {
                 id: matchedItem.id,
@@ -306,14 +467,10 @@ async function openDetailFromAniListTitle(title) {
             alert(`Anime "${title}" belum tersedia di database NimeDesu.`);
         }
     } catch (err) {
-        console.error("Gagal mencocokkan judul dengan backend Render:", err);
-        alert("Gagal menghubungkan ke server NimeDesu.");
+        console.error("Gagal mencocokkan judul:", err);
+        alert("Gagal menghubungkan ke server.");
     }
 }
-
-/* =========================================================
-   SEKMEN UTILITAS / CORE NIMEDESU BACKEND RENDER
-   ========================================================= */
 
 function switchView(viewName) {
     const views = ['homeView', 'detailView', 'dmcaView', 'informationView'];
@@ -404,7 +561,7 @@ async function loadAnimeDatabase(page = 1) {
 
     } catch (error) {
         console.error("Gagal memuat API server:", error);
-        document.getElementById('animeDisplayGrid').innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat data dari API server Render. Pastikan server aktif.</p>`;
+        document.getElementById('animeDisplayGrid').innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat data anime dari database.</p>`;
     }
 }
 
@@ -420,11 +577,7 @@ function displayAnimeWithPagination() {
 
     container.innerHTML = currentData.map(item => {
         const scoreBadgeId = `homeScore_${item.id}`;
-        
-        // Panggil fetch skor dari AniList secara asynchronous setelah card dibuat
-        setTimeout(() => {
-            fetchAniListScoreForCard(item.title, scoreBadgeId);
-        }, 100);
+        setTimeout(() => { fetchAniListScoreForCard(item.title, scoreBadgeId); }, 100);
 
         return `
             <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="viewDetails('${item.id}')">
@@ -656,63 +809,6 @@ function viewDetails(id) {
     }
 }
 
-/* =========================================================
-   SISTEM BACA RIWAYAT LOKAL AMAN & PASTI TAMPIL
-   ========================================================= */
-
-function getLocalHistoryArray() {
-    let history = JSON.parse(localStorage.getItem('nimedesu_history_local') || '[]');
-    if (history.length === 0) {
-        let encryptedOldData = localStorage.getItem('nimedesu_history_triple');
-        if (encryptedOldData) {
-            let decryptedHistory = decryptTripleLayer(encryptedOldData);
-            if (decryptedHistory && Array.isArray(decryptedHistory) && decryptedHistory.length > 0) {
-                history = decryptedHistory;
-                localStorage.setItem('nimedesu_history_local', JSON.stringify(history));
-            }
-        }
-    }
-    return history;
-}
-
-async function renderHistory() {
-    const historySection = document.getElementById('historySection');
-    const historyGrid = document.getElementById('historyGrid');
-
-    let history = getLocalHistoryArray();
-
-    if (history.length === 0) {
-        historySection.classList.add('hidden');
-        return;
-    }
-
-    historySection.classList.remove('hidden');
-    historyGrid.innerHTML = history.map(item => `
-        <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?url=${encodeURIComponent(item.url)}&eps=${item.lastEpisodeIndex || 0}'">
-            <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
-                <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
-                <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
-                    <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
-                        <i class="fa-solid fa-play ml-0.5 text-base"></i>
-                    </div>
-                </div>
-                <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">
-                    ${item.lastWatchedEpisode || 'Eps 1'}
-                </span>
-            </div>
-            <div class="p-3">
-                <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
-            </div>
-        </div>
-    `).join('');
-}
-
-function clearHistory() {
-    localStorage.removeItem('nimedesu_history_local');
-    localStorage.removeItem('nimedesu_history_triple');
-    document.getElementById('historySection').classList.add('hidden');
-}
-
 function openStreamingTab() {
     if (!activeAnime || !activeAnime.url) return;
     window.open(`stream.html?url=${encodeURIComponent(activeAnime.url)}&eps=0`, '_blank');
@@ -736,9 +832,8 @@ function toggleTheme() {
 }
 
 /* =========================================================
-   FITUR ANILIST API (PODIUM ALWAYS VISIBLE + 12 ITEM PER PAGE)
+   INFORMASI & PODIUM ANILIST DENGAN BOOKMARK DATABASE
    ========================================================= */
-
 let currentInfoType = 'bypopularity';
 let currentInfoPage = 1;
 
@@ -776,16 +871,16 @@ function openInformation(type, page = 1) {
     const descEl = document.getElementById('informationDescription');
     if (type === 'upcoming') {
         headerEl.innerText = 'Upcoming Anime';
-        descEl.innerText = 'Daftar anime yang paling ditunggu-tunggu berdasarkan database AniList.';
+        descEl.innerText = 'Daftar anime yang paling ditunggu-tunggu.';
     } else if (type === 'bypopularity') {
         headerEl.innerText = 'Peringkat Popularitas (Top Trending)';
-        descEl.innerText = 'Daftar anime terpopuler berdasarkan jumlah komunitas penggemar di AniList.';
+        descEl.innerText = 'Daftar anime terpopuler.';
     } else if (type === 'favorite') {
         headerEl.innerText = 'Highest Rated Anime';
-        descEl.innerText = 'Daftar anime dengan skor evaluasi tertinggi berdasarkan database AniList.';
+        descEl.innerText = 'Daftar anime dengan skor evaluasi tertinggi.';
     } else if (type === 'bookmark') {
         headerEl.innerText = 'Bookmark Kamu';
-        descEl.innerText = 'Anime yang sudah kamu bookmark lewat akun AniList — otomatis tersinkron di perangkat manapun kamu login.';
+        descEl.innerText = 'Daftar anime tersimpan di database akun Anda.';
     }
     
     const loadingEl = document.getElementById('informationLoading');
@@ -805,81 +900,6 @@ function openInformation(type, page = 1) {
     }
     
     window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-/* =========================================================
-   TAB BOOKMARK — AMBIL WATCHLIST (PLANNING & CURRENT) DARI AKUN ANILIST
-   Otomatis sinkron di perangkat manapun selama login AniList yang sama
-   ========================================================= */
-async function fetchAniListBookmarks(page, loadingEl, podiumEl, gridEl, paginationEl) {
-    const token = localStorage.getItem('anilist_token');
-    const userStr = localStorage.getItem('anilist_user');
-    const user = userStr ? JSON.parse(userStr) : null;
-
-    if (!token || !user) {
-        loadingEl.classList.add('hidden');
-        gridEl.innerHTML = `
-            <div class="col-span-full flex flex-col items-center justify-center py-16 space-y-4 text-center">
-                <i class="fa-regular fa-bookmark text-3xl text-neon-yellow"></i>
-                <p class="text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-300 max-w-xs">Login dengan akun AniList dulu untuk melihat daftar bookmark kamu di sini.</p>
-                <button onclick="loginAniList()" class="px-4 py-2 rounded-full bg-neon-yellow text-black text-xs font-bold shadow-glow-yellow transition hover:opacity-90">Login AniList</button>
-            </div>`;
-        return;
-    }
-
-    try {
-        const query = `
-        query ($userId: Int) {
-            MediaListCollection(userId: $userId, type: ANIME, status_in: [PLANNING, CURRENT]) {
-                lists {
-                    entries {
-                        updatedAt
-                        media {
-                            id
-                            title { romaji english userPreferred }
-                            coverImage { extraLarge large }
-                            averageScore
-                            popularity
-                        }
-                    }
-                }
-            }
-        }`;
-
-        const res = await fetch('https://graphql.anilist.co', {
-            method: 'POST',
-            headers: {
-                'Authorization': 'Bearer ' + token,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({ query, variables: { userId: user.id } })
-        });
-        const json = await res.json();
-        const lists = json?.data?.MediaListCollection?.lists || [];
-        let entries = [];
-        lists.forEach(l => entries = entries.concat(l.entries || []));
-        entries.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-
-        loadingEl.classList.add('hidden');
-
-        if (entries.length === 0) {
-            gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Belum ada anime yang kamu bookmark. Tekan ikon <i class="fa-regular fa-bookmark"></i> di poster anime untuk menambahkan.</p>`;
-            return;
-        }
-
-        const perPage = 12;
-        const totalPageCount = Math.max(1, Math.ceil(entries.length / perPage));
-        const pageEntries = entries.slice((page - 1) * perPage, page * perPage);
-
-        gridEl.innerHTML = pageEntries.map((entry, idx) => renderRankListItem(entry.media, (page - 1) * perPage + idx + 1)).join('');
-        renderInfoPagination('bookmark', page, totalPageCount, paginationEl);
-
-    } catch (err) {
-        console.error("Gagal memuat bookmark AniList:", err);
-        loadingEl.classList.add('hidden');
-        gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat daftar bookmark. Coba lagi beberapa saat.</p>`;
-    }
 }
 
 function formatNumberShort(num) {
@@ -987,73 +1007,36 @@ async function fetchAniListData(type, page, loadingEl, podiumEl, gridEl, paginat
     } catch (err) {
         console.error("AniList Error:", err);
         loadingEl.classList.add('hidden');
-        gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat data AniList.</p>`;
+        gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat data.</p>`;
     }
 }
 
 function renderPodiumData(top3) {
-    // Rank #1
-    const r1 = top3[0];
-    const title1 = r1.title?.userPreferred || r1.title?.romaji || r1.title?.english || 'Tanpa Judul';
-    document.getElementById('podium1Title').innerText = title1;
-    document.getElementById('podium1Img').src = r1.coverImage?.extraLarge || r1.coverImage?.large;
-    document.getElementById('podium1Score').innerHTML = `<i class="fa-solid fa-star text-[10px]"></i> ${r1.averageScore ? (r1.averageScore / 10).toFixed(1) : 'N/A'}`;
-    document.getElementById('podium1Pop').innerHTML = `<i class="fa-solid fa-bookmark text-[10px]"></i> ${formatNumberShort(r1.popularity)}`;
-    
-    const area1 = document.getElementById('podium1ClickArea');
-    const titleEl1 = document.getElementById('podium1Title');
-    if(area1) area1.onclick = () => openDetailFromAniListTitle(title1);
-    if(titleEl1) titleEl1.onclick = () => openDetailFromAniListTitle(title1);
+    top3.forEach((r, index) => {
+        const rankIdx = index + 1;
+        const title = r.title?.userPreferred || r.title?.romaji || r.title?.english || 'Tanpa Judul';
+        const imgEl = document.getElementById(`podium${rankIdx}Img`);
+        const titleEl = document.getElementById(`podium${rankIdx}Title`);
+        const scoreEl = document.getElementById(`podium${rankIdx}Score`);
+        const popEl = document.getElementById(`podium${rankIdx}Pop`);
+        const clickArea = document.getElementById(`podium${rankIdx}ClickArea`);
+        const btn = document.getElementById(`podium${rankIdx}BookmarkBtn`);
 
-    const btn1 = document.getElementById('podium1BookmarkBtn');
-    if (btn1) {
-        btn1.onclick = function(e) {
-            e.stopPropagation();
-            addAniListBookmark(r1.id, this);
-        };
-    }
+        if (imgEl) imgEl.src = r.coverImage?.extraLarge || r.coverImage?.large;
+        if (titleEl) titleEl.innerText = title;
+        if (scoreEl) scoreEl.innerHTML = `<i class="fa-solid fa-star text-[10px]"></i> ${r.averageScore ? (r.averageScore / 10).toFixed(1) : 'N/A'}`;
+        if (popEl) popEl.innerHTML = `<i class="fa-solid fa-bookmark text-[10px]"></i> ${formatNumberShort(r.popularity)}`;
 
-    // Rank #2
-    const r2 = top3[1];
-    const title2 = r2.title?.userPreferred || r2.title?.romaji || r2.title?.english || 'Tanpa Judul';
-    document.getElementById('podium2Title').innerText = title2;
-    document.getElementById('podium2Img').src = r2.coverImage?.extraLarge || r2.coverImage?.large;
-    document.getElementById('podium2Score').innerHTML = `<i class="fa-solid fa-star text-[10px]"></i> ${r2.averageScore ? (r2.averageScore / 10).toFixed(1) : 'N/A'}`;
-    document.getElementById('podium2Pop').innerHTML = `<i class="fa-solid fa-bookmark text-[10px]"></i> ${formatNumberShort(r2.popularity)}`;
-    
-    const area2 = document.getElementById('podium2ClickArea');
-    const titleEl2 = document.getElementById('podium2Title');
-    if(area2) area2.onclick = () => openDetailFromAniListTitle(title2);
-    if(titleEl2) titleEl2.onclick = () => openDetailFromAniListTitle(title2);
+        if (clickArea) clickArea.onclick = () => openDetailFromAniListTitle(title);
+        if (titleEl) titleEl.onclick = () => openDetailFromAniListTitle(title);
 
-    const btn2 = document.getElementById('podium2BookmarkBtn');
-    if (btn2) {
-        btn2.onclick = function(e) {
-            e.stopPropagation();
-            addAniListBookmark(r2.id, this);
-        };
-    }
-
-    // Rank #3
-    const r3 = top3[2];
-    const title3 = r3.title?.userPreferred || r3.title?.romaji || r3.title?.english || 'Tanpa Judul';
-    document.getElementById('podium3Title').innerText = title3;
-    document.getElementById('podium3Img').src = r3.coverImage?.extraLarge || r3.coverImage?.large;
-    document.getElementById('podium3Score').innerHTML = `<i class="fa-solid fa-star text-[10px]"></i> ${r3.averageScore ? (r3.averageScore / 10).toFixed(1) : 'N/A'}`;
-    document.getElementById('podium3Pop').innerHTML = `<i class="fa-solid fa-bookmark text-[10px]"></i> ${formatNumberShort(r3.popularity)}`;
-    
-    const area3 = document.getElementById('podium3ClickArea');
-    const titleEl3 = document.getElementById('podium3Title');
-    if(area3) area3.onclick = () => openDetailFromAniListTitle(title3);
-    if(titleEl3) titleEl3.onclick = () => openDetailFromAniListTitle(title3);
-
-    const btn3 = document.getElementById('podium3BookmarkBtn');
-    if (btn3) {
-        btn3.onclick = function(e) {
-            e.stopPropagation();
-            addAniListBookmark(r3.id, this);
-        };
-    }
+        if (btn) {
+            btn.onclick = function(e) {
+                e.stopPropagation();
+                addAniListBookmark(r, this);
+            };
+        }
+    });
 }
 
 function renderRankListItem(anime, rankNumber) {
@@ -1073,11 +1056,11 @@ function renderRankListItem(anime, rankNumber) {
                     <div class="flex items-center gap-2 mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
                         <span class="flex items-center gap-1 text-neon-yellow font-semibold"><i class="fa-solid fa-star text-[10px]"></i> ${score}</span>
                         <span>•</span>
-                        <span><i class="fa-solid fa-bookmark text-[10px]"></i> ${pop} members</span>
+                        <span><i class="fa-solid fa-bookmark text-[10px]"></i> ${pop}</span>
                     </div>
                 </div>
             </div>
-            <button onclick="addAniListBookmark(${anime.id}, this)" title="Tambah ke Bookmark AniList" class="p-2 text-zinc-400 hover:text-neon-yellow transition shrink-0">
+            <button onclick="addAniListBookmark(${anime.id}, this)" title="Simpan ke Bookmark" class="p-2 text-zinc-400 hover:text-neon-yellow transition shrink-0">
                 <i class="fa-regular fa-bookmark"></i>
             </button>
         </div>
@@ -1105,7 +1088,6 @@ function renderInfoPagination(type, page, totalPageCount, paginationEl) {
 }
 
 window.onload = function() {
-    injectDecoyCookiesForScrapers();
     handleAniListOAuthCallback();
     checkAniListAuthStatus();
 
