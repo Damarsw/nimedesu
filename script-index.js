@@ -9,6 +9,10 @@ const itemsPerPage = 12;
 let activeSearchQuery = "";
 let activeStatusFilter = "";
 let activeGenreFilter = "";
+let isBookmarkViewActive = false;
+
+// Cache daftar bookmark lokal di memori agar ikon bookmark langsung menyala
+let userBookmarksCache = [];
 
 const RENDER_API_URL = "/api-backend";
 
@@ -27,7 +31,7 @@ function generateSecurityToken() {
 }
 
 /* =========================================================
-   HELPER API BACKEND: SYNC, GET DATA, & UPDATE COOKIES
+   HELPER API BACKEND: USER SYNC, GET & UPDATE SUPABASE
    ========================================================= */
 function getUserIdentifier(user) {
     if (!user) return null;
@@ -60,7 +64,7 @@ async function syncUserWithSupabase(user) {
 
         const result = await res.json();
         if (result && result.cookies) {
-            console.log("✅ User berhasil tersinkronisasi via backend:", result);
+            userBookmarksCache = result.cookies.bookmarks || [];
             return result.cookies;
         }
         return null;
@@ -84,13 +88,14 @@ async function getSupabaseUserData(user) {
         });
         const result = await res.json();
         const cookies = result.cookies || {};
+        userBookmarksCache = cookies.bookmarks || [];
         return {
             history: Array.isArray(cookies.history) ? cookies.history : [],
-            bookmarks: Array.isArray(cookies.bookmarks) ? cookies.bookmarks : [],
+            bookmarks: userBookmarksCache,
             user_info: cookies.user_info || {}
         };
     } catch (err) {
-        console.error("Gagal mengambil data user via backend:", err);
+        console.error("Gagal mengambil data user:", err);
         return { history: [], bookmarks: [] };
     }
 }
@@ -114,11 +119,260 @@ async function saveSupabaseUserData(user, payload) {
             })
         });
         const result = await res.json();
+        userBookmarksCache = payload.bookmarks || [];
         return result.status === "success";
     } catch (err) {
-        console.error("Gagal update data user via backend:", err);
+        console.error("Gagal update data user:", err);
         return false;
     }
+}
+
+/* =========================================================
+   SINKRONISASI BOOKMARK KE ANILIST WATCHLIST (PLANNING)
+   ========================================================= */
+async function syncBookmarkToAniList(title) {
+    const token = localStorage.getItem('anilist_token');
+    if (!token || !title) return;
+
+    try {
+        let cleanTitle = title.replace(/([a-zA-Z0-9])x([a-zA-Z0-9])/gi, '$1 x $2').trim();
+        
+        // 1. Cari ID anime di AniList
+        const searchRes = await fetch('https://graphql.anilist.co', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({
+                query: `query ($search: String) { Media(search: $search, type: ANIME) { id } }`,
+                variables: { search: cleanTitle }
+            })
+        });
+        const searchJson = await searchRes.json();
+        const mediaId = searchJson?.data?.Media?.id;
+
+        if (mediaId) {
+            // 2. Simpan ke AniList list PLANNING
+            const mutRes = await fetch('https://graphql.anilist.co', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    query: `mutation ($mediaId: Int, $status: MediaListStatus) { SaveMediaListEntry (mediaId: $mediaId, status: $status) { id status } }`,
+                    variables: { mediaId: parseInt(mediaId), status: 'PLANNING' }
+                })
+            });
+            const mutJson = await mutRes.json();
+            if (mutJson?.data?.SaveMediaListEntry) {
+                console.log(`✅ Anime "${title}" berhasil disinkronkan ke Watchlist AniList kamu!`);
+            }
+        } else {
+            console.log(`ℹ️ Anime "${title}" tidak ditemukan di AniList, tersimpan di database NimeDesu.`);
+        }
+    } catch (e) {
+        console.warn("Sinkronisasi AniList dilewati:", e);
+    }
+}
+
+/* =========================================================
+   TOGGLE BOOKMARK (DARI POSTER ATAU PODIUM)
+   ========================================================= */
+async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
+    const user = getLoggedInUser();
+    if (!user) {
+        alert("Silakan login dengan akun AniList terlebih dahulu untuk menyimpan bookmark!");
+        loginAniList();
+        return;
+    }
+
+    let animeObj = null;
+    if (typeof animeObjOrId === 'object' && animeObjOrId !== null) {
+        animeObj = animeObjOrId;
+    } else {
+        animeObj = currentData.find(a => String(a.id) === String(animeObjOrId));
+    }
+
+    if (!animeObj) return;
+
+    try {
+        const userData = await getSupabaseUserData(user);
+        let bookmarks = userData.bookmarks || [];
+
+        const bookmarkItem = {
+            id: animeObj.id,
+            title: animeObj.title?.userPreferred || animeObj.title || "Anime",
+            url: animeObj.url || "",
+            thumbnail: animeObj.coverImage?.extraLarge || animeObj.thumbnail || "https://placehold.co/400x600?text=No+Image",
+            status: animeObj.status || "Ongoing",
+            skor: animeObj.skor || (animeObj.averageScore ? (animeObj.averageScore / 10).toFixed(1) : "-"),
+            genres: animeObj.genres || [],
+            synopsis: animeObj.synopsis || "Sinopsis belum tersedia.",
+            addedAt: new Date().toISOString()
+        };
+
+        const existsIndex = bookmarks.findIndex(b => String(b.id) === String(bookmarkItem.id) || b.title?.toLowerCase() === bookmarkItem.title?.toLowerCase());
+
+        if (existsIndex > -1) {
+            // Hapus dari bookmark
+            bookmarks.splice(existsIndex, 1);
+            alert(`"${bookmarkItem.title}" dihapus dari Bookmark!`);
+            if (buttonEl) {
+                const icon = buttonEl.querySelector('i');
+                if (icon) icon.className = 'fa-regular fa-bookmark text-xs text-zinc-300';
+            }
+        } else {
+            // Tambahkan ke bookmark
+            bookmarks.unshift(bookmarkItem);
+            alert(`"${bookmarkItem.title}" berhasil disimpan ke Bookmark!`);
+            if (buttonEl) {
+                const icon = buttonEl.querySelector('i');
+                if (icon) icon.className = 'fa-solid fa-bookmark text-xs text-neon-yellow';
+            }
+
+            // Sync ke AniList di background
+            syncBookmarkToAniList(bookmarkItem.title);
+        }
+
+        userData.bookmarks = bookmarks;
+        await saveSupabaseUserData(user, userData);
+
+        // Jika sedang membuka tab Bookmark, muat ulang tampilannya
+        if (isBookmarkViewActive) {
+            loadBookmarkTab(currentPage);
+        }
+
+    } catch (err) {
+        console.error("Gagal toggle bookmark:", err);
+        alert("Terjadi kesalahan saat memproses bookmark.");
+    }
+}
+
+// Alias fungsi untuk podium / list ranking
+function addAniListBookmark(animeOrMediaId, buttonEl) {
+    toggleBookmarkAnime(animeOrMediaId, buttonEl);
+}
+
+/* =========================================================
+   TAB BOOKMARK PADA BERANDA
+   ========================================================= */
+async function loadBookmarkTab(page = 1) {
+    isBookmarkViewActive = true;
+    currentPage = page;
+
+    const user = getLoggedInUser();
+    const container = document.getElementById('animeDisplayGrid');
+    const paginationBox = document.getElementById('paginationBox');
+
+    if (!user) {
+        container.innerHTML = `
+            <div class="col-span-full flex flex-col items-center justify-center py-16 space-y-4 text-center">
+                <i class="fa-regular fa-bookmark text-4xl text-neon-yellow"></i>
+                <p class="text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-300 max-w-sm">Fitur Bookmark terkunci. Silakan login terlebih dahulu untuk mengakses daftar bookmark Anda.</p>
+                <button onclick="loginAniList()" class="px-5 py-2.5 rounded-full bg-neon-yellow text-black text-xs font-bold shadow-glow-yellow transition hover:opacity-90">Login AniList</button>
+            </div>
+        `;
+        paginationBox.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="col-span-full flex flex-col items-center justify-center py-16 space-y-3">
+            <i class="fa-solid fa-spinner fa-spin text-2xl text-black dark:text-neon-yellow"></i>
+            <p class="text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-300">Memuat data bookmark dari database...</p>
+        </div>
+    `;
+
+    const userData = await getSupabaseUserData(user);
+    const bookmarks = userData.bookmarks || [];
+
+    if (bookmarks.length === 0) {
+        container.innerHTML = `
+            <div class="col-span-full flex flex-col items-center justify-center py-16 space-y-3 text-center">
+                <i class="fa-regular fa-bookmark text-3xl text-zinc-400"></i>
+                <p class="text-zinc-600 dark:text-zinc-400 text-xs sm:text-sm font-medium">Belum ada anime yang Anda bookmark. Klik ikon <i class="fa-regular fa-bookmark"></i> pada poster anime untuk menyimpan.</p>
+            </div>
+        `;
+        paginationBox.innerHTML = '';
+        return;
+    }
+
+    currentData = bookmarks.map((b, idx) => ({
+        id: b.id || (idx + 1),
+        title: b.title || "Tanpa Judul",
+        url: b.url || "",
+        status: b.status || "Ongoing",
+        genres: b.genres || [],
+        synopsis: b.synopsis || "Sinopsis belum tersedia.",
+        thumbnail: b.thumbnail || "https://placehold.co/400x600?text=No+Image",
+        japanese: b.japanese || "-",
+        skor: b.skor || b.score || "-",
+        statusText: b.status || "-",
+        totalEpisode: b.totalEpisode || "-",
+        durasi: b.durasi || "-",
+        tanggalRilis: b.tanggalRilis || "-",
+        studio: b.studio || "-"
+    }));
+
+    totalPages = Math.max(1, Math.ceil(currentData.length / itemsPerPage));
+    const startIdx = (page - 1) * itemsPerPage;
+    const endIdx = startIdx + itemsPerPage;
+    const pageItems = currentData.slice(startIdx, endIdx);
+
+    renderBookmarkGrid(pageItems);
+}
+
+function renderBookmarkGrid(items) {
+    const container = document.getElementById('animeDisplayGrid');
+    const paginationBox = document.getElementById('paginationBox');
+
+    container.innerHTML = items.map(item => {
+        const scoreBadgeId = `homeScore_${item.id}`;
+        setTimeout(() => { fetchAniListScoreForCard(item.title, scoreBadgeId); }, 100);
+
+        return `
+            <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="viewDetails('${item.id}')">
+                <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
+                    <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
+                    <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
+                        <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
+                            <i class="fa-solid fa-circle-info ml-0.5 text-base"></i>
+                        </div>
+                    </div>
+                    <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${item.status}</span>
+                    <span id="${scoreBadgeId}" class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md text-neon-yellow text-[10px] font-bold px-2 py-0.5 rounded-full shadow z-10">⭐ ${item.skor && item.skor !== '-' ? item.skor : 'N/A'}</span>
+                    
+                    <!-- IKON BOOKMARK AKTIF -->
+                    <button onclick="event.stopPropagation(); toggleBookmarkAnime('${item.id}', this)" title="Hapus dari Bookmark" class="absolute top-2 right-2 p-2 rounded-full bg-black/70 backdrop-blur-md text-neon-yellow hover:scale-110 transition z-20 shadow-md">
+                        <i class="fa-solid fa-bookmark text-xs"></i>
+                    </button>
+                </div>
+                <div class="p-3">
+                    <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    let paginationHTML = '';
+    const baseBtnClass = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow transition shadow-xs';
+    const disabledBtnClass = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border-zinc-200 dark:border-zinc-800 cursor-not-allowed';
+
+    paginationHTML += `<button class="${currentPage > 1 ? baseBtnClass : disabledBtnClass}" ${currentPage <= 1 ? 'disabled' : ''} onclick="loadBookmarkTab(1)">&laquo;</button>`;
+    paginationHTML += `<button class="${currentPage > 1 ? baseBtnClass : disabledBtnClass}" ${currentPage <= 1 ? 'disabled' : ''} onclick="loadBookmarkTab(${currentPage - 1})">&lsaquo;</button>`;
+
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, currentPage + 2);
+
+    for (let i = startPage; i <= endPage; i++) {
+        const activeClass = i === currentPage ? 'bg-neon-yellow text-black font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder shadow-xs';
+        paginationHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${activeClass} transition" onclick="loadBookmarkTab(${i})">${i}</button>`;
+    }
+
+    paginationHTML += `<button class="${currentPage < totalPages ? baseBtnClass : disabledBtnClass}" ${currentPage >= totalPages ? 'disabled' : ''} onclick="loadBookmarkTab(${currentPage + 1})">&rsaquo;</button>`;
+    paginationHTML += `<button class="${currentPage < totalPages ? baseBtnClass : disabledBtnClass}" ${currentPage >= totalPages ? 'disabled' : ''} onclick="loadBookmarkTab(${totalPages})">&raquo;</button>`;
+
+    paginationBox.innerHTML = paginationHTML;
 }
 
 /* =========================================================
@@ -203,7 +457,6 @@ async function checkAniListAuthStatus() {
                 `;
             }
 
-            // AUTO SYNC KE DATABASE MELALUI BACKEND API
             await syncUserWithSupabase(user);
             renderHistory();
         }
@@ -213,127 +466,8 @@ async function checkAniListAuthStatus() {
 }
 
 /* =========================================================
-   BOOKMARK & RIWAYAT TONTONAN (SUPABASE VIA BACKEND)
+   RIWAYAT TONTONAN (SUPABASE)
    ========================================================= */
-async function addAniListBookmark(animeOrMediaId, buttonEl) {
-    const user = getLoggedInUser();
-    if (!user) {
-        alert("Silakan login dengan akun AniList terlebih dahulu untuk menyimpan bookmark ke database!");
-        loginAniList();
-        return;
-    }
-
-    try {
-        const userData = await getSupabaseUserData(user);
-        let bookmarks = userData.bookmarks || [];
-
-        let animeObj = null;
-        if (typeof animeOrMediaId === 'object') {
-            animeObj = animeOrMediaId;
-        } else {
-            animeObj = currentData.find(a => a.id == animeOrMediaId);
-        }
-
-        const bookmarkItem = {
-            id: animeObj ? animeObj.id : animeOrMediaId,
-            title: animeObj ? (animeObj.title?.userPreferred || animeObj.title || "Anime") : "Anime",
-            thumbnail: animeObj ? (animeObj.coverImage?.extraLarge || animeObj.thumbnail || "https://placehold.co/150x200") : "https://placehold.co/150x200",
-            score: animeObj ? (animeObj.averageScore ? (animeObj.averageScore / 10).toFixed(1) : animeObj.skor || "-") : "-",
-            popularity: animeObj ? (animeObj.popularity ? formatNumberShort(animeObj.popularity) : "-") : "-",
-            addedAt: new Date().toISOString()
-        };
-
-        const existsIndex = bookmarks.findIndex(b => String(b.id) === String(bookmarkItem.id));
-        if (existsIndex > -1) {
-            bookmarks.splice(existsIndex, 1);
-            alert("Dihapus dari Bookmark!");
-            if (buttonEl) {
-                const icon = buttonEl.querySelector('i');
-                if (icon) icon.className = 'fa-regular fa-bookmark';
-            }
-        } else {
-            bookmarks.unshift(bookmarkItem);
-            alert("Berhasil disimpan ke Bookmark di Database!");
-            if (buttonEl) {
-                const icon = buttonEl.querySelector('i');
-                if (icon) icon.className = 'fa-solid fa-bookmark text-neon-yellow';
-            }
-        }
-
-        userData.bookmarks = bookmarks;
-        await saveSupabaseUserData(user, userData);
-
-        if (currentInfoType === 'bookmark') {
-            openInformation('bookmark', currentInfoPage);
-        }
-    } catch (err) {
-        console.error("Gagal sinkron bookmark via backend:", err);
-        alert("Terjadi kesalahan saat menyinkronkan bookmark.");
-    }
-}
-
-async function fetchAniListBookmarks(page, loadingEl, podiumEl, gridEl, paginationEl) {
-    const user = getLoggedInUser();
-
-    if (!user) {
-        loadingEl.classList.add('hidden');
-        gridEl.innerHTML = `
-            <div class="col-span-full flex flex-col items-center justify-center py-16 space-y-4 text-center">
-                <i class="fa-regular fa-bookmark text-3xl text-neon-yellow"></i>
-                <p class="text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-300 max-w-xs">Fitur Bookmark terkunci. Silakan login terlebih dahulu untuk mengakses bookmark tersimpan Anda di database.</p>
-                <button onclick="loginAniList()" class="px-4 py-2 rounded-full bg-neon-yellow text-black text-xs font-bold shadow-glow-yellow transition hover:opacity-90">Login AniList</button>
-            </div>`;
-        return;
-    }
-
-    try {
-        const userData = await getSupabaseUserData(user);
-        const entries = userData.bookmarks || [];
-
-        loadingEl.classList.add('hidden');
-
-        if (entries.length === 0) {
-            gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Belum ada anime yang Anda bookmark di database. Tekan ikon <i class="fa-regular fa-bookmark"></i> pada poster anime untuk menambahkan.</p>`;
-            return;
-        }
-
-        const perPage = 12;
-        const totalPageCount = Math.max(1, Math.ceil(entries.length / perPage));
-        const pageEntries = entries.slice((page - 1) * perPage, page * perPage);
-
-        gridEl.innerHTML = pageEntries.map((bItem, idx) => {
-            const rankNum = (page - 1) * perPage + idx + 1;
-            const escapedTitle = bItem.title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-            return `
-                <div class="bg-neon-lightCard dark:bg-neon-darkCard border border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow rounded-xl p-3 flex items-center gap-3.5 transition shadow-xs">
-                    <span class="font-extrabold text-sm sm:text-base text-zinc-400 dark:text-zinc-500 w-7 text-center shrink-0">#${rankNum}</span>
-                    <div onclick="openDetailFromAniListTitle('${escapedTitle}')" class="flex items-center gap-3.5 flex-grow min-w-0 cursor-pointer group">
-                        <img src="${bItem.thumbnail}" alt="${bItem.title}" class="w-12 h-16 object-cover rounded-lg shrink-0 bg-zinc-800 group-hover:scale-105 transition duration-200">
-                        <div class="flex-grow min-w-0">
-                            <h4 class="font-bold text-black dark:text-white text-xs sm:text-sm truncate group-hover:text-neon-yellow transition">${bItem.title}</h4>
-                            <div class="flex items-center gap-2 mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-                                <span class="flex items-center gap-1 text-neon-yellow font-semibold"><i class="fa-solid fa-star text-[10px]"></i> ${bItem.score}</span>
-                                <span>•</span>
-                                <span><i class="fa-solid fa-bookmark text-[10px]"></i> ${bItem.popularity}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <button onclick="addAniListBookmark('${bItem.id}', this)" title="Hapus dari Bookmark" class="p-2 text-neon-yellow hover:text-red-500 transition shrink-0">
-                        <i class="fa-solid fa-bookmark"></i>
-                    </button>
-                </div>
-            `;
-        }).join('');
-
-        renderInfoPagination('bookmark', page, totalPageCount, paginationEl);
-
-    } catch (err) {
-        console.error("Gagal memuat bookmark via backend:", err);
-        loadingEl.classList.add('hidden');
-        gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat bookmark dari database.</p>`;
-    }
-}
-
 async function renderHistory() {
     const historySection = document.getElementById('historySection');
     const historyGrid = document.getElementById('historyGrid');
@@ -535,6 +669,7 @@ function toggleInformationSubmenu(e) {
 
 async function loadAnimeDatabase(page = 1) {
     try {
+        isBookmarkViewActive = false;
         currentPage = page;
         let fetchUrl = `${RENDER_API_URL}/anime?page=${page}&per_page=${itemsPerPage}`;
         
@@ -591,6 +726,9 @@ function displayAnimeWithPagination() {
         const scoreBadgeId = `homeScore_${item.id}`;
         setTimeout(() => { fetchAniListScoreForCard(item.title, scoreBadgeId); }, 100);
 
+        // Cek apakah anime ini sudah di-bookmark
+        const isBookmarked = userBookmarksCache.some(b => String(b.id) === String(item.id) || b.title?.toLowerCase() === item.title?.toLowerCase());
+
         return `
             <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="viewDetails('${item.id}')">
                 <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
@@ -602,6 +740,11 @@ function displayAnimeWithPagination() {
                     </div>
                     <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${item.status}</span>
                     <span id="${scoreBadgeId}" class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md text-neon-yellow text-[10px] font-bold px-2 py-0.5 rounded-full shadow z-10">⭐ ${item.skor && item.skor !== '-' ? item.skor : 'N/A'}</span>
+                    
+                    <!-- IKON BOOKMARK DI POSTER BERANDA -->
+                    <button onclick="event.stopPropagation(); toggleBookmarkAnime('${item.id}', this)" title="Simpan Bookmark" class="absolute top-2 right-2 p-2 rounded-full bg-black/70 backdrop-blur-md text-zinc-300 hover:text-neon-yellow hover:scale-110 transition z-20 shadow-md">
+                        <i class="${isBookmarked ? 'fa-solid fa-bookmark text-neon-yellow' : 'fa-regular fa-bookmark'} text-xs"></i>
+                    </button>
                 </div>
                 <div class="p-3">
                     <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
@@ -632,7 +775,11 @@ function displayAnimeWithPagination() {
 }
 
 function goToPage(pageNumber) {
-    loadAnimeDatabase(pageNumber);
+    if (isBookmarkViewActive) {
+        loadBookmarkTab(pageNumber);
+    } else {
+        loadAnimeDatabase(pageNumber);
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -740,6 +887,13 @@ function changeTab(type, element) {
 
     activeSearchQuery = "";
     activeGenreFilter = "";
+
+    if (type === 'bookmark') {
+        activeStatusFilter = "";
+        document.getElementById('sectionHeader').innerText = "Daftar Bookmark Tersimpan";
+        loadBookmarkTab(1);
+        return;
+    }
 
     if(type === 'all') {
         activeStatusFilter = "";
@@ -867,7 +1021,6 @@ function openInformation(type, page = 1) {
     let activeBtnId = 'infoBtnPopularity';
     if (type === 'upcoming') activeBtnId = 'infoBtnUpcoming';
     if (type === 'favorite') activeBtnId = 'infoBtnFavorite';
-    if (type === 'bookmark') activeBtnId = 'infoBtnBookmark';
     
     const activeBtn = document.getElementById(activeBtnId);
     if (activeBtn) {
@@ -890,9 +1043,6 @@ function openInformation(type, page = 1) {
     } else if (type === 'favorite') {
         headerEl.innerText = 'Highest Rated Anime';
         descEl.innerText = 'Daftar anime dengan skor evaluasi tertinggi.';
-    } else if (type === 'bookmark') {
-        headerEl.innerText = 'Bookmark Kamu';
-        descEl.innerText = 'Daftar anime tersimpan di database akun Anda.';
     }
     
     const loadingEl = document.getElementById('informationLoading');
@@ -905,12 +1055,7 @@ function openInformation(type, page = 1) {
     gridEl.innerHTML = '';
     paginationEl.innerHTML = '';
     
-    if (type === 'bookmark') {
-        fetchAniListBookmarks(page, loadingEl, podiumEl, gridEl, paginationEl);
-    } else {
-        fetchAniListData(type, page, loadingEl, podiumEl, gridEl, paginationEl);
-    }
-    
+    fetchAniListData(type, page, loadingEl, podiumEl, gridEl, paginationEl);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1045,7 +1190,7 @@ function renderPodiumData(top3) {
         if (btn) {
             btn.onclick = function(e) {
                 e.stopPropagation();
-                addAniListBookmark(r, this);
+                toggleBookmarkAnime(r, this);
             };
         }
     });
@@ -1057,6 +1202,8 @@ function renderRankListItem(anime, rankNumber) {
     const score = anime.averageScore ? (anime.averageScore / 10).toFixed(1) : 'N/A';
     const pop = formatNumberShort(anime.popularity);
     const escapedTitle = title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+    const isBookmarked = userBookmarksCache.some(b => b.title?.toLowerCase() === title.toLowerCase());
 
     return `
         <div class="bg-neon-lightCard dark:bg-neon-darkCard border border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow rounded-xl p-3 flex items-center gap-3.5 transition shadow-xs">
@@ -1072,8 +1219,8 @@ function renderRankListItem(anime, rankNumber) {
                     </div>
                 </div>
             </div>
-            <button onclick="addAniListBookmark(${anime.id}, this)" title="Simpan ke Bookmark" class="p-2 text-zinc-400 hover:text-neon-yellow transition shrink-0">
-                <i class="fa-regular fa-bookmark"></i>
+            <button onclick="toggleBookmarkAnime(${JSON.stringify({ id: anime.id, title: title, thumbnail: img, score: score, popularity: pop }).replace(/"/g, '&quot;')}, this)" title="Simpan Bookmark" class="p-2 text-zinc-400 hover:text-neon-yellow transition shrink-0">
+                <i class="${isBookmarked ? 'fa-solid fa-bookmark text-neon-yellow' : 'fa-regular fa-bookmark'}"></i>
             </button>
         </div>
     `;
