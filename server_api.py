@@ -9,26 +9,20 @@ from flask_cors import CORS
 from supabase import create_client
 
 app = Flask(__name__)
-
-# Mengizinkan CORS hanya untuk domain Vercel Anda
 CORS(app, resources={r"/api/*": {"origins": "https://nimedesu.vercel.app"}})
 
 # ---------------------------------------------------------------------------
-# CONFIG - Diambil dari Environment Variables di Render
+# CONFIG DATABASE & KEAMANAN
 # ---------------------------------------------------------------------------
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 SECRET_SERVER_KEY = os.environ.get("SECRET_SERVER_KEY", "NimeDesuSecretKey2026")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    raise RuntimeError(
-        "Missing SUPABASE_URL / SUPABASE_KEY environment variables. "
-        "Set them in Render -> Environment before deploying."
-    )
+    raise RuntimeError("Missing SUPABASE_URL / SUPABASE_KEY environment variables.")
 
 client_obj = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Tabel Supabase
 TABLE_ANIME = "anime"
 TABLE_EPISODE = "episode"
 TABLE_LOGIN = "login"
@@ -52,18 +46,22 @@ SRV_KEY_LABEL = "keterangan"
 SRV_KEY_SERVER_NAME = "server"
 
 # ---------------------------------------------------------------------------
-# IN-MEMORY CACHING (HEMAT KUOTA API & RESPON KILAT)
+# CACHING MEMORI (HEMAT KUOTA ANILIST & SUPABASE)
 # ---------------------------------------------------------------------------
 RANKING_CACHE = {}
-CACHE_TTL = 1800 
+ANIME_LIST_CACHE = {}
 
+CACHE_TTL_RANKING = 7200  # 2 Jam untuk Peringkat AniList
+CACHE_TTL_ANIME = 300     # 5 Menit untuk Daftar Anime
 
+# ---------------------------------------------------------------------------
+# SECURITY MIDDLEWARE
+# ---------------------------------------------------------------------------
 @app.before_request
 def security_validation():
     if request.method == "OPTIONS":
         return
 
-    # Endpoint bot pinger / health check dan proxy stream dikecualikan
     if request.path in ["/", "/health", "/api/proxy-stream", "/proxy-stream"]:
         return
 
@@ -101,14 +99,12 @@ def security_validation():
         except ValueError:
             return jsonify({"error": "Access Denied: Malformed Request"}), 403
 
+
 @app.route("/")
 @app.route("/health")
 def home():
-    return jsonify({
-        "status": "online",
-        "service": "NimeDesu Backend API",
-        "timestamp": int(time.time())
-    }), 200
+    return jsonify({"status": "online", "service": "NimeDesu API", "timestamp": int(time.time())}), 200
+
 
 @app.route("/api/proxy-stream", methods=["GET"])
 @app.route("/proxy-stream", methods=["GET"])
@@ -158,6 +154,7 @@ def proxy_stream():
     except Exception as e:
         return f"Proxy Error: {str(e)}", 500
 
+
 @app.route("/api/anime", methods=["GET"])
 def api_anime():
     try:
@@ -166,6 +163,15 @@ def api_anime():
         search_query = request.args.get("q", "").strip()
         status_filter = request.args.get("status", "").strip()
         genre_filter = request.args.get("genre", "").strip()
+
+        cache_key = f"{page}_{per_page}_{search_query}_{status_filter}_{genre_filter}"
+        now = time.time()
+
+        # Gunakan cache jika masih berlaku (5 menit)
+        if cache_key in ANIME_LIST_CACHE and (now - ANIME_LIST_CACHE[cache_key]["time"] < CACHE_TTL_ANIME):
+            cached_resp = jsonify(ANIME_LIST_CACHE[cache_key]["data"])
+            cached_resp.headers["Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=600"
+            return cached_resp
 
         start = (page - 1) * per_page
         end = start + per_page - 1
@@ -188,12 +194,19 @@ def api_anime():
         for item in data:
             item["image_url"] = item.get(COL_ANIME_IMAGE)
 
-        return jsonify({
+        payload = {
             "data": data,
             "total": total_records,
             "page": page,
             "total_pages": total_pages,
-        })
+        }
+
+        # Simpan ke cache
+        ANIME_LIST_CACHE[cache_key] = {"time": now, "data": payload}
+
+        resp = jsonify(payload)
+        resp.headers["Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=600"
+        return resp
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -248,16 +261,17 @@ def api_anime_detail():
             "episodes": episodes_list,
         }
 
-        return jsonify(result_payload)
-
+        resp = jsonify(result_payload)
+        resp.headers["Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=600"
+        return resp
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @app.route("/api/ranking", methods=["GET"])
 def api_ranking():
     """
-    Mengambil data peringkat dari AniList dengan sistem Cache 30 Menit.
-    Frontend tidak perlu lagi request langsung ke GraphQL eksternal.
+    Mengambil data peringkat dari AniList dengan sistem Cache 2 Jam.
     """
     category = request.args.get("type", "bypopularity").strip()
     page = int(request.args.get("page", 1))
@@ -265,13 +279,14 @@ def api_ranking():
     cache_key = f"{category}_{page}"
     current_time = time.time()
 
-    # Cek apakah data ada di cache dan belum expired
+    # Cek cache
     if cache_key in RANKING_CACHE:
         cached_entry = RANKING_CACHE[cache_key]
-        if current_time - cached_entry["timestamp"] < CACHE_TTL:
-            return jsonify(cached_entry["data"])
+        if current_time - cached_entry["timestamp"] < CACHE_TTL_RANKING:
+            resp = jsonify(cached_entry["data"])
+            resp.headers["Cache-Control"] = "public, s-maxage=3600, stale-while-revalidate=7200"
+            return resp
 
-    # Query ke GraphQL AniList
     sort_query = "POPULARITY_DESC"
     status_query = ""
 
@@ -315,7 +330,6 @@ def api_ranking():
         list_media = list_obj.get("media", [])
         page_info = list_obj.get("pageInfo", {})
 
-        # Format hasil
         if page == 1 and len(list_media) > 3:
             list_media = list_media[3:]
 
@@ -325,15 +339,17 @@ def api_ranking():
             "last_page": page_info.get("lastPage", 1)
         }
 
-        # Simpan ke cache
         RANKING_CACHE[cache_key] = {
             "timestamp": current_time,
             "data": payload
         }
 
-        return jsonify(payload)
+        response = jsonify(payload)
+        response.headers["Cache-Control"] = "public, s-maxage=3600, stale-while-revalidate=7200"
+        return response
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @app.route("/api/user-sync", methods=["POST"])
 def api_user_sync():
@@ -400,6 +416,7 @@ def api_user_update():
         return jsonify({"status": "success", "data": res.data})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
