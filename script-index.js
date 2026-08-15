@@ -569,7 +569,8 @@ async function clearHistory() {
    PENCARIAN, DETAIL VIEW & SCROLL HELPER
    ========================================================= */
 function scrollToSearchResults() {
-    const target = document.getElementById('btnSemua')?.parentElement || 
+    const target = document.getElementById('btnBookmarkTab')?.parentElement || 
+                   document.getElementById('btnSemua')?.parentElement || 
                    document.getElementById('sectionHeader') || 
                    document.getElementById('animeDisplayGrid');
 
@@ -954,18 +955,33 @@ function resetTabActiveStyles() {
     document.querySelectorAll('.nav-tab-btn').forEach(b => {
         b.classList.remove('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
         b.classList.add('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
+
+        // Kembalikan warna ikon menjadi kuning saat tab inaktif
+        const icon = b.querySelector('i');
+        if (icon) {
+            icon.classList.remove('text-black');
+            icon.classList.add('text-neon-yellow');
+        }
     });
 }
 
 function changeTab(type, element) {
     switchView('home');
     resetTabActiveStyles();
-    if(element) {
+
+    if (element) {
         element.classList.remove('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
         element.classList.add('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
+
+        // Ubah warna ikon menjadi hitam saat tab aktif
+        const icon = element.querySelector('i');
+        if (icon) {
+            icon.classList.remove('text-neon-yellow');
+            icon.classList.add('text-black');
+        }
     }
     const dropdown = document.getElementById('genreDropdown');
-    if(dropdown) dropdown.style.display = 'none';
+    if (dropdown) dropdown.style.display = 'none';
 
     activeSearchQuery = "";
     activeGenreFilter = "";
@@ -977,13 +993,13 @@ function changeTab(type, element) {
         return;
     }
 
-    if(type === 'all') {
+    if (type === 'all') {
         activeStatusFilter = "";
         document.getElementById('sectionHeader').innerText = "Semua Daftar Anime";
-    } else if(type === 'ongoing') {
+    } else if (type === 'ongoing') {
         activeStatusFilter = "Ongoing";
         document.getElementById('sectionHeader').innerText = "Anime Ongoing Terbaru";
-    } else if(type === 'finished' || type === 'completed') {
+    } else if (type === 'finished' || type === 'completed') {
         activeStatusFilter = "Finished";
         document.getElementById('sectionHeader').innerText = "Anime Finished";
     }
@@ -999,13 +1015,18 @@ function toggleDropdown(e) {
 function filterGenre(genre) {
     switchView('home');
     const dropdown = document.getElementById('genreDropdown');
-    if(dropdown) dropdown.style.display = 'none';
+    if (dropdown) dropdown.style.display = 'none';
     
     resetTabActiveStyles();
     const genreBtn = document.getElementById('btnGenre');
-    if(genreBtn) {
+    if (genreBtn) {
         genreBtn.classList.remove('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
         genreBtn.classList.add('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
+        const icon = genreBtn.querySelector('i');
+        if (icon) {
+            icon.classList.remove('text-neon-yellow');
+            icon.classList.add('text-black');
+        }
     }
 
     activeSearchQuery = "";
