@@ -436,7 +436,7 @@ function displayAnimeWithPagination() {
                         </div>
                     </div>
                     <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${item.status}</span>
-                    <span id="${scoreBadgeId}" class="absolute bottom-2 right-2 bg-neon-yellow text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow">⭐ ${item.skor && item.skor !== '-' ? item.skor : 'N/A'}</span>
+                    <span id="${scoreBadgeId}" class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md text-neon-yellow text-[10px] font-bold px-2 py-0.5 rounded-full shadow z-10">⭐ ${item.skor && item.skor !== '-' ? item.skor : 'N/A'}</span>
                 </div>
                 <div class="p-3">
                     <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
