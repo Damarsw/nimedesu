@@ -50,6 +50,7 @@ SRV_KEY_SERVER_NAME = "server"
 # ---------------------------------------------------------------------------
 RANKING_CACHE = {}
 ANIME_LIST_CACHE = {}
+SCORE_CACHE = {}
 
 CACHE_TTL_RANKING = 7200  # 2 Jam untuk Peringkat AniList
 CACHE_TTL_ANIME = 300     # 5 Menit untuk Daftar Anime
@@ -167,7 +168,6 @@ def api_anime():
         cache_key = f"{page}_{per_page}_{search_query}_{status_filter}_{genre_filter}"
         now = time.time()
 
-        # Gunakan cache jika masih berlaku (5 menit)
         if cache_key in ANIME_LIST_CACHE and (now - ANIME_LIST_CACHE[cache_key]["time"] < CACHE_TTL_ANIME):
             cached_resp = jsonify(ANIME_LIST_CACHE[cache_key]["data"])
             cached_resp.headers["Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=600"
@@ -201,14 +201,14 @@ def api_anime():
             "total_pages": total_pages,
         }
 
-        # Simpan ke cache
         ANIME_LIST_CACHE[cache_key] = {"time": now, "data": payload}
 
         resp = jsonify(payload)
         resp.headers["Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=600"
         return resp
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        # Prevent 500 error on frontend
+        return jsonify({"data": [], "total": 0, "page": 1, "total_pages": 1, "error": str(e)}), 200
 
 
 @app.route("/api/anime-detail", methods=["GET"])
@@ -265,21 +265,52 @@ def api_anime_detail():
         resp.headers["Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=600"
         return resp
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e), "episodes": []}), 200
 
 
+# ---------------------------------------------------------------------------
+# PROXY ENDPOINT FOR ANILIST SCORES (MENGHINDARI CORS DI FRONTEND)
+# ---------------------------------------------------------------------------
+@app.route("/api/anilist-score", methods=["GET"])
+def api_anilist_score():
+    title = request.args.get("title", "").strip()
+    if not title:
+        return jsonify({"score": "N/A"}), 200
+
+    cache_key = title.lower()
+    if cache_key in SCORE_CACHE:
+        return jsonify({"score": SCORE_CACHE[cache_key]}), 200
+
+    query_str = "query ($search: String) { Media (search: $search, type: ANIME) { averageScore } }"
+    try:
+        resp = requests.post(
+            "https://graphql.anilist.co",
+            json={"query": query_str, "variables": {"search": title}},
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            timeout=5
+        )
+        if resp.status_code == 200:
+            json_data = resp.json()
+            avg_score = json_data.get("data", {}).get("Media", {}).get("averageScore")
+            score_formatted = f"{(avg_score / 10):.1f}" if avg_score else "N/A"
+            SCORE_CACHE[cache_key] = score_formatted
+            return jsonify({"score": score_formatted}), 200
+        return jsonify({"score": "N/A"}), 200
+    except Exception:
+        return jsonify({"score": "N/A"}), 200
+
+
+# ---------------------------------------------------------------------------
+# PROXY ENDPOINT FOR ANILIST RANKING & SEARCH (MENGHINDARI CORS & ERROR 500)
+# ---------------------------------------------------------------------------
 @app.route("/api/ranking", methods=["GET"])
 def api_ranking():
-    """
-    Mengambil data peringkat dari AniList dengan sistem Cache 2 Jam.
-    """
     category = request.args.get("type", "bypopularity").strip()
     page = int(request.args.get("page", 1))
 
     cache_key = f"{category}_{page}"
     current_time = time.time()
 
-    # Cek cache
     if cache_key in RANKING_CACHE:
         cached_entry = RANKING_CACHE[cache_key]
         if current_time - cached_entry["timestamp"] < CACHE_TTL_RANKING:
@@ -323,8 +354,12 @@ def api_ranking():
             headers={"Content-Type": "application/json", "Accept": "application/json"},
             timeout=10
         )
-        json_data = resp.json()
+        
+        if resp.status_code != 200:
+            # Safe Fallback
+            return jsonify({"top3": [], "list": [], "last_page": 1, "warning": "AniList API limited"}), 200
 
+        json_data = resp.json()
         top3 = json_data.get("data", {}).get("top3", {}).get("media", [])
         list_obj = json_data.get("data", {}).get("listData", {})
         list_media = list_obj.get("media", [])
@@ -348,7 +383,8 @@ def api_ranking():
         response.headers["Cache-Control"] = "public, s-maxage=3600, stale-while-revalidate=7200"
         return response
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        # Safe Fallback to prevent 500 status on frontend
+        return jsonify({"top3": [], "list": [], "last_page": 1, "error": str(e)}), 200
 
 
 @app.route("/api/user-sync", methods=["POST"])
