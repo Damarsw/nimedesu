@@ -59,7 +59,7 @@ function getCachedScore(title, defaultScore) {
 async function fetchAniListScoreForCard(animeTitle, elementId, defaultScore) {
     if (defaultScore && defaultScore !== '-' && defaultScore !== 'N/A') {
         const targetEl = document.getElementById(elementId);
-        if (targetEl) targetEl.innerHTML = `⭐ ${defaultScore}`;
+        if (targetEl) targetEl.innerHTML = `★ ${defaultScore}`;
         return;
     }
     if (!animeTitle) return;
@@ -69,7 +69,7 @@ async function fetchAniListScoreForCard(animeTitle, elementId, defaultScore) {
 
     if (scoreLocalCache[cacheKey]) {
         const targetEl = document.getElementById(elementId);
-        if (targetEl) targetEl.innerHTML = `⭐ ${scoreLocalCache[cacheKey]}`;
+        if (targetEl) targetEl.innerHTML = `★ ${scoreLocalCache[cacheKey]}`;
         return;
     }
 
@@ -93,7 +93,7 @@ async function fetchAniListScoreForCard(animeTitle, elementId, defaultScore) {
             } catch (e) {}
 
             if (targetEl) {
-                targetEl.innerHTML = `⭐ ${formatted}`;
+                targetEl.innerHTML = `★ ${formatted}`;
             }
         }
     } catch (err) {}
@@ -376,7 +376,7 @@ function renderBookmarkGrid(items) {
                         </div>
                     </div>
                     <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${item.status}</span>
-                    <span id="${scoreBadgeId}" class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md text-neon-yellow text-[10px] font-bold px-2 py-0.5 rounded-full shadow z-10">⭐ ${cachedScore}</span>
+                    <span id="${scoreBadgeId}" class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md text-neon-yellow text-[10px] font-bold px-2 py-0.5 rounded-full shadow z-10">★ ${cachedScore}</span>
                     
                     <button onclick="event.stopPropagation(); toggleBookmarkAnime('${item.id}', this)" title="Hapus dari Bookmark" class="absolute top-2 right-2 p-2 rounded-full bg-black/70 backdrop-blur-md text-neon-yellow hover:scale-110 transition z-20 shadow-md">
                         <i class="fa-solid fa-bookmark text-xs"></i>
@@ -566,8 +566,24 @@ async function clearHistory() {
 }
 
 /* =========================================================
-   PENCARIAN & DETAIL VIEW
+   PENCARIAN, DETAIL VIEW & SCROLL HELPER
    ========================================================= */
+function scrollToSearchResults() {
+    const target = document.getElementById('btnSemua')?.parentElement || 
+                   document.getElementById('sectionHeader') || 
+                   document.getElementById('animeDisplayGrid');
+
+    if (target) {
+        const navbarOffset = 70;
+        const targetPosition = target.getBoundingClientRect().top + window.pageYOffset - navbarOffset;
+
+        window.scrollTo({
+            top: targetPosition,
+            behavior: 'smooth'
+        });
+    }
+}
+
 async function openDetailFromAniListTitle(title) {
     if (!title) return;
     try {
@@ -631,7 +647,7 @@ async function openDetailFromAniListTitle(title) {
     }
 }
 
-function switchView(viewName) {
+function switchView(viewName, shouldScrollToTop = true) {
     currentView = viewName;
     const views = ['homeView', 'detailView', 'dmcaView', 'informationView'];
     views.forEach(id => {
@@ -653,7 +669,10 @@ function switchView(viewName) {
         const information = document.getElementById('informationView');
         if (information) information.classList.remove('hidden');
     }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    if (shouldScrollToTop) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
 }
 
 function toggleSidebar() {
@@ -753,7 +772,7 @@ function displayAnimeWithPagination() {
                         </div>
                     </div>
                     <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${item.status}</span>
-                    <span id="${scoreBadgeId}" class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md text-neon-yellow text-[10px] font-bold px-2 py-0.5 rounded-full shadow z-10">⭐ ${cachedScore}</span>
+                    <span id="${scoreBadgeId}" class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md text-neon-yellow text-[10px] font-bold px-2 py-0.5 rounded-full shadow z-10">★ ${cachedScore}</span>
                     
                     <button onclick="event.stopPropagation(); toggleBookmarkAnime('${item.id}', this)" title="Simpan Bookmark" class="absolute top-2 right-2 p-2 rounded-full bg-black/70 backdrop-blur-md hover:scale-110 transition z-20 shadow-md">
                         <i class="${isBookmarked ? 'fa-solid fa-bookmark text-neon-yellow' : 'fa-regular fa-bookmark text-zinc-300'} text-xs"></i>
@@ -997,7 +1016,7 @@ function filterGenre(genre) {
 }
 
 /* =========================================================
-   EKSEKUSI PENCARIAN (OTOMATIS TUTUP & BERSIHKAN INPUT)
+   EKSEKUSI PENCARIAN (OTOMATIS TUTUP, BERSIHKAN & AUTO-SCROLL)
    ========================================================= */
 function searchAnime() {
     const searchField = document.getElementById('searchField');
@@ -1031,10 +1050,16 @@ function searchAnime() {
     // JIKA DI BERANDA ATAU VIEW LAINNYA
     activeSearchQuery = query;
     activeGenreFilter = "";
-    document.getElementById('sectionHeader').innerText = query ? `Hasil Pencarian: "${query}"` : "Semua Daftar Anime";
+    const sectionHeader = document.getElementById('sectionHeader');
+    if (sectionHeader) {
+        sectionHeader.innerText = query ? `Hasil Pencarian: "${query}"` : "Semua Daftar Anime";
+    }
     
-    switchView('home');
-    loadAnimeDatabase(1);
+    switchView('home', false);
+    loadAnimeDatabase(1).then(() => {
+        scrollToSearchResults();
+    });
+    scrollToSearchResults();
 }
 
 function viewDetails(id) {
@@ -1332,7 +1357,7 @@ async function searchInformationRanking(query, type = (currentInfoType || 'bypop
 
             if (gridEl) {
                 gridEl.innerHTML = items.map(anime => {
-                    const realRank = anime.score ? `⭐ ${anime.score}` : '-';
+                    const realRank = anime.score ? `★ ${anime.score}` : '-';
                     return renderRankListItem(anime, realRank);
                 }).join('');
             }
@@ -1522,9 +1547,16 @@ window.onload = async function() {
     const queryParam = urlParams.get('q');
     if (queryParam) {
         activeSearchQuery = queryParam;
-        document.getElementById('sectionHeader').innerText = `Hasil Pencarian: "${queryParam}"`;
+        const sectionHeader = document.getElementById('sectionHeader');
+        if (sectionHeader) {
+            sectionHeader.innerText = `Hasil Pencarian: "${queryParam}"`;
+        }
     }
 
     renderHistory();
-    loadAnimeDatabase(1);
+    await loadAnimeDatabase(1);
+
+    if (queryParam) {
+        scrollToSearchResults();
+    }
 };
