@@ -46,7 +46,7 @@ SRV_KEY_LABEL = "keterangan"
 SRV_KEY_SERVER_NAME = "server"
 
 # ---------------------------------------------------------------------------
-# CACHING MEMORI (HEMAT KUOTA ANILIST & SUPABASE)
+# CACHING MEMORI (HEMAT KUOTA ANILIST, JIKAN & SUPABASE)
 # ---------------------------------------------------------------------------
 RANKING_CACHE = {}
 ANIME_LIST_CACHE = {}
@@ -207,7 +207,6 @@ def api_anime():
         resp.headers["Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=600"
         return resp
     except Exception as e:
-        # Prevent 500 error on frontend
         return jsonify({"data": [], "total": 0, "page": 1, "total_pages": 1, "error": str(e)}), 200
 
 
@@ -287,7 +286,7 @@ def api_anilist_score():
             "https://graphql.anilist.co",
             json={"query": query_str, "variables": {"search": title}},
             headers={"Content-Type": "application/json", "Accept": "application/json"},
-            timeout=5
+            timeout=4
         )
         if resp.status_code == 200:
             json_data = resp.json()
@@ -295,13 +294,26 @@ def api_anilist_score():
             score_formatted = f"{(avg_score / 10):.1f}" if avg_score else "N/A"
             SCORE_CACHE[cache_key] = score_formatted
             return jsonify({"score": score_formatted}), 200
-        return jsonify({"score": "N/A"}), 200
     except Exception:
-        return jsonify({"score": "N/A"}), 200
+        pass
+
+    # Fallback score via Jikan API jika AniList down
+    try:
+        j_resp = requests.get(f"https://api.jikan.moe/v4/anime?q={requests.utils.quote(title)}&limit=1", timeout=4)
+        if j_resp.status_code == 200:
+            j_data = j_resp.json().get("data", [])
+            if j_data and j_data[0].get("score"):
+                score_formatted = f"{j_data[0]['score']:.1f}"
+                SCORE_CACHE[cache_key] = score_formatted
+                return jsonify({"score": score_formatted}), 200
+    except Exception:
+        pass
+
+    return jsonify({"score": "N/A"}), 200
 
 
 # ---------------------------------------------------------------------------
-# PROXY ENDPOINT FOR ANILIST RANKING & SEARCH (MENGHINDARI CORS & ERROR 500)
+# PROXY ENDPOINT RANKING DENGAN DUAL BACKUP (AniList -> Jikan MAL -> Supabase)
 # ---------------------------------------------------------------------------
 @app.route("/api/ranking", methods=["GET"])
 def api_ranking():
@@ -311,6 +323,7 @@ def api_ranking():
     cache_key = f"{category}_{page}"
     current_time = time.time()
 
+    # 1. Cek Cache
     if cache_key in RANKING_CACHE:
         cached_entry = RANKING_CACHE[cache_key]
         if current_time - cached_entry["timestamp"] < CACHE_TTL_RANKING:
@@ -318,6 +331,9 @@ def api_ranking():
             resp.headers["Cache-Control"] = "public, s-maxage=3600, stale-while-revalidate=7200"
             return resp
 
+    # =========================================================
+    # OPTION 1: UTAMA - ANILIST GRAPHQL API
+    # =========================================================
     sort_query = "POPULARITY_DESC"
     status_query = ""
 
@@ -352,39 +368,117 @@ def api_ranking():
             "https://graphql.anilist.co",
             json={"query": query_str},
             headers={"Content-Type": "application/json", "Accept": "application/json"},
-            timeout=10
+            timeout=4
         )
         
-        if resp.status_code != 200:
-            # Safe Fallback
-            return jsonify({"top3": [], "list": [], "last_page": 1, "warning": "AniList API limited"}), 200
+        if resp.status_code == 200:
+            json_data = resp.json()
+            if "data" in json_data and json_data["data"]:
+                top3 = json_data.get("data", {}).get("top3", {}).get("media", [])
+                list_obj = json_data.get("data", {}).get("listData", {})
+                list_media = list_obj.get("media", [])
+                page_info = list_obj.get("pageInfo", {})
 
-        json_data = resp.json()
-        top3 = json_data.get("data", {}).get("top3", {}).get("media", [])
-        list_obj = json_data.get("data", {}).get("listData", {})
-        list_media = list_obj.get("media", [])
-        page_info = list_obj.get("pageInfo", {})
+                payload = {
+                    "top3": top3,
+                    "list": list_media,
+                    "last_page": page_info.get("lastPage", 1),
+                    "source": "anilist"
+                }
 
-        if page == 1 and len(list_media) > 3:
-            list_media = list_media[3:]
+                RANKING_CACHE[cache_key] = {"timestamp": current_time, "data": payload}
+                return jsonify(payload), 200
+    except Exception:
+        pass  # Lanjut ke Backup Jikan MAL
 
-        payload = {
-            "top3": top3,
-            "list": list_media,
-            "last_page": page_info.get("lastPage", 1)
-        }
+    # =========================================================
+    # OPTION 2: SECONDARY BACKUP - JIKAN API v4 (MYANIMELIST)
+    # =========================================================
+    try:
+        jikan_filter = "bypopularity"
+        if category == "upcoming":
+            jikan_filter = "upcoming"
+        elif category == "favorite":
+            jikan_filter = "favorite"
 
-        RANKING_CACHE[cache_key] = {
-            "timestamp": current_time,
-            "data": payload
-        }
+        jikan_url = f"https://api.jikan.moe/v4/top/anime?filter={jikan_filter}&page={page}&limit=12"
+        j_resp = requests.get(jikan_url, timeout=5)
 
-        response = jsonify(payload)
-        response.headers["Cache-Control"] = "public, s-maxage=3600, stale-while-revalidate=7200"
-        return response
-    except Exception as e:
-        # Safe Fallback to prevent 500 status on frontend
-        return jsonify({"top3": [], "list": [], "last_page": 1, "error": str(e)}), 200
+        if j_resp.status_code == 200:
+            j_data = j_resp.json()
+            raw_list = j_data.get("data", [])
+            pagination = j_data.get("pagination", {})
+            last_page = pagination.get("last_visible_page", 1)
+
+            parsed_list = []
+            for item in raw_list:
+                parsed_list.append({
+                    "id": item.get("mal_id"),
+                    "title": {
+                        "romaji": item.get("title"),
+                        "english": item.get("title_english"),
+                        "userPreferred": item.get("title")
+                    },
+                    "coverImage": {
+                        "extraLarge": item.get("images", {}).get("jpg", {}).get("large_image_url"),
+                        "large": item.get("images", {}).get("jpg", {}).get("image_url")
+                    },
+                    "averageScore": int(item.get("score", 0) * 10) if item.get("score") else 0,
+                    "popularity": item.get("members", 0)
+                })
+
+            parsed_top3 = parsed_list[:3] if page == 1 else []
+
+            payload = {
+                "top3": parsed_top3,
+                "list": parsed_list,
+                "last_page": last_page,
+                "source": "jikan_mal"
+            }
+
+            RANKING_CACHE[cache_key] = {"timestamp": current_time, "data": payload}
+            return jsonify(payload), 200
+    except Exception:
+        pass  # Lanjut ke Backup Supabase Local
+
+    # =========================================================
+    # OPTION 3: TERAKHIR - FALLBACK DATABASE LOKAL (SUPABASE)
+    # =========================================================
+    try:
+        per_page = 12
+        start = (page - 1) * per_page
+        end = start + per_page - 1
+
+        db_query = client_obj.table(TABLE_ANIME).select("*", count="exact")
+        if category == "upcoming":
+            db_query = db_query.ilike(COL_ANIME_STATUS, "%upcoming%")
+        
+        db_res = db_query.order(COL_ANIME_ID).range(start, end).execute()
+        raw_items = db_res.data or []
+        total_count = db_res.count or len(raw_items)
+        last_page = -(-total_count // per_page) if total_count > 0 else 1
+
+        fallback_list = []
+        for item in raw_items:
+            fallback_list.append({
+                "id": item.get(COL_ANIME_ID),
+                "title": {"romaji": item.get(COL_ANIME_TITLE), "userPreferred": item.get(COL_ANIME_TITLE)},
+                "coverImage": {"extraLarge": item.get(COL_ANIME_IMAGE), "large": item.get(COL_ANIME_IMAGE)},
+                "averageScore": 80,
+                "popularity": 10000
+            })
+
+        fallback_top3 = fallback_list[:3] if page == 1 else []
+
+        return jsonify({
+            "top3": fallback_top3,
+            "list": fallback_list,
+            "last_page": last_page,
+            "source": "supabase_local"
+        }), 200
+
+    except Exception as db_err:
+        return jsonify({"top3": [], "list": [], "last_page": 1, "error": str(db_err)}), 200
 
 
 @app.route("/api/user-sync", methods=["POST"])
