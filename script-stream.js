@@ -47,8 +47,19 @@ function decryptTripleLayer(ciphertext) {
 }
 
 function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIndex, thumbnailImg) {
-    let encryptedData = localStorage.getItem('nimedesu_history_triple');
-    let history = encryptedData ? decryptTripleLayer(encryptedData) || [] : [];
+    // Sumber data utama sekarang disamakan dengan index.html: 'nimedesu_history_local' (plain JSON).
+    // Kalau belum ada tapi masih ada data lama terenkripsi, migrasikan dulu sekali.
+    let history = JSON.parse(localStorage.getItem('nimedesu_history_local') || '[]');
+
+    if (history.length === 0) {
+        let encryptedOldData = localStorage.getItem('nimedesu_history_triple');
+        if (encryptedOldData) {
+            let decryptedHistory = decryptTripleLayer(encryptedOldData);
+            if (decryptedHistory && Array.isArray(decryptedHistory)) {
+                history = decryptedHistory;
+            }
+        }
+    }
 
     const animeItem = {
         id: animeUrl,
@@ -63,7 +74,7 @@ function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIndex, t
     history.unshift(animeItem);
     if (history.length > 6) history.pop();
 
-    localStorage.setItem('nimedesu_history_triple', encryptTripleLayer(history));
+    localStorage.setItem('nimedesu_history_local', JSON.stringify(history));
 }
 
 function toggleSearchInput(event) {
