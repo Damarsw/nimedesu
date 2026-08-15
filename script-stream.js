@@ -78,7 +78,7 @@ async function getSupabaseUserData(user) {
             user_info: cookies.user_info || {}
         };
     } catch (err) {
-        console.error("Gagal membaca user data di stream:", err);
+        console.error("Gagal membaca user data:", err);
         return { history: [], bookmarks: [] };
     }
 }
@@ -104,7 +104,7 @@ async function saveSupabaseUserData(user, payload) {
         const result = await res.json();
         return result.status === "success";
     } catch (err) {
-        console.error("Gagal update user data di stream:", err);
+        console.error("Gagal update user data:", err);
         return false;
     }
 }
@@ -183,15 +183,12 @@ async function checkAniListAuthStatus() {
 }
 
 /* =========================================================
-   SIMPAN RIWAYAT STREAM KE SUPABASE VIA BACKEND
+   SIMPAN RIWAYAT STREAM KE SUPABASE
    ========================================================= */
 async function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIndex, thumbnailImg) {
     const user = getLoggedInUser();
 
-    if (!user) {
-        console.log("User belum login, riwayat tontonan tidak disimpan.");
-        return;
-    }
+    if (!user) return;
 
     try {
         const userData = await getSupabaseUserData(user);
@@ -214,7 +211,7 @@ async function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIn
         userData.history = history;
         await saveSupabaseUserData(user, userData);
     } catch (e) {
-        console.error("Gagal menyimpan riwayat ke Supabase:", e);
+        console.error("Gagal menyimpan riwayat:", e);
     }
 }
 
@@ -232,7 +229,16 @@ function toggleSearchInput(event) {
     }
 }
 
+// Caching SessionStorage (Mengambil 1x per sesi browser)
 async function fetchAllAnimeForSearch() {
+    const cached = sessionStorage.getItem('nimedesu_search_cache');
+    if (cached) {
+        try {
+            allAnimeList = JSON.parse(cached);
+            return;
+        } catch (e) {}
+    }
+
     try {
         const perPage = 1000;
         let page = 1;
@@ -256,8 +262,10 @@ async function fetchAllAnimeForSearch() {
         } while (page <= totalPages);
 
         allAnimeList = all;
+        try {
+            sessionStorage.setItem('nimedesu_search_cache', JSON.stringify(all));
+        } catch (e) {}
     } catch (e) {
-        console.error('Gagal memuat daftar lengkap anime:', e);
         allAnimeList = [];
     }
 }
@@ -382,14 +390,12 @@ async function initStream() {
             try {
                 renderMixedGenreRecommendations();
             } catch (recError) {
-                console.error('Gagal memuat rekomendasi:', recError);
                 document.getElementById('recommendationSlider').innerHTML = '<p class="text-xs text-zinc-500">Gagal memuat rekomendasi.</p>';
             }
         } else {
             document.getElementById('streamTitle').innerText = "Data Episode Tidak Tersedia.";
         }
     } catch (error) {
-        console.error(error);
         document.getElementById('streamTitle').innerText = "Gagal memuat server streaming.";
     }
 }
@@ -480,7 +486,7 @@ function renderDynamicEpisodes() {
     document.getElementById('nextEpBtn').style.opacity = activeEpisodeIndex >= activeEpisodes.length - 1 ? '0.5' : '1';
 
     container.innerHTML = activeEpisodes.map((ep, index) => {
-        const activeClass = index === index ? (index === activeEpisodeIndex ? 'bg-neon-yellow text-white font-bold shadow-glow-yellow' : 'bg-neon-lightBg dark:bg-neon-darkBg text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow') : '';
+        const activeClass = index === activeEpisodeIndex ? 'bg-neon-yellow text-white font-bold shadow-glow-yellow' : 'bg-neon-lightBg dark:bg-neon-darkBg text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow';
         let epLabel = ep.episode_title ? ep.episode_title.replace(/Sub.*$/, '').trim() : `Eps ${index + 1}`;
         if (!epLabel || epLabel.toLowerCase() === globalAnimeTitle.toLowerCase()) return '';
 
