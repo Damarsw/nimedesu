@@ -148,7 +148,6 @@ async function checkAniListAuthStatus() {
     }
 }
 
-/* API MUTATION: MENAMBAHKAN ANIME KE WATCHLIST / BOOKMARK ANILIST */
 async function addAniListBookmark(mediaId, buttonEl) {
     const token = localStorage.getItem('anilist_token');
     if (!token) {
@@ -199,37 +198,45 @@ async function addAniListBookmark(mediaId, buttonEl) {
     }
 }
 
-async function updateAniListProgress(animeMediaId, episodeNumber) {
-    const token = localStorage.getItem('anilist_token');
-    if (!token || !animeMediaId) return;
+/* =========================================================
+   FETCH SCORE DARI ANILIST UNTUK DITAMPILKAN DI POSTER BERANDA
+   ========================================================= */
+async function fetchAniListScoreForCard(animeTitle, elementId) {
+    if (!animeTitle) return;
+    
+    // Normalisasi judul pencarian (misal HUNTERxHUNTER -> HUNTER X HUNTER)
+    let cleanTitle = animeTitle.replace(/([a-zA-Z0-9])x([a-zA-Z0-9])/gi, '$1 x $2').trim();
 
     const query = `
-    mutation ($mediaId: Int, $progress: Int, $status: MediaListStatus) {
-        SaveMediaListEntry (mediaId: $mediaId, progress: $progress, status: $status) {
-            id progress status
+    query ($search: String) {
+        Media (search: $search, type: ANIME) {
+            averageScore
         }
     }`;
 
     try {
-        await fetch('https://graphql.anilist.co', {
+        const response = await fetch('https://graphql.anilist.co', {
             method: 'POST',
             headers: {
-                'Authorization': 'Bearer ' + token,
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
             },
             body: JSON.stringify({
                 query: query,
-                variables: {
-                    mediaId: parseInt(animeMediaId),
-                    progress: parseInt(episodeNumber),
-                    status: 'CURRENT'
-                }
+                variables: { search: cleanTitle }
             })
         });
-        console.log(`[AniList Sync] Episode ${episodeNumber} berhasil disinkronisasi ke AniList.`);
+
+        const result = await response.json();
+        const score = result?.data?.Media?.averageScore;
+        const targetEl = document.getElementById(elementId);
+
+        if (score && targetEl) {
+            const formattedScore = (score / 10).toFixed(1);
+            targetEl.innerHTML = `⭐ ${formattedScore}`;
+        }
     } catch (err) {
-        console.error("Gagal sync ke AniList:", err);
+        // Jika eror atau rate limit AniList, biarkan skor dari DB lokal
     }
 }
 
@@ -240,11 +247,8 @@ async function openDetailFromAniListTitle(title) {
     if (!title) return;
     try {
         const sec = generateSecurityToken();
-        
-        // 1. Normalisasi string pencarian untuk menghapus variasi 'x' tanpa spasi (misal HUNTERxHUNTER -> HUNTER X HUNTER)
         let searchQuery = title.replace(/([a-zA-Z0-9])x([a-zA-Z0-9])/gi, '$1 x $2').trim();
         
-        // Ambil hingga 10 baris hasil pencarian untuk di-filter presisinya
         const fetchUrl = `${RENDER_API_URL}/anime?q=${encodeURIComponent(searchQuery)}&per_page=10`;
         
         const res = await fetch(fetchUrl, {
@@ -258,20 +262,14 @@ async function openDetailFromAniListTitle(title) {
 
         if (matchedList.length > 0) {
             let matchedItem = null;
-
-            // Helper untuk membersihkan string saat membandingkan (mengabaikan kapital dan simbol)
             const normalize = (str) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
             const cleanTarget = normalize(title);
 
-            // 2. CARI MATCH PERSIS (EXACT MATCH) TERLEBIH DAHULU
             matchedItem = matchedList.find(item => normalize(item.title) === cleanTarget);
 
-            // 3. JIKA BEDA SPESIFIK (KAYAK NARUTO VS BORUTO), ELEMENTIR FRASA YANG SALAH
             if (!matchedItem) {
                 matchedItem = matchedList.find(item => {
                     const itemTitleClean = normalize(item.title);
-                    
-                    // Kalau nyari Naruto, abaikan Boruto
                     if (cleanTarget === "naruto" && itemTitleClean.includes("boruto")) {
                         return false;
                     }
@@ -279,12 +277,10 @@ async function openDetailFromAniListTitle(title) {
                 });
             }
 
-            // Fallback ke item pertama jika masih belum ada exact match
             if (!matchedItem) {
                 matchedItem = matchedList[0];
             }
 
-            // 4. MAP DATA MURNI DARI DATABASE SUPABASE KAMU
             const animeObj = {
                 id: matchedItem.id,
                 title: matchedItem.title || title,
@@ -305,7 +301,6 @@ async function openDetailFromAniListTitle(title) {
             const exists = currentData.some(a => a.id == animeObj.id);
             if (!exists) currentData.push(animeObj);
 
-            // Tampilkan detailnya
             viewDetails(animeObj.id);
         } else {
             alert(`Anime "${title}" belum tersedia di database NimeDesu.`);
@@ -423,23 +418,32 @@ function displayAnimeWithPagination() {
         return;
     }
 
-    container.innerHTML = currentData.map(item => `
-        <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="viewDetails('${item.id}')">
-            <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
-                <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
-                <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
-                    <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
-                        <i class="fa-solid fa-circle-info ml-0.5 text-base"></i>
+    container.innerHTML = currentData.map(item => {
+        const scoreBadgeId = `homeScore_${item.id}`;
+        
+        // Panggil fetch skor dari AniList secara asynchronous setelah card dibuat
+        setTimeout(() => {
+            fetchAniListScoreForCard(item.title, scoreBadgeId);
+        }, 100);
+
+        return `
+            <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="viewDetails('${item.id}')">
+                <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
+                    <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
+                    <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
+                        <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
+                            <i class="fa-solid fa-circle-info ml-0.5 text-base"></i>
+                        </div>
                     </div>
+                    <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${item.status}</span>
+                    <span id="${scoreBadgeId}" class="absolute bottom-2 right-2 bg-neon-yellow text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow">⭐ ${item.skor && item.skor !== '-' ? item.skor : 'N/A'}</span>
                 </div>
-                <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${item.status}</span>
-                <span class="absolute bottom-2 right-2 bg-neon-yellow text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow">⭐ ${item.skor}</span>
+                <div class="p-3">
+                    <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
+                </div>
             </div>
-            <div class="p-3">
-                <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 
     let paginationHTML = '';
     const baseBtnClass = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow transition shadow-xs';
