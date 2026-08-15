@@ -30,10 +30,6 @@ try {
 
 const RENDER_API_URL = "/api-backend";
 
-const KEY_X = "LayerX_Secret2026";
-const KEY_Y = "LayerY_Secret2026";
-const KEY_Z = "LayerZ_Secret2026";
-
 function generateSecurityToken() {
     const timestamp = Math.floor(Date.now() / 1000);
     const rawPayload = `${timestamp}_NimeDesuSecretKey2026`;
@@ -45,7 +41,7 @@ function generateSecurityToken() {
 }
 
 /* =========================================================
-   SISTEM SKOR CERDAS DENGAN LOCAL CACHING
+   SISTEM SKOR CERDAS DENGAN LOCAL CACHING & BACKEND PROXY
    ========================================================= */
 function getCachedScore(title, defaultScore) {
     if (defaultScore && defaultScore !== '-' && defaultScore !== 'N/A') {
@@ -73,27 +69,26 @@ async function fetchAniListScoreForCard(animeTitle, elementId, defaultScore) {
         return;
     }
 
-    const query = `query ($search: String) { Media (search: $search, type: ANIME) { averageScore } }`;
-
     try {
-        const response = await fetch('https://graphql.anilist.co', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ query: query, variables: { search: cleanTitle } })
+        const sec = generateSecurityToken();
+        const response = await fetch(`${RENDER_API_URL}/anilist-score?title=${encodeURIComponent(cleanTitle)}`, {
+            headers: {
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            }
         });
         const result = await response.json();
-        const score = result?.data?.Media?.averageScore;
+        const score = result?.score;
         const targetEl = document.getElementById(elementId);
 
-        if (score) {
-            const formatted = (score / 10).toFixed(1);
-            scoreLocalCache[cacheKey] = formatted;
+        if (score && score !== 'N/A') {
+            scoreLocalCache[cacheKey] = score;
             try {
                 localStorage.setItem('nimedesu_scores_cache', JSON.stringify(scoreLocalCache));
             } catch (e) {}
 
             if (targetEl) {
-                targetEl.innerHTML = `★ ${formatted}`;
+                targetEl.innerHTML = `★ ${score}`;
             }
         }
     } catch (err) {}
@@ -841,7 +836,6 @@ function toggleSearchInput(event) {
     }
 }
 
-// Tutup search bar dan dropdown jika klik di luar area
 document.addEventListener('click', function(e) {
     const container = document.getElementById('searchContainer');
     const searchBoxWrapper = document.getElementById('searchBoxWrapper');
@@ -870,7 +864,6 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Pencarian dengan Debounce 300ms
 function liveSearchAnime() {
     clearTimeout(searchDebounceTimer);
     searchDebounceTimer = setTimeout(async () => {
@@ -956,7 +949,6 @@ function resetTabActiveStyles() {
         b.classList.remove('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
         b.classList.add('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
 
-        // Kembalikan warna ikon menjadi kuning saat tab inaktif
         const icon = b.querySelector('i');
         if (icon) {
             icon.classList.remove('text-black');
@@ -973,7 +965,6 @@ function changeTab(type, element) {
         element.classList.remove('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
         element.classList.add('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
 
-        // Ubah warna ikon menjadi hitam saat tab aktif
         const icon = element.querySelector('i');
         if (icon) {
             icon.classList.remove('text-neon-yellow');
@@ -1036,9 +1027,6 @@ function filterGenre(genre) {
     loadAnimeDatabase(1);
 }
 
-/* =========================================================
-   EKSEKUSI PENCARIAN (OTOMATIS TUTUP, BERSIHKAN & AUTO-SCROLL)
-   ========================================================= */
 function searchAnime() {
     const searchField = document.getElementById('searchField');
     const searchContainer = document.getElementById('searchContainer');
@@ -1046,17 +1034,14 @@ function searchAnime() {
     
     const query = searchField ? searchField.value.trim() : "";
 
-    // 1. Tutup bar search & suggestions
     if (searchContainer) searchContainer.classList.add('hidden');
     if (suggestionsBox) suggestionsBox.classList.add('hidden');
 
-    // 2. Hapus tulisan yang diketik pengguna
     if (searchField) {
         searchField.value = '';
         searchField.blur();
     }
 
-    // JIKA SEDANG DI VIEW INFORMASI & PERINGKAT, TETAP DI KATEGORI INFORMASI AKTIF
     if (currentView === 'information') {
         activeInfoSearchQuery = query;
         const targetType = currentInfoType || 'bypopularity';
@@ -1068,7 +1053,6 @@ function searchAnime() {
         return;
     }
 
-    // JIKA DI BERANDA ATAU VIEW LAINNYA
     activeSearchQuery = query;
     activeGenreFilter = "";
     const sectionHeader = document.getElementById('sectionHeader');
@@ -1160,38 +1144,6 @@ function setInfoTabActive(type) {
     }
 }
 
-function getAnimeRealRank(anime, categoryType) {
-    if (!anime) return '-';
-    
-    if (anime.rankingPosition) return anime.rankingPosition;
-    if (anime.rank && typeof anime.rank === 'number') return anime.rank;
-
-    const rankings = anime.rankings;
-    if (Array.isArray(rankings) && rankings.length > 0) {
-        if (categoryType === 'favorite') {
-            const ratedAllTime = rankings.find(r => r.type === 'RATED' && r.allTime);
-            if (ratedAllTime && ratedAllTime.rank) return ratedAllTime.rank;
-
-            const ratedAny = rankings.find(r => r.type === 'RATED');
-            if (ratedAny && ratedAny.rank) return ratedAny.rank;
-        } else if (categoryType === 'bypopularity') {
-            const popAllTime = rankings.find(r => r.type === 'POPULAR' && r.allTime);
-            if (popAllTime && popAllTime.rank) return popAllTime.rank;
-
-            const popFormat = rankings.find(r => r.type === 'POPULAR');
-            if (popFormat && popFormat.rank) return popFormat.rank;
-        } else if (categoryType === 'upcoming') {
-            const popRank = rankings.find(r => r.type === 'POPULAR');
-            if (popRank && popRank.rank) return popRank.rank;
-        }
-
-        const anyRank = rankings.find(r => r.rank);
-        if (anyRank && anyRank.rank) return anyRank.rank;
-    }
-    
-    return '-';
-}
-
 function openInformation(type, page = 1) {
     activeInfoSearchQuery = "";
     currentInfoType = type;
@@ -1227,9 +1179,6 @@ function openInformation(type, page = 1) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-/* =========================================================
-   PENCARIAN SESUAI KATEGORI AKTIF DENGAN REAL RANK
-   ========================================================= */
 async function searchInformationRanking(query, type = (currentInfoType || 'bypopularity'), page = 1) {
     activeInfoSearchQuery = query;
     currentInfoType = type;
@@ -1264,129 +1213,35 @@ async function searchInformationRanking(query, type = (currentInfoType || 'bypop
 
     const perPage = 12;
 
-    let sortParam = ["POPULARITY_DESC"];
-    let statusParam = undefined;
-
-    if (type === 'upcoming') {
-        statusParam = "NOT_YET_RELEASED";
-        sortParam = ["POPULARITY_DESC"];
-    } else if (type === 'favorite') {
-        sortParam = ["SCORE_DESC", "POPULARITY_DESC"];
-    } else {
-        sortParam = ["POPULARITY_DESC"];
-    }
-
-    const gqlQuery = `
-        query ($search: String, $page: Int, $perPage: Int, $sort: [MediaSort], $status: MediaStatus) {
-            Page (page: $page, perPage: $perPage) {
-                pageInfo {
-                    total
-                    currentPage
-                    lastPage
-                    hasNextPage
-                }
-                media (search: $search, type: ANIME, sort: $sort, status: $status) {
-                    id
-                    title {
-                        userPreferred
-                        romaji
-                        english
-                    }
-                    coverImage {
-                        extraLarge
-                        large
-                    }
-                    averageScore
-                    popularity
-                    status
-                    genres
-                    rankings {
-                        id
-                        rank
-                        type
-                        format
-                        year
-                        season
-                        allTime
-                        context
-                    }
-                }
-            }
-        }
-    `;
-
-    const variables = {
-        search: query,
-        page: page,
-        perPage: perPage,
-        sort: sortParam
-    };
-    if (statusParam) {
-        variables.status = statusParam;
-    }
-
     try {
-        const response = await fetch('https://graphql.anilist.co', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({
-                query: gqlQuery,
-                variables: variables
-            })
+        const sec = generateSecurityToken();
+        const res = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(query)}&page=${page}&per_page=${perPage}`, {
+            headers: {
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            }
         });
-        const result = await response.json();
-        const pageData = result?.data?.Page;
-        const listData = pageData?.media || [];
-        const lastPage = pageData?.pageInfo?.lastPage || 1;
+        const json = await res.json();
+        const items = json.data || [];
+        const lastPage = json.total_pages || 1;
 
         if (loadingEl) loadingEl.classList.add('hidden');
 
-        if (listData.length === 0) {
-            if (gridEl) gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Anime "${query}" tidak ditemukan pada kategori ${type}.</p>`;
+        if (items.length === 0) {
+            if (gridEl) gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Anime "${query}" tidak ditemukan.</p>`;
             return;
         }
 
         if (gridEl) {
-            gridEl.innerHTML = listData.map(anime => {
-                const realRank = getAnimeRealRank(anime, type);
+            gridEl.innerHTML = items.map(anime => {
+                const realRank = anime.score ? `★ ${anime.score}` : '-';
                 return renderRankListItem(anime, realRank);
             }).join('');
         }
-
         renderSearchInfoPagination(query, type, page, lastPage, paginationEl);
-
-    } catch (err) {
-        console.error("Gagal search di AniList, mencoba fallback ke database lokal:", err);
-        try {
-            const sec = generateSecurityToken();
-            const res = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(query)}&page=${page}&per_page=${perPage}`, {
-                headers: {
-                    "X-Client-Token": sec.token,
-                    "X-Client-Time": sec.time
-                }
-            });
-            const json = await res.json();
-            const items = json.data || [];
-            const lastPage = json.total_pages || 1;
-
-            if (loadingEl) loadingEl.classList.add('hidden');
-
-            if (items.length === 0) {
-                if (gridEl) gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Anime "${query}" tidak ditemukan.</p>`;
-                return;
-            }
-
-            if (gridEl) {
-                gridEl.innerHTML = items.map(anime => {
-                    const realRank = anime.score ? `★ ${anime.score}` : '-';
-                    return renderRankListItem(anime, realRank);
-                }).join('');
-            }
-            renderSearchInfoPagination(query, type, page, lastPage, paginationEl);
-        } catch (fallbackErr) {
-            if (loadingEl) loadingEl.classList.add('hidden');
-            if (gridEl) gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat hasil pencarian peringkat.</p>`;
-        }
+    } catch (fallbackErr) {
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (gridEl) gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat hasil pencarian peringkat.</p>`;
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -1499,7 +1354,6 @@ function renderRankListItem(anime, rankNumber) {
 
     const isBookmarked = isAnimeBookmarked(anime);
 
-    // Format badge peringkat
     let rankDisplay = "";
     if (typeof rankNumber === 'number') {
         rankDisplay = `#${rankNumber}`;
