@@ -33,7 +33,6 @@ TABLE_ANIME = "anime"
 TABLE_EPISODE = "episode"
 TABLE_LOGIN = "login"
 
-# Kolom Tabel Anime
 COL_ANIME_ID = "id"
 COL_ANIME_TITLE = "title"
 COL_ANIME_URL = "url"
@@ -41,7 +40,6 @@ COL_ANIME_STATUS = "status"
 COL_ANIME_GENRE = "genre"
 COL_ANIME_IMAGE = "img_url"
 
-# Kolom Tabel Episode
 COL_EP_ID = "id"
 COL_EP_ANIME_ID = "anime_id"
 COL_EP_TITLE = "episode_title"
@@ -53,17 +51,20 @@ SRV_KEY_VURL = "vurl"
 SRV_KEY_LABEL = "keterangan"
 SRV_KEY_SERVER_NAME = "server"
 
+# ---------------------------------------------------------------------------
+# IN-MEMORY CACHING (HEMAT KUOTA API & RESPON KILAT)
+# ---------------------------------------------------------------------------
+RANKING_CACHE = {}
+CACHE_TTL = 1800 
 
-# ---------------------------------------------------------------------------
-# MIDDLEWARE KEAMANAN (TOKEN & SIGNATURE VALIDATION)
-# ---------------------------------------------------------------------------
+
 @app.before_request
 def security_validation():
     if request.method == "OPTIONS":
         return
 
-    # Proxy stream dikecualikan dari pengecekan header token khusus
-    if request.path.startswith("/api/proxy-stream") or request.path.startswith("/proxy-stream"):
+    # Endpoint bot pinger / health check dan proxy stream dikecualikan
+    if request.path in ["/", "/health", "/api/proxy-stream", "/proxy-stream"]:
         return
 
     if request.path.startswith("/api/"):
@@ -88,7 +89,6 @@ def security_validation():
             req_time = int(client_time)
             current_time = int(time.time())
 
-            # Toleransi selisih waktu 30 detik
             if abs(current_time - req_time) > 30:
                 return jsonify({"error": "Access Denied: Token Expired"}), 403
 
@@ -101,18 +101,15 @@ def security_validation():
         except ValueError:
             return jsonify({"error": "Access Denied: Malformed Request"}), 403
 
-
-# ---------------------------------------------------------------------------
-# HEALTH CHECK
-# ---------------------------------------------------------------------------
 @app.route("/")
+@app.route("/health")
 def home():
-    return "NimeDesu Server API is Active!"
+    return jsonify({
+        "status": "online",
+        "service": "NimeDesu Backend API",
+        "timestamp": int(time.time())
+    }), 200
 
-
-# ---------------------------------------------------------------------------
-# ROUTE PROXY STREAMING
-# ---------------------------------------------------------------------------
 @app.route("/api/proxy-stream", methods=["GET"])
 @app.route("/proxy-stream", methods=["GET"])
 def proxy_stream():
@@ -161,10 +158,6 @@ def proxy_stream():
     except Exception as e:
         return f"Proxy Error: {str(e)}", 500
 
-
-# ---------------------------------------------------------------------------
-# ROUTE DAFTAR ANIME (DENGAN SEARCH, FILTER & PAGINATION)
-# ---------------------------------------------------------------------------
 @app.route("/api/anime", methods=["GET"])
 def api_anime():
     try:
@@ -205,9 +198,6 @@ def api_anime():
         return jsonify({"error": str(e)}), 500
 
 
-# ---------------------------------------------------------------------------
-# ROUTE DETAIL ANIME & EPISODE
-# ---------------------------------------------------------------------------
 @app.route("/api/anime-detail", methods=["GET"])
 def api_anime_detail():
     anime_url = request.args.get("url", "").strip()
@@ -263,18 +253,90 @@ def api_anime_detail():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/ranking", methods=["GET"])
+def api_ranking():
+    """
+    Mengambil data peringkat dari AniList dengan sistem Cache 30 Menit.
+    Frontend tidak perlu lagi request langsung ke GraphQL eksternal.
+    """
+    category = request.args.get("type", "bypopularity").strip()
+    page = int(request.args.get("page", 1))
 
-# ---------------------------------------------------------------------------
-# ROUTE USER: SYNC LOGIN, GET DATA, & UPDATE COOKIES JSONB
-# ---------------------------------------------------------------------------
+    cache_key = f"{category}_{page}"
+    current_time = time.time()
+
+    # Cek apakah data ada di cache dan belum expired
+    if cache_key in RANKING_CACHE:
+        cached_entry = RANKING_CACHE[cache_key]
+        if current_time - cached_entry["timestamp"] < CACHE_TTL:
+            return jsonify(cached_entry["data"])
+
+    # Query ke GraphQL AniList
+    sort_query = "POPULARITY_DESC"
+    status_query = ""
+
+    if category == "upcoming":
+        status_query = ", status: NOT_YET_RELEASED"
+        sort_query = "POPULARITY_DESC"
+    elif category == "favorite":
+        sort_query = "SCORE_DESC"
+
+    query_str = f"""
+    query {{
+        top3: Page(page: 1, perPage: 3) {{
+            media(type: ANIME, sort: {sort_query}{status_query}) {{
+                id title {{ romaji english userPreferred }}
+                coverImage {{ extraLarge large }}
+                averageScore popularity
+            }}
+        }}
+        listData: Page(page: {page}, perPage: 12) {{
+            pageInfo {{ total currentPage lastPage hasNextPage }}
+            media(type: ANIME, sort: {sort_query}{status_query}) {{
+                id title {{ romaji english userPreferred }}
+                coverImage {{ extraLarge large }}
+                averageScore popularity
+            }}
+        }}
+    }}
+    """
+
+    try:
+        resp = requests.post(
+            "https://graphql.anilist.co",
+            json={"query": query_str},
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            timeout=10
+        )
+        json_data = resp.json()
+
+        top3 = json_data.get("data", {}).get("top3", {}).get("media", [])
+        list_obj = json_data.get("data", {}).get("listData", {})
+        list_media = list_obj.get("media", [])
+        page_info = list_obj.get("pageInfo", {})
+
+        # Format hasil
+        if page == 1 and len(list_media) > 3:
+            list_media = list_media[3:]
+
+        payload = {
+            "top3": top3,
+            "list": list_media,
+            "last_page": page_info.get("lastPage", 1)
+        }
+
+        # Simpan ke cache
+        RANKING_CACHE[cache_key] = {
+            "timestamp": current_time,
+            "data": payload
+        }
+
+        return jsonify(payload)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/api/user-sync", methods=["POST"])
 def api_user_sync():
-    """
-    Dipanggil saat user login AniList.
-    Mengecek apakah anilist_id sudah ada di tabel login.
-    Jika belum ada -> otomatis INSERT baris baru.
-    Mengembalikan data cookies JSONB yang ada.
-    """
     try:
         req_data = request.get_json() or {}
         anilist_id = str(req_data.get("anilist_id", "")).strip()
@@ -283,36 +345,25 @@ def api_user_sync():
         if not anilist_id:
             return jsonify({"error": "anilist_id is required"}), 400
 
-        # Cek data user di tabel login Supabase
         res = client_obj.table(TABLE_LOGIN).select("*").eq("anilist_id", anilist_id).execute()
         data = res.data or []
 
         if not data:
-            # User baru pertama kali login -> INSERT baris baru
             initial_cookies = {
                 "history": [],
                 "bookmarks": [],
                 "user_info": user_info
             }
-            insert_res = client_obj.table(TABLE_LOGIN).insert({
+            client_obj.table(TABLE_LOGIN).insert({
                 "anilist_id": anilist_id,
                 "cookies": initial_cookies
             }).execute()
 
-            return jsonify({
-                "status": "created",
-                "anilist_id": anilist_id,
-                "cookies": initial_cookies
-            })
+            return jsonify({"status": "created", "anilist_id": anilist_id, "cookies": initial_cookies})
         else:
-            # User sudah ada -> ambil cookies JSONB
             row = data[0]
             cookies = row.get("cookies") or {"history": [], "bookmarks": []}
-            return jsonify({
-                "status": "exists",
-                "anilist_id": anilist_id,
-                "cookies": cookies
-            })
+            return jsonify({"status": "exists", "anilist_id": anilist_id, "cookies": cookies})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -320,9 +371,6 @@ def api_user_sync():
 
 @app.route("/api/user-data", methods=["GET"])
 def api_user_data():
-    """
-    Mengambil data cookies (history & bookmarks) user dari tabel login Supabase.
-    """
     anilist_id = str(request.args.get("anilist_id", "")).strip()
     if not anilist_id:
         return jsonify({"error": "anilist_id is required"}), 400
@@ -334,16 +382,12 @@ def api_user_data():
             cookies = data[0].get("cookies") or {"history": [], "bookmarks": []}
             return jsonify({"cookies": cookies})
         return jsonify({"cookies": {"history": [], "bookmarks": []}})
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/user-update", methods=["POST"])
 def api_user_update():
-    """
-    Menyimpan pembaruan cookies (history / bookmarks) user ke database Supabase.
-    """
     try:
         req_data = request.get_json() or {}
         anilist_id = str(req_data.get("anilist_id", "")).strip()
@@ -354,14 +398,9 @@ def api_user_update():
 
         res = client_obj.table(TABLE_LOGIN).update({"cookies": cookies}).eq("anilist_id", anilist_id).execute()
         return jsonify({"status": "success", "data": res.data})
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
-# ---------------------------------------------------------------------------
-# ENTRY POINT
-# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
