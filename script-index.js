@@ -11,7 +11,6 @@ let activeStatusFilter = "";
 let activeGenreFilter = "";
 let isBookmarkViewActive = false;
 
-// Cache bookmark user di memori agar ikon di seluruh halaman otomatis aktif
 let userBookmarksCache = [];
 
 const RENDER_API_URL = "/api-backend";
@@ -30,9 +29,6 @@ function generateSecurityToken() {
     };
 }
 
-/* =========================================================
-   HELPER PENCARI STATUS BOOKMARK (SMART MATCHING)
-   ========================================================= */
 function isAnimeBookmarked(anime) {
     if (!userBookmarksCache || userBookmarksCache.length === 0 || !anime) return false;
     
@@ -55,9 +51,6 @@ function isAnimeBookmarked(anime) {
     });
 }
 
-/* =========================================================
-   HELPER API BACKEND (SUPABASE VIA FLASK)
-   ========================================================= */
 function getUserIdentifier(user) {
     if (!user) return null;
     return user.name || String(user.id);
@@ -94,7 +87,7 @@ async function syncUserWithSupabase(user) {
         }
         return null;
     } catch (err) {
-        console.error("❌ Gagal sync user via backend:", err);
+        console.error("Gagal sync user:", err);
         return null;
     }
 }
@@ -152,53 +145,6 @@ async function saveSupabaseUserData(user, payload) {
     }
 }
 
-/* =========================================================
-   SINKRONISASI KE ANILIST WATCHLIST (PLANNING)
-   ========================================================= */
-async function syncBookmarkToAniList(title) {
-    const token = localStorage.getItem('anilist_token');
-    if (!token || !title) return;
-
-    try {
-        let cleanTitle = title.replace(/([a-zA-Z0-9])x([a-zA-Z0-9])/gi, '$1 x $2').trim();
-        
-        const searchRes = await fetch('https://graphql.anilist.co', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({
-                query: `query ($search: String) { Media(search: $search, type: ANIME) { id } }`,
-                variables: { search: cleanTitle }
-            })
-        });
-        const searchJson = await searchRes.json();
-        const mediaId = searchJson?.data?.Media?.id;
-
-        if (mediaId) {
-            const mutRes = await fetch('https://graphql.anilist.co', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + token,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({
-                    query: `mutation ($mediaId: Int, $status: MediaListStatus) { SaveMediaListEntry (mediaId: $mediaId, status: $status) { id status } }`,
-                    variables: { mediaId: parseInt(mediaId), status: 'PLANNING' }
-                })
-            });
-            const mutJson = await mutRes.json();
-            if (mutJson?.data?.SaveMediaListEntry) {
-                console.log(`✅ Tersinkronkan ke AniList watchlist: ${title}`);
-            }
-        }
-    } catch (e) {
-        console.warn("Sinkronisasi AniList dilewati:", e);
-    }
-}
-
-/* =========================================================
-   TOGGLE BOOKMARK ANIME (POSTER / PODIUM / LIST)
-   ========================================================= */
 async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
     const user = getLoggedInUser();
     if (!user) {
@@ -226,7 +172,7 @@ async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
             url: animeObj.url || "",
             thumbnail: animeObj.coverImage?.extraLarge || animeObj.coverImage?.large || animeObj.thumbnail || "https://placehold.co/400x600?text=No+Image",
             status: animeObj.status || "Ongoing",
-            skor: animeObj.skor || (animeObj.averageScore ? (animeObj.averageScore / 10).toFixed(1) : "-"),
+            skor: animeObj.skor || animeObj.score || "-",
             genres: animeObj.genres || [],
             synopsis: animeObj.synopsis || "Sinopsis belum tersedia.",
             addedAt: new Date().toISOString()
@@ -252,8 +198,6 @@ async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
                 const icon = buttonEl.querySelector('i');
                 if (icon) icon.className = 'fa-solid fa-bookmark text-xs text-neon-yellow';
             }
-
-            syncBookmarkToAniList(bookmarkItem.title);
         }
 
         userData.bookmarks = bookmarks;
@@ -273,9 +217,6 @@ function addAniListBookmark(animeOrMediaId, buttonEl) {
     toggleBookmarkAnime(animeOrMediaId, buttonEl);
 }
 
-/* =========================================================
-   TAB BOOKMARK DI BERANDA
-   ========================================================= */
 async function loadBookmarkTab(page = 1) {
     isBookmarkViewActive = true;
     currentPage = page;
@@ -346,32 +287,27 @@ function renderBookmarkGrid(items) {
     const container = document.getElementById('animeDisplayGrid');
     const paginationBox = document.getElementById('paginationBox');
 
-    container.innerHTML = items.map(item => {
-        const scoreBadgeId = `homeScore_${item.id}`;
-        setTimeout(() => { fetchAniListScoreForCard(item.title, scoreBadgeId); }, 100);
-
-        return `
-            <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="viewDetails('${item.id}')">
-                <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
-                    <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
-                    <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
-                        <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
-                            <i class="fa-solid fa-circle-info ml-0.5 text-base"></i>
-                        </div>
+    container.innerHTML = items.map(item => `
+        <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="viewDetails('${item.id}')">
+            <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
+                <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
+                <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
+                    <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
+                        <i class="fa-solid fa-circle-info ml-0.5 text-base"></i>
                     </div>
-                    <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${item.status}</span>
-                    <span id="${scoreBadgeId}" class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md text-neon-yellow text-[10px] font-bold px-2 py-0.5 rounded-full shadow z-10">⭐ ${item.skor && item.skor !== '-' ? item.skor : 'N/A'}</span>
-                    
-                    <button onclick="event.stopPropagation(); toggleBookmarkAnime('${item.id}', this)" title="Hapus dari Bookmark" class="absolute top-2 right-2 p-2 rounded-full bg-black/70 backdrop-blur-md text-neon-yellow hover:scale-110 transition z-20 shadow-md">
-                        <i class="fa-solid fa-bookmark text-xs"></i>
-                    </button>
                 </div>
-                <div class="p-3">
-                    <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
-                </div>
+                <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${item.status}</span>
+                <span class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md text-neon-yellow text-[10px] font-bold px-2 py-0.5 rounded-full shadow z-10">⭐ ${item.skor && item.skor !== '-' ? item.skor : 'N/A'}</span>
+                
+                <button onclick="event.stopPropagation(); toggleBookmarkAnime('${item.id}', this)" title="Hapus dari Bookmark" class="absolute top-2 right-2 p-2 rounded-full bg-black/70 backdrop-blur-md text-neon-yellow hover:scale-110 transition z-20 shadow-md">
+                    <i class="fa-solid fa-bookmark text-xs"></i>
+                </button>
             </div>
-        `;
-    }).join('');
+            <div class="p-3">
+                <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
+            </div>
+        </div>
+    `).join('');
 
     let paginationHTML = '';
     const baseBtnClass = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow transition shadow-xs';
@@ -394,9 +330,6 @@ function renderBookmarkGrid(items) {
     paginationBox.innerHTML = paginationHTML;
 }
 
-/* =========================================================
-   AUTENTIKASI ANILIST
-   ========================================================= */
 const ANILIST_CLIENT_ID = "48567";
 
 function getLoggedInUser() {
@@ -484,9 +417,6 @@ async function checkAniListAuthStatus() {
     }
 }
 
-/* =========================================================
-   RIWAYAT TONTONAN (SUPABASE)
-   ========================================================= */
 async function renderHistory() {
     const historySection = document.getElementById('historySection');
     const historyGrid = document.getElementById('historyGrid');
@@ -527,7 +457,7 @@ async function renderHistory() {
             </div>
         `).join('');
     } catch (err) {
-        console.error("Gagal mengambil riwayat via backend:", err);
+        console.error("Gagal mengambil riwayat:", err);
     }
 }
 
@@ -545,35 +475,6 @@ async function clearHistory() {
     } catch (err) {
         console.error("Gagal menghapus riwayat:", err);
     }
-}
-
-/* =========================================================
-   SKOR, PENCARIAN & DETAIL VIEW
-   ========================================================= */
-async function fetchAniListScoreForCard(animeTitle, elementId) {
-    if (!animeTitle) return;
-    let cleanTitle = animeTitle.replace(/([a-zA-Z0-9])x([a-zA-Z0-9])/gi, '$1 x $2').trim();
-
-    const query = `
-    query ($search: String) {
-        Media (search: $search, type: ANIME) {
-            averageScore
-        }
-    }`;
-
-    try {
-        const response = await fetch('https://graphql.anilist.co', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ query: query, variables: { search: cleanTitle } })
-        });
-        const result = await response.json();
-        const score = result?.data?.Media?.averageScore;
-        const targetEl = document.getElementById(elementId);
-        if (score && targetEl) {
-            targetEl.innerHTML = `⭐ ${(score / 10).toFixed(1)}`;
-        }
-    } catch (err) {}
 }
 
 async function openDetailFromAniListTitle(title) {
@@ -742,9 +643,6 @@ function displayAnimeWithPagination() {
     }
 
     container.innerHTML = currentData.map(item => {
-        const scoreBadgeId = `homeScore_${item.id}`;
-        setTimeout(() => { fetchAniListScoreForCard(item.title, scoreBadgeId); }, 100);
-
         const isBookmarked = isAnimeBookmarked(item);
 
         return `
@@ -757,9 +655,8 @@ function displayAnimeWithPagination() {
                         </div>
                     </div>
                     <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${item.status}</span>
-                    <span id="${scoreBadgeId}" class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md text-neon-yellow text-[10px] font-bold px-2 py-0.5 rounded-full shadow z-10">⭐ ${item.skor && item.skor !== '-' ? item.skor : 'N/A'}</span>
+                    <span class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md text-neon-yellow text-[10px] font-bold px-2 py-0.5 rounded-full shadow z-10">⭐ ${item.skor && item.skor !== '-' ? item.skor : 'N/A'}</span>
                     
-                    <!-- IKON BOOKMARK BERANDA -->
                     <button onclick="event.stopPropagation(); toggleBookmarkAnime('${item.id}', this)" title="Simpan Bookmark" class="absolute top-2 right-2 p-2 rounded-full bg-black/70 backdrop-blur-md hover:scale-110 transition z-20 shadow-md">
                         <i class="${isBookmarked ? 'fa-solid fa-bookmark text-neon-yellow' : 'fa-regular fa-bookmark text-zinc-300'} text-xs"></i>
                     </button>
@@ -920,7 +817,6 @@ function changeTab(type, element) {
         activeStatusFilter = "Ongoing";
         document.getElementById('sectionHeader').innerText = "Anime Ongoing Terbaru";
     } else if(type === 'finished' || type === 'completed') {
-        // FILTER "Finished" SESUAI STATUS DI DATABASE
         activeStatusFilter = "Finished";
         document.getElementById('sectionHeader').innerText = "Anime Finished";
     }
@@ -1016,9 +912,6 @@ function toggleTheme() {
     }
 }
 
-/* =========================================================
-   INFORMASI & PODIUM ANILIST DENGAN PENANDA BOOKMARK
-   ========================================================= */
 let currentInfoType = 'bypopularity';
 let currentInfoPage = 1;
 
@@ -1074,7 +967,7 @@ function openInformation(type, page = 1) {
     gridEl.innerHTML = '';
     paginationEl.innerHTML = '';
     
-    fetchAniListData(type, page, loadingEl, podiumEl, gridEl, paginationEl);
+    fetchRankingFromBackend(type, page, loadingEl, podiumEl, gridEl, paginationEl);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1085,105 +978,37 @@ function formatNumberShort(num) {
     return num.toString();
 }
 
-async function fetchAniListData(type, page, loadingEl, podiumEl, gridEl, paginationEl) {
-    let sortQuery = 'POPULARITY_DESC';
-    let statusQuery = '';
-
-    if (type === 'upcoming') {
-        statusQuery = ', status: NOT_YET_RELEASED';
-        sortQuery = 'POPULARITY_DESC';
-    } else if (type === 'favorite') {
-        sortQuery = 'SCORE_DESC';
-    }
-
+async function fetchRankingFromBackend(type, page, loadingEl, podiumEl, gridEl, paginationEl) {
     try {
-        let top3Data = [];
-        
-        if (page === 1) {
-            const queryPage1 = `
-            query {
-                Page(page: 1, perPage: 15) {
-                    pageInfo { total currentPage lastPage hasNextPage }
-                    media(type: ANIME, sort: ${sortQuery}${statusQuery}) {
-                        id title { romaji english userPreferred }
-                        coverImage { extraLarge large }
-                        averageScore popularity favourites status
-                    }
-                }
-            }`;
-            const res = await fetch('https://graphql.anilist.co', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ query: queryPage1 })
-            });
-            const json = await res.json();
-            const rawData = json?.data?.Page?.media || [];
-            const pageInfo = json?.data?.Page?.pageInfo || {};
-
-            loadingEl.classList.add('hidden');
-
-            if (rawData.length < 3) {
-                gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Data tidak cukup.</p>`;
-                return;
+        const sec = generateSecurityToken();
+        const res = await fetch(`${RENDER_API_URL}/ranking?type=${encodeURIComponent(type)}&page=${page}`, {
+            headers: {
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
             }
+        });
+        const json = await res.json();
+        
+        loadingEl.classList.add('hidden');
 
-            top3Data = rawData.slice(0, 3);
+        const top3Data = json.top3 || [];
+        const listData = json.list || [];
+        const lastPage = json.last_page || 1;
+
+        if (top3Data.length >= 3) {
             renderPodiumData(top3Data);
             podiumEl.classList.remove('hidden');
-
-            const listData = rawData.slice(3);
-            gridEl.innerHTML = listData.map((anime, idx) => renderRankListItem(anime, idx + 4)).join('');
-
-            renderInfoPagination(type, page, pageInfo.lastPage || 1, paginationEl);
-
-        } else {
-            const queryPageN = `
-            query {
-                top3: Page(page: 1, perPage: 3) {
-                    media(type: ANIME, sort: ${sortQuery}${statusQuery}) {
-                        id title { romaji english userPreferred }
-                        coverImage { extraLarge large }
-                        averageScore popularity favourites status
-                    }
-                }
-                listData: Page(page: ${page}, perPage: 12) {
-                    pageInfo { total currentPage lastPage hasNextPage }
-                    media(type: ANIME, sort: ${sortQuery}${statusQuery}) {
-                        id title { romaji english userPreferred }
-                        coverImage { extraLarge large }
-                        averageScore popularity favourites status
-                    }
-                }
-            }`;
-
-            const res = await fetch('https://graphql.anilist.co', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ query: queryPageN })
-            });
-            const json = await res.json();
-            
-            top3Data = json?.data?.top3?.media || [];
-            const rawListData = json?.data?.listData?.media || [];
-            const pageInfo = json?.data?.listData?.pageInfo || {};
-
-            loadingEl.classList.add('hidden');
-
-            if (top3Data.length >= 3) {
-                renderPodiumData(top3Data);
-                podiumEl.classList.remove('hidden');
-            }
-
-            const startRankOffset = 15 + ((page - 2) * 12);
-            gridEl.innerHTML = rawListData.map((anime, idx) => renderRankListItem(anime, startRankOffset + idx + 1)).join('');
-
-            renderInfoPagination(type, page, pageInfo.lastPage || 1, paginationEl);
         }
 
+        const startRankOffset = page === 1 ? 4 : (15 + ((page - 2) * 12) + 1);
+        gridEl.innerHTML = listData.map((anime, idx) => renderRankListItem(anime, startRankOffset + idx)).join('');
+
+        renderInfoPagination(type, page, lastPage, paginationEl);
+
     } catch (err) {
-        console.error("AniList Error:", err);
+        console.error("Gagal memuat ranking:", err);
         loadingEl.classList.add('hidden');
-        gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat data.</p>`;
+        gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat data peringkat.</p>`;
     }
 }
 
