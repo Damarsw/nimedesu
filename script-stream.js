@@ -215,19 +215,49 @@ async function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIn
     }
 }
 
+/* =========================================================
+   SEARCH BAR TOGGLE & OUTSIDE CLICK
+   ========================================================= */
 function toggleSearchInput(event) {
     if(event) event.stopPropagation();
     const container = document.getElementById('searchContainer');
     const field = document.getElementById('searchField');
+    const suggestions = document.getElementById('searchSuggestions');
+
     if (container.classList.contains('hidden')) {
         container.classList.remove('hidden');
         field.focus();
+        
+        // Posisikan kursor di bagian akhir teks
+        const len = field.value.length;
+        field.setSelectionRange(len, len);
+
         if(allAnimeList.length === 0) fetchAllAnimeForSearch();
+        if(field.value.trim() !== '') liveSearchAnime();
     } else {
         container.classList.add('hidden');
-        document.getElementById('searchSuggestions').classList.add('hidden');
+        if (suggestions) suggestions.classList.add('hidden');
     }
 }
+
+// Tutup search bar saat klik di luar area tanpa mereset teks input
+document.addEventListener('click', function(e) {
+    const container = document.getElementById('searchContainer');
+    const searchBoxWrapper = document.getElementById('searchBoxWrapper');
+    const searchSuggestions = document.getElementById('searchSuggestions');
+    const btnToggle = document.getElementById('btnSearchToggle');
+
+    if (container && !container.classList.contains('hidden')) {
+        const isClickInside = (searchBoxWrapper && searchBoxWrapper.contains(e.target)) ||
+                              (searchSuggestions && searchSuggestions.contains(e.target)) ||
+                              (btnToggle && btnToggle.contains(e.target));
+        
+        if (!isClickInside) {
+            container.classList.add('hidden');
+            if (searchSuggestions) searchSuggestions.classList.add('hidden');
+        }
+    }
+});
 
 // Caching SessionStorage (Mengambil 1x per sesi browser)
 async function fetchAllAnimeForSearch() {
@@ -314,20 +344,6 @@ function executeSearch() {
         window.location.href = `index.html?q=${encodeURIComponent(query)}`;
     }
 }
-
-document.addEventListener('click', function(e) {
-    const container = document.getElementById('searchContainer');
-    const searchBoxWrapper = document.getElementById('searchBoxWrapper');
-    const searchSuggestions = document.getElementById('searchSuggestions');
-    const btnToggle = document.getElementById('btnSearchToggle');
-
-    if (container && !container.classList.contains('hidden')) {
-        if (!searchBoxWrapper.contains(e.target) && !searchSuggestions.contains(e.target) && !btnToggle.contains(e.target)) {
-            container.classList.add('hidden');
-            searchSuggestions.classList.add('hidden');
-        }
-    }
-});
 
 async function initStream() {
     const urlParams = new URLSearchParams(window.location.search);
