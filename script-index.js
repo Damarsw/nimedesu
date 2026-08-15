@@ -809,11 +809,9 @@ function toggleSearchInput(event) {
         container.classList.remove('hidden');
         field.focus();
         
-        // Posisikan kursor di bagian paling akhir teks yang ada
         const len = field.value.length;
         field.setSelectionRange(len, len);
 
-        // Jika terdapat teks sebelumnya, langsung munculkan saran live search
         if (field.value.trim() !== '') {
             liveSearchAnime();
         }
@@ -823,7 +821,7 @@ function toggleSearchInput(event) {
     }
 }
 
-// Tutup search bar dan dropdown jika klik di luar area, teks tetap tersimpan di latar belakang
+// Tutup search bar dan dropdown jika klik di luar area
 document.addEventListener('click', function(e) {
     const container = document.getElementById('searchContainer');
     const searchBoxWrapper = document.getElementById('searchBoxWrapper');
@@ -832,7 +830,6 @@ document.addEventListener('click', function(e) {
     const dropdown = document.getElementById('genreDropdown');
     const btnGenre = document.getElementById('btnGenre');
 
-    // Tutup search bar tanpa menghapus teks input
     if (container && !container.classList.contains('hidden')) {
         const isClickInside = (searchBoxWrapper && searchBoxWrapper.contains(e.target)) ||
                               (searchSuggestions && searchSuggestions.contains(e.target)) ||
@@ -844,7 +841,6 @@ document.addEventListener('click', function(e) {
         }
     }
 
-    // Tutup dropdown genre
     if (dropdown && dropdown.style.display === 'flex') {
         if (!btnGenre || !btnGenre.contains(e.target)) {
             if (!dropdown.contains(e.target)) {
@@ -921,8 +917,13 @@ function liveSearchAnime() {
 }
 
 function selectLiveSearchItem(anime) {
-    document.getElementById('searchContainer').classList.add('hidden');
-    document.getElementById('searchSuggestions').classList.add('hidden');
+    const searchContainer = document.getElementById('searchContainer');
+    const searchSuggestions = document.getElementById('searchSuggestions');
+    const searchField = document.getElementById('searchField');
+
+    if (searchContainer) searchContainer.classList.add('hidden');
+    if (searchSuggestions) searchSuggestions.classList.add('hidden');
+    if (searchField) searchField.value = '';
 
     const exists = currentData.some(a => a.id == anime.id);
     if (!exists) currentData.push(anime);
@@ -996,12 +997,24 @@ function filterGenre(genre) {
 }
 
 /* =========================================================
-   EKSEKUSI PENCARIAN (BERANDA VS INFORMASI & PERINGKAT)
+   EKSEKUSI PENCARIAN (OTOMATIS TUTUP & BERSIHKAN INPUT)
    ========================================================= */
 function searchAnime() {
-    const query = document.getElementById('searchField').value.trim();
+    const searchField = document.getElementById('searchField');
+    const searchContainer = document.getElementById('searchContainer');
     const suggestionsBox = document.getElementById('searchSuggestions');
+    
+    const query = searchField ? searchField.value.trim() : "";
+
+    // 1. Tutup bar search & suggestions
+    if (searchContainer) searchContainer.classList.add('hidden');
     if (suggestionsBox) suggestionsBox.classList.add('hidden');
+
+    // 2. Hapus tulisan yang diketik pengguna
+    if (searchField) {
+        searchField.value = '';
+        searchField.blur();
+    }
 
     // JIKA SEDANG DI VIEW INFORMASI & PERINGKAT, TETAP DI KATEGORI INFORMASI AKTIF
     if (currentView === 'information') {
@@ -1101,7 +1114,6 @@ function setInfoTabActive(type) {
     }
 }
 
-// Mengambil peringkat asli anime dari rankings AniList
 function getAnimeRealRank(anime, categoryType) {
     if (!anime) return '-';
     
@@ -1114,8 +1126,8 @@ function getAnimeRealRank(anime, categoryType) {
             const ratedAllTime = rankings.find(r => r.type === 'RATED' && r.allTime);
             if (ratedAllTime && ratedAllTime.rank) return ratedAllTime.rank;
 
-            const ratedFormat = rankings.find(r => r.type === 'RATED');
-            if (ratedFormat && ratedFormat.rank) return ratedFormat.rank;
+            const ratedAny = rankings.find(r => r.type === 'RATED');
+            if (ratedAny && ratedAny.rank) return ratedAny.rank;
         } else if (categoryType === 'bypopularity') {
             const popAllTime = rankings.find(r => r.type === 'POPULAR' && r.allTime);
             if (popAllTime && popAllTime.rank) return popAllTime.rank;
@@ -1510,8 +1522,6 @@ window.onload = async function() {
     const queryParam = urlParams.get('q');
     if (queryParam) {
         activeSearchQuery = queryParam;
-        const sField = document.getElementById('searchField');
-        if (sField) sField.value = queryParam;
         document.getElementById('sectionHeader').innerText = `Hasil Pencarian: "${queryParam}"`;
     }
 
