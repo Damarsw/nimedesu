@@ -2,6 +2,7 @@ import os
 import time
 import hmac
 import hashlib
+import base64
 import requests
 from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
@@ -9,10 +10,11 @@ from supabase import create_client
 
 app = Flask(__name__)
 
+# Mengizinkan CORS hanya untuk domain Vercel Anda
 CORS(app, resources={r"/api/*": {"origins": "https://nimedesu.vercel.app"}})
 
 # ---------------------------------------------------------------------------
-# CONFIG - Diambil dengan benar dari Environment Variables di Render
+# CONFIG - Diambil dari Environment Variables di Render
 # ---------------------------------------------------------------------------
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
@@ -26,9 +28,12 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 client_obj = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# Tabel Supabase
 TABLE_ANIME = "anime"
 TABLE_EPISODE = "episode"
+TABLE_LOGIN = "login"
 
+# Kolom Tabel Anime
 COL_ANIME_ID = "id"
 COL_ANIME_TITLE = "title"
 COL_ANIME_URL = "url"
@@ -36,6 +41,7 @@ COL_ANIME_STATUS = "status"
 COL_ANIME_GENRE = "genre"
 COL_ANIME_IMAGE = "img_url"
 
+# Kolom Tabel Episode
 COL_EP_ID = "id"
 COL_EP_ANIME_ID = "anime_id"
 COL_EP_TITLE = "episode_title"
@@ -48,11 +54,15 @@ SRV_KEY_LABEL = "keterangan"
 SRV_KEY_SERVER_NAME = "server"
 
 
+# ---------------------------------------------------------------------------
+# MIDDLEWARE KEAMANAN (TOKEN & SIGNATURE VALIDATION)
+# ---------------------------------------------------------------------------
 @app.before_request
 def security_validation():
     if request.method == "OPTIONS":
         return
 
+    # Proxy stream dikecualikan dari pengecekan header token khusus
     if request.path.startswith("/api/proxy-stream") or request.path.startswith("/proxy-stream"):
         return
 
@@ -78,6 +88,7 @@ def security_validation():
             req_time = int(client_time)
             current_time = int(time.time())
 
+            # Toleransi selisih waktu 30 detik
             if abs(current_time - req_time) > 30:
                 return jsonify({"error": "Access Denied: Token Expired"}), 403
 
@@ -91,11 +102,17 @@ def security_validation():
             return jsonify({"error": "Access Denied: Malformed Request"}), 403
 
 
+# ---------------------------------------------------------------------------
+# HEALTH CHECK
+# ---------------------------------------------------------------------------
 @app.route("/")
 def home():
     return "NimeDesu Server API is Active!"
 
 
+# ---------------------------------------------------------------------------
+# ROUTE PROXY STREAMING
+# ---------------------------------------------------------------------------
 @app.route("/api/proxy-stream", methods=["GET"])
 @app.route("/proxy-stream", methods=["GET"])
 def proxy_stream():
@@ -145,6 +162,9 @@ def proxy_stream():
         return f"Proxy Error: {str(e)}", 500
 
 
+# ---------------------------------------------------------------------------
+# ROUTE DAFTAR ANIME (DENGAN SEARCH, FILTER & PAGINATION)
+# ---------------------------------------------------------------------------
 @app.route("/api/anime", methods=["GET"])
 def api_anime():
     try:
@@ -185,6 +205,9 @@ def api_anime():
         return jsonify({"error": str(e)}), 500
 
 
+# ---------------------------------------------------------------------------
+# ROUTE DETAIL ANIME & EPISODE
+# ---------------------------------------------------------------------------
 @app.route("/api/anime-detail", methods=["GET"])
 def api_anime_detail():
     anime_url = request.args.get("url", "").strip()
@@ -213,7 +236,6 @@ def api_anime_detail():
                     original_url = srv.get(SRV_KEY_URL) or srv.get(SRV_KEY_VURL, "")
                     encoded_url = ""
                     if original_url:
-                        import base64
                         encoded_url = base64.b64encode(original_url.encode("utf-8")).decode("utf-8")
 
                     server_val = srv.get(SRV_KEY_SERVER_NAME) or srv.get(SRV_KEY_LABEL) or "1"
@@ -242,6 +264,104 @@ def api_anime_detail():
         return jsonify({"error": str(e)}), 500
 
 
+# ---------------------------------------------------------------------------
+# ROUTE USER: SYNC LOGIN, GET DATA, & UPDATE COOKIES JSONB
+# ---------------------------------------------------------------------------
+@app.route("/api/user-sync", methods=["POST"])
+def api_user_sync():
+    """
+    Dipanggil saat user login AniList.
+    Mengecek apakah anilist_id sudah ada di tabel login.
+    Jika belum ada -> otomatis INSERT baris baru.
+    Mengembalikan data cookies JSONB yang ada.
+    """
+    try:
+        req_data = request.get_json() or {}
+        anilist_id = str(req_data.get("anilist_id", "")).strip()
+        user_info = req_data.get("user_info", {})
+
+        if not anilist_id:
+            return jsonify({"error": "anilist_id is required"}), 400
+
+        # Cek data user di tabel login Supabase
+        res = client_obj.table(TABLE_LOGIN).select("*").eq("anilist_id", anilist_id).execute()
+        data = res.data or []
+
+        if not data:
+            # User baru pertama kali login -> INSERT baris baru
+            initial_cookies = {
+                "history": [],
+                "bookmarks": [],
+                "user_info": user_info
+            }
+            insert_res = client_obj.table(TABLE_LOGIN).insert({
+                "anilist_id": anilist_id,
+                "cookies": initial_cookies
+            }).execute()
+
+            return jsonify({
+                "status": "created",
+                "anilist_id": anilist_id,
+                "cookies": initial_cookies
+            })
+        else:
+            # User sudah ada -> ambil cookies JSONB
+            row = data[0]
+            cookies = row.get("cookies") or {"history": [], "bookmarks": []}
+            return jsonify({
+                "status": "exists",
+                "anilist_id": anilist_id,
+                "cookies": cookies
+            })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/user-data", methods=["GET"])
+def api_user_data():
+    """
+    Mengambil data cookies (history & bookmarks) user dari tabel login Supabase.
+    """
+    anilist_id = str(request.args.get("anilist_id", "")).strip()
+    if not anilist_id:
+        return jsonify({"error": "anilist_id is required"}), 400
+
+    try:
+        res = client_obj.table(TABLE_LOGIN).select("cookies").eq("anilist_id", anilist_id).execute()
+        data = res.data or []
+        if data:
+            cookies = data[0].get("cookies") or {"history": [], "bookmarks": []}
+            return jsonify({"cookies": cookies})
+        return jsonify({"cookies": {"history": [], "bookmarks": []}})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/user-update", methods=["POST"])
+def api_user_update():
+    """
+    Menyimpan pembaruan cookies (history / bookmarks) user ke database Supabase.
+    """
+    try:
+        req_data = request.get_json() or {}
+        anilist_id = str(req_data.get("anilist_id", "")).strip()
+        cookies = req_data.get("cookies", {})
+
+        if not anilist_id:
+            return jsonify({"error": "anilist_id is required"}), 400
+
+        res = client_obj.table(TABLE_LOGIN).update({"cookies": cookies}).eq("anilist_id", anilist_id).execute()
+        return jsonify({"status": "success", "data": res.data})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
+# ENTRY POINT
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
