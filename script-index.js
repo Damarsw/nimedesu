@@ -45,24 +45,6 @@ function generateSecurityToken() {
 }
 
 /* =========================================================
-   HELPER AUTO-SCROLL KE HASIL PENCARIAN
-   ========================================================= */
-function scrollToSearchResults(targetId = 'sectionHeader') {
-    setTimeout(() => {
-        const targetEl = document.getElementById(targetId);
-        if (targetEl) {
-            const headerOffset = 80; // Kompensasi tinggi fixed navbar (64px + padding)
-            const elementPosition = targetEl.getBoundingClientRect().top;
-            const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-            window.scrollTo({
-                top: Math.max(0, offsetPosition),
-                behavior: 'smooth'
-            });
-        }
-    }, 100);
-}
-
-/* =========================================================
    SISTEM SKOR CERDAS DENGAN LOCAL CACHING
    ========================================================= */
 function getCachedScore(title, defaultScore) {
@@ -428,6 +410,383 @@ function renderBookmarkGrid(items) {
     paginationBox.innerHTML = paginationHTML;
 }
 
+/* =========================================================
+   AUTENTIKASI ANILIST
+   ========================================================= */
+const ANILIST_CLIENT_ID = "48567";
+
+function getLoggedInUser() {
+    const userStr = localStorage.getItem('anilist_user');
+    const token = localStorage.getItem('anilist_token');
+    if (!token || !userStr) return null;
+    try { return JSON.parse(userStr); } catch (e) { return null; }
+}
+
+function handleAniListOAuthCallback() {
+    const hash = window.location.hash;
+    if (hash && hash.includes('access_token=')) {
+        const tokenParams = new URLSearchParams(hash.replace('#', '?'));
+        const accessToken = tokenParams.get('access_token');
+        if (accessToken) {
+            localStorage.setItem('anilist_token', accessToken);
+            history.replaceState(null, document.title, window.location.pathname + window.location.search);
+        }
+    }
+}
+
+function loginAniList() {
+    if (!ANILIST_CLIENT_ID || ANILIST_CLIENT_ID === "YOUR_ANILIST_CLIENT_ID") {
+        alert("Client ID AniList belum diatur.");
+        return;
+    }
+    const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${ANILIST_CLIENT_ID}&response_type=token`;
+    window.location.href = authUrl;
+}
+
+function logoutAniList() {
+    localStorage.removeItem('anilist_token');
+    localStorage.removeItem('anilist_user');
+    alert("Berhasil logout!");
+    location.reload();
+}
+
+async function checkAniListAuthStatus() {
+    const token = localStorage.getItem('anilist_token');
+    const headerAuthContainer = document.getElementById('headerAuthContainer');
+    const sidebarAuthBtn = document.getElementById('sidebarAuthBtn');
+
+    if (!token) return;
+
+    const query = `query { Viewer { id name avatar { medium } } }`;
+    try {
+        const response = await fetch('https://graphql.anilist.co', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({ query: query })
+        });
+        const result = await response.json();
+        const user = result?.data?.Viewer;
+
+        if (user) {
+            localStorage.setItem('anilist_user', JSON.stringify(user));
+
+            if (headerAuthContainer) {
+                headerAuthContainer.innerHTML = `
+                    <div class="flex items-center gap-2 bg-white dark:bg-zinc-800/90 p-1 pr-3 rounded-full border border-neon-yellow shadow-xs">
+                        <img src="${user.avatar.medium}" class="w-6 h-6 rounded-full object-cover">
+                        <span class="text-xs font-bold text-black dark:text-neon-yellow max-w-[80px] truncate">${user.name}</span>
+                        <button onclick="logoutAniList()" class="ml-1 text-[11px] text-black dark:text-zinc-400 hover:text-red-500 transition" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
+                    </div>
+                `;
+            }
+
+            if (sidebarAuthBtn) {
+                sidebarAuthBtn.innerHTML = `
+                    <button onclick="logoutAniList()" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-500/20 text-red-500 transition text-left">
+                        <i class="fa-solid fa-right-from-bracket w-5 text-center"></i> Logout (${user.name})
+                    </button>
+                `;
+            }
+
+            await syncUserWithSupabase(user);
+            renderHistory();
+        }
+    } catch (err) {
+        console.error("Auth check failed:", err);
+    }
+}
+
+/* =========================================================
+   RIWAYAT TONTONAN
+   ========================================================= */
+async function renderHistory() {
+    const historySection = document.getElementById('historySection');
+    const historyGrid = document.getElementById('historyGrid');
+
+    const user = getLoggedInUser();
+
+    if (!user) {
+        if (historySection) historySection.classList.add('hidden');
+        return;
+    }
+
+    try {
+        const userData = await getSupabaseUserData(user);
+        const history = userData.history || [];
+
+        if (history.length === 0) {
+            if (historySection) historySection.classList.add('hidden');
+            return;
+        }
+
+        if (historySection) historySection.classList.remove('hidden');
+        if (historyGrid) {
+            historyGrid.innerHTML = history.map(item => `
+                <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?url=${encodeURIComponent(item.url)}&eps=${item.lastEpisodeIndex || 0}'">
+                    <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
+                        <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
+                        <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
+                            <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
+                                <i class="fa-solid fa-play ml-0.5 text-base"></i>
+                            </div>
+                        </div>
+                        <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">
+                            ${item.lastWatchedEpisode || 'Eps 1'}
+                        </span>
+                    </div>
+                    <div class="p-3">
+                        <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
+                    </div>
+                </div>
+            `).join('');
+        }
+    } catch (err) {
+        console.error("Gagal mengambil riwayat:", err);
+    }
+}
+
+async function clearHistory() {
+    const user = getLoggedInUser();
+    if (!user) return;
+
+    if (!confirm("Apakah Anda yakin ingin menghapus seluruh riwayat tontonan di database?")) return;
+
+    try {
+        const userData = await getSupabaseUserData(user);
+        userData.history = [];
+        await saveSupabaseUserData(user, userData);
+        document.getElementById('historySection').classList.add('hidden');
+    } catch (err) {
+        console.error("Gagal menghapus riwayat:", err);
+    }
+}
+
+/* =========================================================
+   PENCARIAN & DETAIL VIEW
+   ========================================================= */
+async function openDetailFromAniListTitle(title) {
+    if (!title) return;
+    try {
+        const sec = generateSecurityToken();
+        let searchQuery = title.replace(/([a-zA-Z0-9])x([a-zA-Z0-9])/gi, '$1 x $2').trim();
+        const fetchUrl = `${RENDER_API_URL}/anime?q=${encodeURIComponent(searchQuery)}&per_page=10`;
+        
+        const res = await fetch(fetchUrl, {
+            headers: {
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            }
+        });
+        const result = await res.json();
+        const matchedList = result.data || [];
+
+        if (matchedList.length > 0) {
+            let matchedItem = null;
+            const normalize = (str) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const cleanTarget = normalize(title);
+
+            matchedItem = matchedList.find(item => normalize(item.title) === cleanTarget);
+            if (!matchedItem) {
+                matchedItem = matchedList.find(item => {
+                    const itemTitleClean = normalize(item.title);
+                    if (cleanTarget === "naruto" && itemTitleClean.includes("boruto")) return false;
+                    return true;
+                });
+            }
+            if (!matchedItem) matchedItem = matchedList[0];
+
+            const cachedScore = getCachedScore(matchedItem.title, matchedItem.score);
+
+            const animeObj = {
+                id: matchedItem.id,
+                title: matchedItem.title || title,
+                url: matchedItem.url ? matchedItem.url.trim() : "",
+                status: matchedItem.status || "Ongoing",
+                genres: matchedItem.genre ? matchedItem.genre.split(',').map(g => g.trim()) : [],
+                synopsis: matchedItem.sinopsis || "Sinopsis belum tersedia.",
+                thumbnail: matchedItem.img_url || matchedItem.image_url || "https://placehold.co/400x600?text=No+Image",
+                japanese: matchedItem.japanese || "-",
+                skor: cachedScore,
+                statusText: matchedItem.status || "-",
+                totalEpisode: matchedItem.total_episodes || "-",
+                durasi: matchedItem.duration || "-",
+                tanggalRilis: matchedItem.release_date || "-",
+                studio: matchedItem.studio || "-"
+            };
+
+            const exists = currentData.some(a => a.id == animeObj.id);
+            if (!exists) currentData.push(animeObj);
+
+            viewDetails(animeObj.id);
+        } else {
+            alert(`Anime "${title}" belum tersedia di database NimeDesu.`);
+        }
+    } catch (err) {
+        console.error("Gagal mencocokkan judul:", err);
+        alert("Gagal menghubungkan ke server.");
+    }
+}
+
+function switchView(viewName) {
+    currentView = viewName;
+    const views = ['homeView', 'detailView', 'dmcaView', 'informationView'];
+    views.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+    });
+
+    if (viewName === 'home') {
+        const home = document.getElementById('homeView');
+        if (home) home.classList.remove('hidden');
+        renderHistory();
+    } else if (viewName === 'detail') {
+        const detail = document.getElementById('detailView');
+        if (detail) detail.classList.remove('hidden');
+    } else if (viewName === 'dmca') {
+        const dmca = document.getElementById('dmcaView');
+        if (dmca) dmca.classList.remove('hidden');
+    } else if (viewName === 'information') {
+        const information = document.getElementById('informationView');
+        if (information) information.classList.remove('hidden');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebarMenu');
+    const overlay = document.getElementById('sidebarOverlay');
+    if (sidebar.classList.contains('-translate-x-full')) {
+        sidebar.classList.remove('-translate-x-full');
+        overlay.classList.remove('hidden');
+    } else {
+        sidebar.classList.add('-translate-x-full');
+        overlay.classList.add('hidden');
+    }
+}
+
+function toggleInformationSubmenu(e) {
+    if(e) e.stopPropagation();
+    const submenu = document.getElementById('informationSubmenu');
+    const icon = document.getElementById('informationMenuIcon');
+    if (submenu.classList.contains('hidden')) {
+        submenu.classList.remove('hidden');
+        icon.classList.add('rotate-180');
+    } else {
+        submenu.classList.add('hidden');
+        icon.classList.remove('rotate-180');
+    }
+}
+
+async function loadAnimeDatabase(page = 1) {
+    try {
+        isBookmarkViewActive = false;
+        currentPage = page;
+        let fetchUrl = `${RENDER_API_URL}/anime?page=${page}&per_page=${itemsPerPage}`;
+        
+        if (activeSearchQuery) fetchUrl += `&q=${encodeURIComponent(activeSearchQuery)}`;
+        if (activeStatusFilter) fetchUrl += `&status=${encodeURIComponent(activeStatusFilter)}`;
+        if (activeGenreFilter) fetchUrl += `&genre=${encodeURIComponent(activeGenreFilter)}`;
+
+        const sec = generateSecurityToken();
+        const response = await fetch(fetchUrl, {
+            headers: {
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            }
+        });
+        const result = await response.json();
+
+        currentData = (result.data || []).map((item, index) => ({
+            id: item.id || (index + 1),
+            title: item.title || "Tanpa Judul",
+            url: item.url ? item.url.trim() : "",
+            status: item.status || "Ongoing",
+            genres: item.genre ? item.genre.split(',').map(g => g.trim()) : [],
+            synopsis: item.sinopsis || "Sinopsis belum tersedia.",
+            thumbnail: item.img_url || item.image_url || "https://placehold.co/400x600?text=No+Image",
+            japanese: item.japanese || "-",
+            skor: item.score || "-",
+            statusText: item.status || "-",
+            totalEpisode: item.total_episodes || "-",
+            durasi: item.duration || "-",
+            tanggalRilis: item.release_date || "-",
+            studio: item.studio || "-"
+        }));
+
+        totalPages = result.total_pages || 1;
+        displayAnimeWithPagination();
+
+    } catch (error) {
+        console.error("Gagal memuat API server:", error);
+        document.getElementById('animeDisplayGrid').innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat data anime dari database.</p>`;
+    }
+}
+
+function displayAnimeWithPagination() {
+    const container = document.getElementById('animeDisplayGrid');
+    const paginationBox = document.getElementById('paginationBox');
+
+    if (currentData.length === 0) {
+        container.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Tidak ada anime ditemukan.</p>`;
+        paginationBox.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = currentData.map(item => {
+        const scoreBadgeId = `homeScore_${item.id}`;
+        setTimeout(() => { fetchAniListScoreForCard(item.title, scoreBadgeId, item.skor); }, 50);
+
+        const isBookmarked = isAnimeBookmarked(item);
+        const cachedScore = getCachedScore(item.title, item.skor);
+
+        return `
+            <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="viewDetails('${item.id}')">
+                <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
+                    <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
+                    <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
+                        <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
+                            <i class="fa-solid fa-circle-info ml-0.5 text-base"></i>
+                        </div>
+                    </div>
+                    <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${item.status}</span>
+                    <span id="${scoreBadgeId}" class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md text-neon-yellow text-[10px] font-bold px-2 py-0.5 rounded-full shadow z-10">⭐ ${cachedScore}</span>
+                    
+                    <button onclick="event.stopPropagation(); toggleBookmarkAnime('${item.id}', this)" title="Simpan Bookmark" class="absolute top-2 right-2 p-2 rounded-full bg-black/70 backdrop-blur-md hover:scale-110 transition z-20 shadow-md">
+                        <i class="${isBookmarked ? 'fa-solid fa-bookmark text-neon-yellow' : 'fa-regular fa-bookmark text-zinc-300'} text-xs"></i>
+                    </button>
+                </div>
+                <div class="p-3">
+                    <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    let paginationHTML = '';
+    const baseBtnClass = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow transition shadow-xs';
+    const disabledBtnClass = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border-zinc-200 dark:border-zinc-800 cursor-not-allowed';
+
+    paginationHTML += `<button class="${currentPage > 1 ? baseBtnClass : disabledBtnClass}" ${currentPage <= 1 ? 'disabled' : ''} onclick="goToPage(1)">&laquo;</button>`;
+    paginationHTML += `<button class="${currentPage > 1 ? baseBtnClass : disabledBtnClass}" ${currentPage <= 1 ? 'disabled' : ''} onclick="goToPage(${currentPage - 1})">&lsaquo;</button>`;
+
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, currentPage + 2);
+
+    for (let i = startPage; i <= endPage; i++) {
+        const activeClass = i === currentPage ? 'bg-neon-yellow text-black font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder shadow-xs';
+        paginationHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${activeClass} transition" onclick="goToPage(${i})">${i}</button>`;
+    }
+
+    paginationHTML += `<button class="${currentPage < totalPages ? baseBtnClass : disabledBtnClass}" ${currentPage >= totalPages ? 'disabled' : ''} onclick="goToPage(${currentPage + 1})">&rsaquo;</button>`;
+    paginationHTML += `<button class="${currentPage < totalPages ? baseBtnClass : disabledBtnClass}" ${currentPage >= totalPages ? 'disabled' : ''} onclick="goToPage(${totalPages})">&raquo;</button>`;
+
+    paginationBox.innerHTML = paginationHTML;
+}
+
 function goToPage(pageNumber) {
     if (isBookmarkViewActive) {
         loadBookmarkTab(pageNumber);
@@ -635,11 +994,10 @@ function filterGenre(genre) {
     activeGenreFilter = genre;
     document.getElementById('sectionHeader').innerText = `Genre: ${genre}`;
     loadAnimeDatabase(1);
-    scrollToSearchResults('sectionHeader');
 }
 
 /* =========================================================
-   EKSEKUSI PENCARIAN & AUTO-SCROLL KE HASIL
+   EKSEKUSI PENCARIAN (OTOMATIS TUTUP & BERSIHKAN INPUT)
    ========================================================= */
 function searchAnime() {
     const searchField = document.getElementById('searchField');
@@ -658,7 +1016,7 @@ function searchAnime() {
         searchField.blur();
     }
 
-    // JIKA SEDANG DI VIEW INFORMASI & PERINGKAT
+    // JIKA SEDANG DI VIEW INFORMASI & PERINGKAT, TETAP DI KATEGORI INFORMASI AKTIF
     if (currentView === 'information') {
         activeInfoSearchQuery = query;
         const targetType = currentInfoType || 'bypopularity';
@@ -667,7 +1025,6 @@ function searchAnime() {
             return;
         }
         searchInformationRanking(query, targetType, 1);
-        scrollToSearchResults('informationHeader');
         return;
     }
 
@@ -678,7 +1035,6 @@ function searchAnime() {
     
     switchView('home');
     loadAnimeDatabase(1);
-    scrollToSearchResults('sectionHeader');
 }
 
 function viewDetails(id) {
@@ -986,6 +1342,7 @@ async function searchInformationRanking(query, type = (currentInfoType || 'bypop
             if (gridEl) gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat hasil pencarian peringkat.</p>`;
         }
     }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function renderSearchInfoPagination(query, type, page, totalPageCount, paginationEl) {
@@ -998,17 +1355,17 @@ function renderSearchInfoPagination(query, type, page, totalPageCount, paginatio
     const disBtn = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border-zinc-200 dark:border-zinc-800 cursor-not-allowed';
     const escapedQuery = query.replace(/'/g, "\\'");
 
-    pagHTML += `<button class="${page > 1 ? baseBtn : disBtn}" ${page <= 1 ? 'disabled' : ''} onclick="searchInformationRanking('${escapedQuery}', '${type}', ${page - 1}); scrollToSearchResults('informationHeader');">&lsaquo;</button>`;
+    pagHTML += `<button class="${page > 1 ? baseBtn : disBtn}" ${page <= 1 ? 'disabled' : ''} onclick="searchInformationRanking('${escapedQuery}', '${type}', ${page - 1})">&lsaquo;</button>`;
     
     let sPage = Math.max(1, page - 2);
     let ePage = Math.min(totalPageCount, page + 2);
     
     for (let i = sPage; i <= ePage; i++) {
         let actClass = i === page ? 'bg-neon-yellow text-black font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder shadow-xs';
-        pagHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${actClass} transition" onclick="searchInformationRanking('${escapedQuery}', '${type}', ${i}); scrollToSearchResults('informationHeader');">${i}</button>`;
+        pagHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${actClass} transition" onclick="searchInformationRanking('${escapedQuery}', '${type}', ${i})">${i}</button>`;
     }
     
-    pagHTML += `<button class="${page < totalPageCount ? baseBtn : disBtn}" ${page >= totalPageCount ? 'disabled' : ''} onclick="searchInformationRanking('${escapedQuery}', '${type}', ${page + 1}); scrollToSearchResults('informationHeader');">&rsaquo;</button>`;
+    pagHTML += `<button class="${page < totalPageCount ? baseBtn : disBtn}" ${page >= totalPageCount ? 'disabled' : ''} onclick="searchInformationRanking('${escapedQuery}', '${type}', ${page + 1})">&rsaquo;</button>`;
     
     paginationEl.innerHTML = pagHTML;
 }
@@ -1096,6 +1453,7 @@ function renderRankListItem(anime, rankNumber) {
 
     const isBookmarked = isAnimeBookmarked(anime);
 
+    // Format badge peringkat
     let rankDisplay = "";
     if (typeof rankNumber === 'number') {
         rankDisplay = `#${rankNumber}`;
@@ -1165,7 +1523,6 @@ window.onload = async function() {
     if (queryParam) {
         activeSearchQuery = queryParam;
         document.getElementById('sectionHeader').innerText = `Hasil Pencarian: "${queryParam}"`;
-        scrollToSearchResults('sectionHeader');
     }
 
     renderHistory();
