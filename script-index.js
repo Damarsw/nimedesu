@@ -6,7 +6,10 @@ let totalPages = 1;
 let activeAnime = null;
 const itemsPerPage = 12;
 
+// State view dan filter
+let currentView = 'home'; // 'home' | 'information' | 'detail' | 'dmca'
 let activeSearchQuery = "";
+let activeInfoSearchQuery = "";
 let activeStatusFilter = "";
 let activeGenreFilter = "";
 let isBookmarkViewActive = false;
@@ -503,7 +506,7 @@ async function renderHistory() {
     const user = getLoggedInUser();
 
     if (!user) {
-        historySection.classList.add('hidden');
+        if (historySection) historySection.classList.add('hidden');
         return;
     }
 
@@ -512,29 +515,31 @@ async function renderHistory() {
         const history = userData.history || [];
 
         if (history.length === 0) {
-            historySection.classList.add('hidden');
+            if (historySection) historySection.classList.add('hidden');
             return;
         }
 
-        historySection.classList.remove('hidden');
-        historyGrid.innerHTML = history.map(item => `
-            <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?url=${encodeURIComponent(item.url)}&eps=${item.lastEpisodeIndex || 0}'">
-                <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
-                    <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
-                    <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
-                        <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
-                            <i class="fa-solid fa-play ml-0.5 text-base"></i>
+        if (historySection) historySection.classList.remove('hidden');
+        if (historyGrid) {
+            historyGrid.innerHTML = history.map(item => `
+                <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?url=${encodeURIComponent(item.url)}&eps=${item.lastEpisodeIndex || 0}'">
+                    <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
+                        <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
+                        <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
+                            <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
+                                <i class="fa-solid fa-play ml-0.5 text-base"></i>
+                            </div>
                         </div>
+                        <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">
+                            ${item.lastWatchedEpisode || 'Eps 1'}
+                        </span>
                     </div>
-                    <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">
-                        ${item.lastWatchedEpisode || 'Eps 1'}
-                    </span>
+                    <div class="p-3">
+                        <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
+                    </div>
                 </div>
-                <div class="p-3">
-                    <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
-                </div>
-            </div>
-        `).join('');
+            `).join('');
+        }
     } catch (err) {
         console.error("Gagal mengambil riwayat:", err);
     }
@@ -623,6 +628,7 @@ async function openDetailFromAniListTitle(title) {
 }
 
 function switchView(viewName) {
+    currentView = viewName;
     const views = ['homeView', 'detailView', 'dmcaView', 'informationView'];
     views.forEach(id => {
         const el = document.getElementById(id);
@@ -786,20 +792,65 @@ function goToPage(pageNumber) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+/* =========================================================
+   SEARCH BAR TOGGLE & OUTSIDE CLICK
+   ========================================================= */
 function toggleSearchInput(event) {
     if(event) event.stopPropagation();
     const container = document.getElementById('searchContainer');
     const field = document.getElementById('searchField');
+    const suggestions = document.getElementById('searchSuggestions');
+
     if (container.classList.contains('hidden')) {
         container.classList.remove('hidden');
         field.focus();
+        
+        // Posisikan kursor di bagian paling akhir teks yang ada
+        const len = field.value.length;
+        field.setSelectionRange(len, len);
+
+        // Jika terdapat teks sebelumnya, langsung munculkan saran live search
+        if (field.value.trim() !== '') {
+            liveSearchAnime();
+        }
     } else {
         container.classList.add('hidden');
-        document.getElementById('searchSuggestions').classList.add('hidden');
+        if (suggestions) suggestions.classList.add('hidden');
     }
 }
 
-// Pencarian dengan Debounce 300ms (Hemat request)
+// Tutup search bar dan dropdown jika klik di luar area, teks tetap tersimpan
+document.addEventListener('click', function(e) {
+    const container = document.getElementById('searchContainer');
+    const searchBoxWrapper = document.getElementById('searchBoxWrapper');
+    const searchSuggestions = document.getElementById('searchSuggestions');
+    const btnToggle = document.getElementById('btnSearchToggle');
+    const dropdown = document.getElementById('genreDropdown');
+    const btnGenre = document.getElementById('btnGenre');
+
+    // Tutup search bar tanpa menghapus teks input
+    if (container && !container.classList.contains('hidden')) {
+        const isClickInside = (searchBoxWrapper && searchBoxWrapper.contains(e.target)) ||
+                              (searchSuggestions && searchSuggestions.contains(e.target)) ||
+                              (btnToggle && btnToggle.contains(e.target));
+        
+        if (!isClickInside) {
+            container.classList.add('hidden');
+            if (searchSuggestions) searchSuggestions.classList.add('hidden');
+        }
+    }
+
+    // Tutup dropdown genre
+    if (dropdown && dropdown.style.display === 'flex') {
+        if (!btnGenre || !btnGenre.contains(e.target)) {
+            if (!dropdown.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        }
+    }
+});
+
+// Pencarian dengan Debounce 300ms
 function liveSearchAnime() {
     clearTimeout(searchDebounceTimer);
     searchDebounceTimer = setTimeout(async () => {
@@ -868,7 +919,6 @@ function liveSearchAnime() {
 function selectLiveSearchItem(anime) {
     document.getElementById('searchContainer').classList.add('hidden');
     document.getElementById('searchSuggestions').classList.add('hidden');
-    document.getElementById('searchField').value = '';
 
     const exists = currentData.some(a => a.id == anime.id);
     if (!exists) currentData.push(anime);
@@ -884,6 +934,7 @@ function resetTabActiveStyles() {
 }
 
 function changeTab(type, element) {
+    switchView('home');
     resetTabActiveStyles();
     if(element) {
         element.classList.remove('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
@@ -940,10 +991,26 @@ function filterGenre(genre) {
     loadAnimeDatabase(1);
 }
 
+/* =========================================================
+   EKSEKUSI PENCARIAN (BERANDA VS INFORMASI & PERINGKAT)
+   ========================================================= */
 function searchAnime() {
     const query = document.getElementById('searchField').value.trim();
-    document.getElementById('searchSuggestions').classList.add('hidden');
+    const suggestionsBox = document.getElementById('searchSuggestions');
+    if (suggestionsBox) suggestionsBox.classList.add('hidden');
 
+    // JIKA SEDANG DI VIEW INFORMASI & PERINGKAT, TETAP DI VIEW INFORMASI
+    if (currentView === 'information') {
+        activeInfoSearchQuery = query;
+        if (!query) {
+            openInformation(currentInfoType || 'bypopularity', 1);
+            return;
+        }
+        searchInformationRanking(query, 1);
+        return;
+    }
+
+    // JIKA DI BERANDA ATAU VIEW LAINNYA
     activeSearchQuery = query;
     activeGenreFilter = "";
     document.getElementById('sectionHeader').innerText = query ? `Hasil Pencarian: "${query}"` : "Semua Daftar Anime";
@@ -989,11 +1056,6 @@ function openStreamingTab() {
     window.open(`stream.html?url=${encodeURIComponent(activeAnime.url)}&eps=0`, '_blank');
 }
 
-window.onclick = function(e) {
-    const dropdown = document.getElementById('genreDropdown');
-    if(dropdown && !e.target.closest('#btnGenre')) { dropdown.style.display = 'none'; }
-}
-
 function toggleTheme() {
     const html = document.documentElement;
     const icon = document.getElementById('themeIcon');
@@ -1007,12 +1069,13 @@ function toggleTheme() {
 }
 
 /* =========================================================
-   INFORMASI & PERINGKAT VIA BACKEND (CACHED 2 JAM)
+   INFORMASI & PERINGKAT VIA BACKEND & ANILIST
    ========================================================= */
 let currentInfoType = 'bypopularity';
 let currentInfoPage = 1;
 
 function openInformation(type, page = 1) {
+    activeInfoSearchQuery = "";
     currentInfoType = type;
     currentInfoPage = page;
     
@@ -1066,6 +1129,158 @@ function openInformation(type, page = 1) {
     
     fetchRankingFromBackend(type, page, loadingEl, podiumEl, gridEl, paginationEl);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* =========================================================
+   PENCARIAN KHUSUS DALAM VIEW INFORMASI & PERINGKAT
+   ========================================================= */
+async function searchInformationRanking(query, page = 1) {
+    activeInfoSearchQuery = query;
+    currentInfoPage = page;
+    
+    switchView('information');
+    
+    // Matikan highlight pada tombol kategori
+    document.querySelectorAll('.info-tab-btn').forEach(b => {
+        b.className = 'info-tab-btn px-4 py-2 rounded-full bg-neon-lightCard dark:bg-neon-darkCard text-xs font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs';
+        const icon = b.querySelector('i');
+        if (icon) {
+            icon.classList.remove('text-black');
+            icon.classList.add('text-neon-yellow');
+        }
+    });
+
+    const headerEl = document.getElementById('informationHeader');
+    const descEl = document.getElementById('informationDescription');
+    if (headerEl) headerEl.innerText = `Hasil Pencarian: "${query}"`;
+    if (descEl) descEl.innerText = `Menampilkan hasil pencarian peringkat anime untuk "${query}"`;
+
+    const loadingEl = document.getElementById('informationLoading');
+    const podiumEl = document.getElementById('podiumSection');
+    const gridEl = document.getElementById('informationGrid');
+    const paginationEl = document.getElementById('informationPagination');
+
+    if (loadingEl) loadingEl.classList.remove('hidden');
+    if (podiumEl) podiumEl.classList.add('hidden');
+    if (gridEl) gridEl.innerHTML = '';
+    if (paginationEl) paginationEl.innerHTML = '';
+
+    const perPage = 12;
+
+    const gqlQuery = `
+        query ($search: String, $page: Int, $perPage: Int) {
+            Page (page: $page, perPage: $perPage) {
+                pageInfo {
+                    total
+                    currentPage
+                    lastPage
+                    hasNextPage
+                }
+                media (search: $search, type: ANIME, sort: [POPULARITY_DESC, SCORE_DESC]) {
+                    id
+                    title {
+                        userPreferred
+                        romaji
+                        english
+                    }
+                    coverImage {
+                        extraLarge
+                        large
+                    }
+                    averageScore
+                    popularity
+                    status
+                    genres
+                }
+            }
+        }
+    `;
+
+    try {
+        const response = await fetch('https://graphql.anilist.co', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({
+                query: gqlQuery,
+                variables: { search: query, page: page, perPage: perPage }
+            })
+        });
+        const result = await response.json();
+        const pageData = result?.data?.Page;
+        const listData = pageData?.media || [];
+        const lastPage = pageData?.pageInfo?.lastPage || 1;
+
+        if (loadingEl) loadingEl.classList.add('hidden');
+
+        if (listData.length === 0) {
+            if (gridEl) gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Anime "${query}" tidak ditemukan di informasi & peringkat.</p>`;
+            return;
+        }
+
+        const startRankOffset = (page - 1) * perPage + 1;
+        if (gridEl) {
+            gridEl.innerHTML = listData.map((anime, idx) => renderRankListItem(anime, startRankOffset + idx)).join('');
+        }
+
+        renderSearchInfoPagination(query, page, lastPage, paginationEl);
+
+    } catch (err) {
+        console.error("Gagal search di AniList, mencoba fallback ke database lokal:", err);
+        try {
+            const sec = generateSecurityToken();
+            const res = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(query)}&page=${page}&per_page=${perPage}`, {
+                headers: {
+                    "X-Client-Token": sec.token,
+                    "X-Client-Time": sec.time
+                }
+            });
+            const json = await res.json();
+            const items = json.data || [];
+            const lastPage = json.total_pages || 1;
+
+            if (loadingEl) loadingEl.classList.add('hidden');
+
+            if (items.length === 0) {
+                if (gridEl) gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Anime "${query}" tidak ditemukan.</p>`;
+                return;
+            }
+
+            const startRankOffset = (page - 1) * perPage + 1;
+            if (gridEl) {
+                gridEl.innerHTML = items.map((anime, idx) => renderRankListItem(anime, startRankOffset + idx)).join('');
+            }
+            renderSearchInfoPagination(query, page, lastPage, paginationEl);
+        } catch (fallbackErr) {
+            if (loadingEl) loadingEl.classList.add('hidden');
+            if (gridEl) gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat hasil pencarian peringkat.</p>`;
+        }
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderSearchInfoPagination(query, page, totalPageCount, paginationEl) {
+    if (!paginationEl || totalPageCount <= 1) {
+        if (paginationEl) paginationEl.innerHTML = '';
+        return;
+    }
+    let pagHTML = '';
+    const baseBtn = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow transition shadow-xs';
+    const disBtn = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border-zinc-200 dark:border-zinc-800 cursor-not-allowed';
+    const escapedQuery = query.replace(/'/g, "\\'");
+
+    pagHTML += `<button class="${page > 1 ? baseBtn : disBtn}" ${page <= 1 ? 'disabled' : ''} onclick="searchInformationRanking('${escapedQuery}', ${page - 1})">&lsaquo;</button>`;
+    
+    let sPage = Math.max(1, page - 2);
+    let ePage = Math.min(totalPageCount, page + 2);
+    
+    for (let i = sPage; i <= ePage; i++) {
+        let actClass = i === page ? 'bg-neon-yellow text-black font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder shadow-xs';
+        pagHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${actClass} transition" onclick="searchInformationRanking('${escapedQuery}', ${i})">${i}</button>`;
+    }
+    
+    pagHTML += `<button class="${page < totalPageCount ? baseBtn : disBtn}" ${page >= totalPageCount ? 'disabled' : ''} onclick="searchInformationRanking('${escapedQuery}', ${page + 1})">&rsaquo;</button>`;
+    
+    paginationEl.innerHTML = pagHTML;
 }
 
 function formatNumberShort(num) {
@@ -1143,10 +1358,10 @@ function renderPodiumData(top3) {
 }
 
 function renderRankListItem(anime, rankNumber) {
-    const title = anime.title?.userPreferred || anime.title?.romaji || anime.title?.english || 'Tanpa Judul';
-    const img = anime.coverImage?.extraLarge || anime.coverImage?.large || 'https://placehold.co/150x200?text=No+Image';
-    const score = anime.averageScore ? (anime.averageScore / 10).toFixed(1) : 'N/A';
-    const pop = formatNumberShort(anime.popularity);
+    const title = anime.title?.userPreferred || anime.title?.romaji || anime.title?.english || anime.title || 'Tanpa Judul';
+    const img = anime.coverImage?.extraLarge || anime.coverImage?.large || anime.img_url || anime.image_url || anime.thumbnail || 'https://placehold.co/150x200?text=No+Image';
+    const score = anime.averageScore ? (anime.averageScore / 10).toFixed(1) : (anime.score || anime.skor || 'N/A');
+    const pop = formatNumberShort(anime.popularity || 0);
     const escapedTitle = title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
     const isBookmarked = isAnimeBookmarked(anime);
@@ -1205,6 +1420,16 @@ window.onload = async function() {
     activeSearchQuery = "";
     activeGenreFilter = "";
     activeStatusFilter = "";
+
+    // Tangkap query URL dari halaman lain jika ada (misal dari stream.html)
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryParam = urlParams.get('q');
+    if (queryParam) {
+        activeSearchQuery = queryParam;
+        const sField = document.getElementById('searchField');
+        if (sField) sField.value = queryParam;
+        document.getElementById('sectionHeader').innerText = `Hasil Pencarian: "${queryParam}"`;
+    }
 
     renderHistory();
     loadAnimeDatabase(1);
