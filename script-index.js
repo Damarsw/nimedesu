@@ -126,7 +126,6 @@ async function checkAniListAuthStatus() {
             localStorage.setItem('anilist_user', JSON.stringify(user));
 
             if (headerAuthContainer) {
-                // PROFILE HEADER WITH WHITE BG AND BLACK LOGOUT ICON IN LIGHT MODE
                 headerAuthContainer.innerHTML = `
                     <div class="flex items-center gap-2 bg-white dark:bg-zinc-800/90 p-1 pr-3 rounded-full border border-neon-yellow shadow-xs">
                         <img src="${user.avatar.medium}" class="w-6 h-6 rounded-full object-cover">
@@ -235,13 +234,18 @@ async function updateAniListProgress(animeMediaId, episodeNumber) {
 }
 
 /* =========================================================
-   CROSS-CHECK JUDUL ANILIST KE BACKEND RENDER DENGAN ILIKE
+   SMART CROSS-CHECK JUDUL ANILIST KE DATABASE RENDER / SUPABASE
    ========================================================= */
 async function openDetailFromAniListTitle(title) {
     if (!title) return;
     try {
         const sec = generateSecurityToken();
-        const fetchUrl = `${RENDER_API_URL}/anime?q=${encodeURIComponent(title)}&per_page=1`;
+        
+        // 1. Normalisasi string pencarian untuk menghapus variasi 'x' tanpa spasi (misal HUNTERxHUNTER -> HUNTER X HUNTER)
+        let searchQuery = title.replace(/([a-zA-Z0-9])x([a-zA-Z0-9])/gi, '$1 x $2').trim();
+        
+        // Ambil hingga 10 baris hasil pencarian untuk di-filter presisinya
+        const fetchUrl = `${RENDER_API_URL}/anime?q=${encodeURIComponent(searchQuery)}&per_page=10`;
         
         const res = await fetch(fetchUrl, {
             headers: {
@@ -250,33 +254,58 @@ async function openDetailFromAniListTitle(title) {
             }
         });
         const result = await res.json();
-        const matched = result.data || [];
+        const matchedList = result.data || [];
 
-        if (matched.length > 0) {
-            const item = matched[0];
-            
-            // 100% DATA DETAIL DIAMBIL MURNI DARI DATABASE KAMU
+        if (matchedList.length > 0) {
+            let matchedItem = null;
+
+            // Helper untuk membersihkan string saat membandingkan (mengabaikan kapital dan simbol)
+            const normalize = (str) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const cleanTarget = normalize(title);
+
+            // 2. CARI MATCH PERSIS (EXACT MATCH) TERLEBIH DAHULU
+            matchedItem = matchedList.find(item => normalize(item.title) === cleanTarget);
+
+            // 3. JIKA BEDA SPESIFIK (KAYAK NARUTO VS BORUTO), ELEMENTIR FRASA YANG SALAH
+            if (!matchedItem) {
+                matchedItem = matchedList.find(item => {
+                    const itemTitleClean = normalize(item.title);
+                    
+                    // Kalau nyari Naruto, abaikan Boruto
+                    if (cleanTarget === "naruto" && itemTitleClean.includes("boruto")) {
+                        return false;
+                    }
+                    return true;
+                });
+            }
+
+            // Fallback ke item pertama jika masih belum ada exact match
+            if (!matchedItem) {
+                matchedItem = matchedList[0];
+            }
+
+            // 4. MAP DATA MURNI DARI DATABASE SUPABASE KAMU
             const animeObj = {
-                id: item.id,
-                title: item.title || "Tanpa Judul",
-                url: item.url ? item.url.trim() : "",
-                status: item.status || "Ongoing",
-                genres: item.genre ? item.genre.split(',').map(g => g.trim()) : [],
-                synopsis: item.sinopsis || "Sinopsis belum tersedia.",
-                thumbnail: item.img_url || item.image_url || "https://placehold.co/400x600?text=No+Image", // img_url DB Supabase
-                japanese: item.japanese || "-",
-                skor: item.score || "-",
-                statusText: item.status || "-",
-                totalEpisode: item.total_episodes || "-",
-                durasi: item.duration || "-",
-                tanggalRilis: item.release_date || "-",
-                studio: item.studio || "-"
+                id: matchedItem.id,
+                title: matchedItem.title || title,
+                url: matchedItem.url ? matchedItem.url.trim() : "",
+                status: matchedItem.status || "Ongoing",
+                genres: matchedItem.genre ? matchedItem.genre.split(',').map(g => g.trim()) : [],
+                synopsis: matchedItem.sinopsis || "Sinopsis belum tersedia.",
+                thumbnail: matchedItem.img_url || matchedItem.image_url || "https://placehold.co/400x600?text=No+Image",
+                japanese: matchedItem.japanese || "-",
+                skor: matchedItem.score || "-",
+                statusText: matchedItem.status || "-",
+                totalEpisode: matchedItem.total_episodes || "-",
+                durasi: matchedItem.duration || "-",
+                tanggalRilis: matchedItem.release_date || "-",
+                studio: matchedItem.studio || "-"
             };
 
             const exists = currentData.some(a => a.id == animeObj.id);
             if (!exists) currentData.push(animeObj);
 
-            // Beralih ke halaman detail menggunakan data database kamu
+            // Tampilkan detailnya
             viewDetails(animeObj.id);
         } else {
             alert(`Anime "${title}" belum tersedia di database NimeDesu.`);
