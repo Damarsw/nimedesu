@@ -209,11 +209,8 @@
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-lg sm:text-xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-black dark:text-white flex items-center gap-2">
                         <i class="fa-solid fa-clock-rotate-left text-black dark:text-neon-yellow"></i> Terakhir Ditonton
-                        <span id="historySyncLabel" class="hidden text-[10px] font-semibold px-2 py-0.5 rounded-full bg-neon-yellow/20 text-neon-yellow border border-neon-yellow/40 normal-case tracking-normal">
-                            <i class="fa-solid fa-arrows-rotate text-[9px]"></i> Tersinkron AniList
-                        </span>
                     </h2>
-                    <button id="clearHistoryBtn" onclick="clearHistory()" class="text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-red-500 transition">Hapus Riwayat</button>
+                    <button onclick="clearHistory()" class="text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-red-500 transition">Hapus Riwayat</button>
                 </div>
                 <div id="historyGrid" class="flex gap-4 overflow-x-auto no-scrollbar scroll-smooth pb-2 pt-1"></div>
             </div>
