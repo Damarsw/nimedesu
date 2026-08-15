@@ -7,16 +7,6 @@ let globalAnimeTitle = "Anime";
 let allAnimeList = [];
 let currentAnimeThumbnail = "";
 
-/* =========================================================
-   KONFIGURASI SUPABASE DATABASE
-   ========================================================= */
-const SUPABASE_URL = "https://yezdnsgypbjogzoftgmz.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllemRuc2d5cGJqY2d6b2Z0Z216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4ODc4OTUsImV4cCI6MjEwMDQ2Mzg5NX0.oTp6v4ahm0Ta654CuB7a13l9apBtUrD-Wyn-YTKYl7I";
-
-const supabaseClient = (typeof window.supabase !== 'undefined' && window.supabase.createClient)
-    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    : null;
-
 const KEY_X = "LayerX_Secret2026";
 const KEY_Y = "LayerY_Secret2026";
 const KEY_Z = "LayerZ_Secret2026";
@@ -31,128 +21,96 @@ function generateSecurityToken() {
     };
 }
 
-/* =========================================================
-   HELPER SUPABASE DATA
-   ========================================================= */
 function getUserIdentifier(user) {
     if (!user) return null;
     return user.name || String(user.id);
 }
 
 async function syncUserWithSupabase(user) {
-    if (!supabaseClient || !user) return null;
+    if (!user) return null;
     const identifier = getUserIdentifier(user);
 
     try {
-        const { data: existingRow, error: selectErr } = await supabaseClient
-            .from('login')
-            .select('*')
-            .or(`anilist_id.eq.${identifier},anilist_id.eq.${user.id}`)
-            .maybeSingle();
-
-        if (!existingRow) {
-            const initialCookies = {
-                history: [],
-                bookmarks: [],
+        const sec = generateSecurityToken();
+        const res = await fetch(`${RENDER_API_URL}/user-sync`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            },
+            body: JSON.stringify({
+                anilist_id: identifier,
                 user_info: {
                     id: user.id,
                     name: user.name,
                     avatar: user.avatar?.medium || "",
-                    first_login: new Date().toISOString()
+                    login_at: new Date().toISOString()
                 }
-            };
+            })
+        });
 
-            await supabaseClient
-                .from('login')
-                .insert({
-                    anilist_id: identifier,
-                    cookies: initialCookies
-                });
-
-            return initialCookies;
-        } else {
-            let cookiesData = existingRow.cookies || {};
-            if (typeof cookiesData === 'string') {
-                try { cookiesData = JSON.parse(cookiesData); } catch (e) { cookiesData = {}; }
-            }
-            return cookiesData;
-        }
+        const result = await res.json();
+        return result.cookies || null;
     } catch (err) {
-        console.error("Gagal sinkronisasi user di stream:", err);
+        console.error("Gagal sync user di stream:", err);
         return null;
     }
 }
 
 async function getSupabaseUserData(user) {
-    if (!supabaseClient || !user) return { history: [], bookmarks: [] };
+    if (!user) return { history: [], bookmarks: [] };
     const identifier = getUserIdentifier(user);
 
     try {
-        const { data, error } = await supabaseClient
-            .from('login')
-            .select('cookies')
-            .or(`anilist_id.eq.${identifier},anilist_id.eq.${user.id}`)
-            .maybeSingle();
-
-        if (error || !data || !data.cookies) return { history: [], bookmarks: [] };
-        
-        let parsed = data.cookies;
-        if (typeof parsed === 'string') {
-            try { parsed = JSON.parse(parsed); } catch (e) { parsed = {}; }
-        }
+        const sec = generateSecurityToken();
+        const res = await fetch(`${RENDER_API_URL}/user-data?anilist_id=${encodeURIComponent(identifier)}`, {
+            headers: {
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            }
+        });
+        const result = await res.json();
+        const cookies = result.cookies || {};
         return {
-            history: Array.isArray(parsed.history) ? parsed.history : [],
-            bookmarks: Array.isArray(parsed.bookmarks) ? parsed.bookmarks : [],
-            user_info: parsed.user_info || {}
+            history: Array.isArray(cookies.history) ? cookies.history : [],
+            bookmarks: Array.isArray(cookies.bookmarks) ? cookies.bookmarks : [],
+            user_info: cookies.user_info || {}
         };
     } catch (err) {
-        console.error("Gagal membaca Supabase:", err);
+        console.error("Gagal membaca user data di stream:", err);
         return { history: [], bookmarks: [] };
     }
 }
 
 async function saveSupabaseUserData(user, payload) {
-    if (!supabaseClient || !user) return false;
+    if (!user) return false;
     const identifier = getUserIdentifier(user);
 
     try {
-        const { data: existing } = await supabaseClient
-            .from('login')
-            .select('id')
-            .or(`anilist_id.eq.${identifier},anilist_id.eq.${user.id}`)
-            .maybeSingle();
-
-        if (!payload.user_info) {
-            payload.user_info = {
-                id: user.id,
-                name: user.name,
-                avatar: user.avatar?.medium || "",
-                last_updated: new Date().toISOString()
-            };
-        }
-
-        if (existing && existing.id) {
-            await supabaseClient
-                .from('login')
-                .update({ cookies: payload })
-                .eq('id', existing.id);
-        } else {
-            await supabaseClient
-                .from('login')
-                .insert({
-                    anilist_id: identifier,
-                    cookies: payload
-                });
-        }
-        return true;
+        const sec = generateSecurityToken();
+        const res = await fetch(`${RENDER_API_URL}/user-update`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            },
+            body: JSON.stringify({
+                anilist_id: identifier,
+                cookies: payload
+            })
+        });
+        const result = await res.json();
+        return result.status === "success";
     } catch (err) {
-        console.error("Gagal update Supabase:", err);
+        console.error("Gagal update user data di stream:", err);
         return false;
     }
 }
 
 /* =========================================================
-   AUTENTIKASI ANILIST DI STREAM.HTML
+   AUTENTIKASI ANILIST DI STREAM
    ========================================================= */
 const ANILIST_CLIENT_ID = "48567";
 
@@ -225,12 +183,11 @@ async function checkAniListAuthStatus() {
 }
 
 /* =========================================================
-   SIMPAN RIWAYAT STREAM KE SUPABASE DATABASE (HANYA JIKA LOGIN)
+   SIMPAN RIWAYAT STREAM KE SUPABASE VIA BACKEND
    ========================================================= */
 async function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIndex, thumbnailImg) {
     const user = getLoggedInUser();
 
-    // JIKA USER TIDAK LOGIN, RIWAYAT TIDAK AKAN DISIMPAN
     if (!user) {
         console.log("User belum login, riwayat tontonan tidak disimpan.");
         return;
@@ -523,7 +480,7 @@ function renderDynamicEpisodes() {
     document.getElementById('nextEpBtn').style.opacity = activeEpisodeIndex >= activeEpisodes.length - 1 ? '0.5' : '1';
 
     container.innerHTML = activeEpisodes.map((ep, index) => {
-        const activeClass = index === activeEpisodeIndex ? 'bg-neon-yellow text-white font-bold shadow-glow-yellow' : 'bg-neon-lightBg dark:bg-neon-darkBg text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow';
+        const activeClass = index === index ? (index === activeEpisodeIndex ? 'bg-neon-yellow text-white font-bold shadow-glow-yellow' : 'bg-neon-lightBg dark:bg-neon-darkBg text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow') : '';
         let epLabel = ep.episode_title ? ep.episode_title.replace(/Sub.*$/, '').trim() : `Eps ${index + 1}`;
         if (!epLabel || epLabel.toLowerCase() === globalAnimeTitle.toLowerCase()) return '';
 
