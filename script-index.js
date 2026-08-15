@@ -12,16 +12,6 @@ let activeGenreFilter = "";
 
 const RENDER_API_URL = "/api-backend";
 
-/* =========================================================
-   KONFIGURASI SUPABASE DATABASE
-   ========================================================= */
-const SUPABASE_URL = "https://yezdnsgypbjogzoftgmz.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllemRuc2d5cGJqY2d6b2Z0Z216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4ODc4OTUsImV4cCI6MjEwMDQ2Mzg5NX0.oTp6v4ahm0Ta654CuB7a13l9apBtUrD-Wyn-YTKYl7I";
-
-const supabaseClient = (typeof window.supabase !== 'undefined' && window.supabase.createClient)
-    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    : null;
-
 const KEY_X = "LayerX_Secret2026";
 const KEY_Y = "LayerY_Secret2026";
 const KEY_Z = "LayerZ_Secret2026";
@@ -37,150 +27,102 @@ function generateSecurityToken() {
 }
 
 /* =========================================================
-   HELPER SUPABASE: REGISTRASI & AKSES COOKIES JSONB
+   HELPER API BACKEND: SYNC, GET DATA, & UPDATE COOKIES
    ========================================================= */
 function getUserIdentifier(user) {
     if (!user) return null;
     return user.name || String(user.id);
 }
 
-// FUNGSI INI AKAN MENGECEK DAN MENAMBAHKAN USER KE DB JIKA BELUM ADA
 async function syncUserWithSupabase(user) {
-    if (!supabaseClient || !user) return null;
+    if (!user) return null;
     const identifier = getUserIdentifier(user);
 
     try {
-        // Cek apakah user (misal 'ninitesda') sudah ada di tabel login
-        const { data: existingRow, error: selectErr } = await supabaseClient
-            .from('login')
-            .select('*')
-            .or(`anilist_id.eq.${identifier},anilist_id.eq.${user.id}`)
-            .maybeSingle();
-
-        if (selectErr) {
-            console.error("Error cek user di Supabase:", selectErr);
-        }
-
-        if (!existingRow) {
-            // JIKA BELUM ADA -> TAMBAHKAN BARIS BARU KE TABEL LOGIN
-            const initialCookies = {
-                history: [],
-                bookmarks: [],
+        const sec = generateSecurityToken();
+        const res = await fetch(`${RENDER_API_URL}/user-sync`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            },
+            body: JSON.stringify({
+                anilist_id: identifier,
                 user_info: {
                     id: user.id,
                     name: user.name,
                     avatar: user.avatar?.medium || "",
-                    first_login: new Date().toISOString()
+                    login_at: new Date().toISOString()
                 }
-            };
+            })
+        });
 
-            const { data: newRow, error: insertErr } = await supabaseClient
-                .from('login')
-                .insert({
-                    anilist_id: identifier,
-                    cookies: initialCookies
-                })
-                .select()
-                .single();
-
-            if (insertErr) {
-                console.error("Gagal menambahkan user ke Supabase:", insertErr);
-                return initialCookies;
-            }
-            console.log(`User ${identifier} berhasil didaftarkan ke database Supabase!`);
-            return initialCookies;
-        } else {
-            // JIKA SUDAH ADA -> AMBIL AKSES KE COOKIES JSONB
-            let cookiesData = existingRow.cookies || {};
-            if (typeof cookiesData === 'string') {
-                try { cookiesData = JSON.parse(cookiesData); } catch (e) { cookiesData = {}; }
-            }
-            return {
-                history: Array.isArray(cookiesData.history) ? cookiesData.history : [],
-                bookmarks: Array.isArray(cookiesData.bookmarks) ? cookiesData.bookmarks : [],
-                user_info: cookiesData.user_info || {}
-            };
+        const result = await res.json();
+        if (result && result.cookies) {
+            console.log("✅ User berhasil tersinkronisasi via backend:", result);
+            return result.cookies;
         }
+        return null;
     } catch (err) {
-        console.error("Gagal sinkronisasi akun dengan Supabase:", err);
+        console.error("❌ Gagal sync user via backend:", err);
         return null;
     }
 }
 
 async function getSupabaseUserData(user) {
-    if (!supabaseClient || !user) return { history: [], bookmarks: [] };
+    if (!user) return { history: [], bookmarks: [] };
     const identifier = getUserIdentifier(user);
 
     try {
-        const { data, error } = await supabaseClient
-            .from('login')
-            .select('cookies')
-            .or(`anilist_id.eq.${identifier},anilist_id.eq.${user.id}`)
-            .maybeSingle();
-
-        if (error || !data || !data.cookies) {
-            return { history: [], bookmarks: [] };
-        }
-
-        let parsed = data.cookies;
-        if (typeof parsed === 'string') {
-            try { parsed = JSON.parse(parsed); } catch (e) { parsed = {}; }
-        }
+        const sec = generateSecurityToken();
+        const res = await fetch(`${RENDER_API_URL}/user-data?anilist_id=${encodeURIComponent(identifier)}`, {
+            headers: {
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            }
+        });
+        const result = await res.json();
+        const cookies = result.cookies || {};
         return {
-            history: Array.isArray(parsed.history) ? parsed.history : [],
-            bookmarks: Array.isArray(parsed.bookmarks) ? parsed.bookmarks : [],
-            user_info: parsed.user_info || {}
+            history: Array.isArray(cookies.history) ? cookies.history : [],
+            bookmarks: Array.isArray(cookies.bookmarks) ? cookies.bookmarks : [],
+            user_info: cookies.user_info || {}
         };
     } catch (err) {
-        console.error("Gagal membaca cookies JSONB dari Supabase:", err);
+        console.error("Gagal mengambil data user via backend:", err);
         return { history: [], bookmarks: [] };
     }
 }
 
 async function saveSupabaseUserData(user, payload) {
-    if (!supabaseClient || !user) return false;
+    if (!user) return false;
     const identifier = getUserIdentifier(user);
 
     try {
-        const { data: existing } = await supabaseClient
-            .from('login')
-            .select('id, cookies')
-            .or(`anilist_id.eq.${identifier},anilist_id.eq.${user.id}`)
-            .maybeSingle();
-
-        if (!payload.user_info) {
-            payload.user_info = {
-                id: user.id,
-                name: user.name,
-                avatar: user.avatar?.medium || "",
-                last_updated: new Date().toISOString()
-            };
-        }
-
-        if (existing && existing.id) {
-            const { error } = await supabaseClient
-                .from('login')
-                .update({ cookies: payload })
-                .eq('id', existing.id);
-            if (error) throw error;
-        } else {
-            const { error } = await supabaseClient
-                .from('login')
-                .insert({
-                    anilist_id: identifier,
-                    cookies: payload
-                });
-            if (error) throw error;
-        }
-        return true;
+        const sec = generateSecurityToken();
+        const res = await fetch(`${RENDER_API_URL}/user-update`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            },
+            body: JSON.stringify({
+                anilist_id: identifier,
+                cookies: payload
+            })
+        });
+        const result = await res.json();
+        return result.status === "success";
     } catch (err) {
-        console.error("Gagal menyimpan cookies JSONB ke Supabase:", err);
+        console.error("Gagal update data user via backend:", err);
         return false;
     }
 }
 
 /* =========================================================
-   INTEGRASI ANILIST OAUTH2 LOGIN
+   AUTENTIKASI ANILIST
    ========================================================= */
 const ANILIST_CLIENT_ID = "48567";
 
@@ -188,11 +130,7 @@ function getLoggedInUser() {
     const userStr = localStorage.getItem('anilist_user');
     const token = localStorage.getItem('anilist_token');
     if (!token || !userStr) return null;
-    try {
-        return JSON.parse(userStr);
-    } catch (e) {
-        return null;
-    }
+    try { return JSON.parse(userStr); } catch (e) { return null; }
 }
 
 function handleAniListOAuthCallback() {
@@ -219,7 +157,7 @@ function loginAniList() {
 function logoutAniList() {
     localStorage.removeItem('anilist_token');
     localStorage.removeItem('anilist_user');
-    alert("Berhasil logout! Sesi lokal ditutup.");
+    alert("Berhasil logout!");
     location.reload();
 }
 
@@ -265,10 +203,8 @@ async function checkAniListAuthStatus() {
                 `;
             }
 
-            // EKSEKUSI PENAMBAHAN / SINKRONISASI KE SUPABASE
+            // AUTO SYNC KE DATABASE MELALUI BACKEND API
             await syncUserWithSupabase(user);
-
-            // Render riwayat tontonan dari database
             renderHistory();
         }
     } catch (err) {
@@ -277,7 +213,7 @@ async function checkAniListAuthStatus() {
 }
 
 /* =========================================================
-   BOOKMARK SINKRONISASI SUPABASE (HANYA AKTIF JIKA LOGIN)
+   BOOKMARK & RIWAYAT TONTONAN (SUPABASE VIA BACKEND)
    ========================================================= */
 async function addAniListBookmark(animeOrMediaId, buttonEl) {
     const user = getLoggedInUser();
@@ -331,7 +267,7 @@ async function addAniListBookmark(animeOrMediaId, buttonEl) {
             openInformation('bookmark', currentInfoPage);
         }
     } catch (err) {
-        console.error("Gagal sinkron bookmark ke Supabase:", err);
+        console.error("Gagal sinkron bookmark via backend:", err);
         alert("Terjadi kesalahan saat menyinkronkan bookmark.");
     }
 }
@@ -392,15 +328,12 @@ async function fetchAniListBookmarks(page, loadingEl, podiumEl, gridEl, paginati
         renderInfoPagination('bookmark', page, totalPageCount, paginationEl);
 
     } catch (err) {
-        console.error("Gagal memuat bookmark Supabase:", err);
+        console.error("Gagal memuat bookmark via backend:", err);
         loadingEl.classList.add('hidden');
         gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat bookmark dari database.</p>`;
     }
 }
 
-/* =========================================================
-   RIWAYAT TONTONAN DARI SUPABASE (WAJIB LOGIN)
-   ========================================================= */
 async function renderHistory() {
     const historySection = document.getElementById('historySection');
     const historyGrid = document.getElementById('historyGrid');
@@ -441,7 +374,7 @@ async function renderHistory() {
             </div>
         `).join('');
     } catch (err) {
-        console.error("Gagal mengambil riwayat dari Supabase:", err);
+        console.error("Gagal mengambil riwayat via backend:", err);
     }
 }
 
@@ -457,12 +390,12 @@ async function clearHistory() {
         await saveSupabaseUserData(user, userData);
         document.getElementById('historySection').classList.add('hidden');
     } catch (err) {
-        console.error("Gagal menghapus riwayat di Supabase:", err);
+        console.error("Gagal menghapus riwayat:", err);
     }
 }
 
 /* =========================================================
-   SKOR ANILIST, PENCARIAN & DETAIL VIEW
+   SKOR, PENCARIAN & DETAIL VIEW
    ========================================================= */
 async function fetchAniListScoreForCard(animeTitle, elementId) {
     if (!animeTitle) return;
