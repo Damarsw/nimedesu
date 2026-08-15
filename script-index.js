@@ -678,6 +678,94 @@ function getLocalHistoryArray() {
 async function renderHistory() {
     const historySection = document.getElementById('historySection');
     const historyGrid = document.getElementById('historyGrid');
+    const historyLabelEl = document.getElementById('historySyncLabel');
+    const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+
+    // Kalau user login AniList, riwayat diambil dari akun (status CURRENT / sedang ditonton)
+    // supaya sama persis walau dibuka di browser/perangkat lain.
+    const token = localStorage.getItem('anilist_token');
+    const userStr = localStorage.getItem('anilist_user');
+    const user = userStr ? JSON.parse(userStr) : null;
+
+    if (token && user && user.id) {
+        try {
+            const query = `
+            query ($userId: Int) {
+                MediaListCollection(userId: $userId, type: ANIME, status: CURRENT) {
+                    lists {
+                        entries {
+                            progress
+                            updatedAt
+                            media {
+                                id
+                                title { romaji english userPreferred }
+                                coverImage { extraLarge large }
+                            }
+                        }
+                    }
+                }
+            }`;
+
+            const res = await fetch('https://graphql.anilist.co', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ query, variables: { userId: user.id } })
+            });
+            const json = await res.json();
+            const lists = json?.data?.MediaListCollection?.lists || [];
+            let entries = [];
+            lists.forEach(l => entries = entries.concat(l.entries || []));
+            entries.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+            entries = entries.slice(0, 12);
+
+            if (entries.length > 0) {
+                historySection.classList.remove('hidden');
+                if (historyLabelEl) {
+                    historyLabelEl.classList.remove('hidden');
+                }
+                if (clearHistoryBtn) {
+                    clearHistoryBtn.classList.add('hidden');
+                }
+                historyGrid.innerHTML = entries.map(entry => {
+                    const title = entry.media.title?.userPreferred || entry.media.title?.romaji || entry.media.title?.english || 'Tanpa Judul';
+                    const img = entry.media.coverImage?.extraLarge || entry.media.coverImage?.large || 'https://placehold.co/300x400?text=No+Image';
+                    const escapedTitle = title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    return `
+                    <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="openDetailFromAniListTitle('${escapedTitle}')">
+                        <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
+                            <img src="${img}" alt="${title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
+                            <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
+                                <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
+                                    <i class="fa-solid fa-circle-info ml-0.5 text-base"></i>
+                                </div>
+                            </div>
+                            <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">
+                                Eps ${entry.progress || 0}
+                            </span>
+                        </div>
+                        <div class="p-3">
+                            <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${title}</h4>
+                        </div>
+                    </div>`;
+                }).join('');
+                return;
+            }
+        } catch (err) {
+            console.error("Gagal memuat riwayat dari AniList, pakai riwayat lokal:", err);
+            // lanjut ke fallback riwayat lokal di bawah
+        }
+    }
+
+    if (historyLabelEl) {
+        historyLabelEl.classList.add('hidden');
+    }
+    if (clearHistoryBtn) {
+        clearHistoryBtn.classList.remove('hidden');
+    }
 
     let history = getLocalHistoryArray();
 
@@ -760,6 +848,7 @@ function openInformation(type, page = 1) {
     let activeBtnId = 'infoBtnPopularity';
     if (type === 'upcoming') activeBtnId = 'infoBtnUpcoming';
     if (type === 'favorite') activeBtnId = 'infoBtnFavorite';
+    if (type === 'bookmark') activeBtnId = 'infoBtnBookmark';
     
     const activeBtn = document.getElementById(activeBtnId);
     if (activeBtn) {
@@ -782,6 +871,9 @@ function openInformation(type, page = 1) {
     } else if (type === 'favorite') {
         headerEl.innerText = 'Highest Rated Anime';
         descEl.innerText = 'Daftar anime dengan skor evaluasi tertinggi berdasarkan database AniList.';
+    } else if (type === 'bookmark') {
+        headerEl.innerText = 'Bookmark Kamu';
+        descEl.innerText = 'Anime yang sudah kamu bookmark lewat akun AniList — otomatis tersinkron di perangkat manapun kamu login.';
     }
     
     const loadingEl = document.getElementById('informationLoading');
@@ -794,9 +886,88 @@ function openInformation(type, page = 1) {
     gridEl.innerHTML = '';
     paginationEl.innerHTML = '';
     
-    fetchAniListData(type, page, loadingEl, podiumEl, gridEl, paginationEl);
+    if (type === 'bookmark') {
+        fetchAniListBookmarks(page, loadingEl, podiumEl, gridEl, paginationEl);
+    } else {
+        fetchAniListData(type, page, loadingEl, podiumEl, gridEl, paginationEl);
+    }
     
     window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* =========================================================
+   TAB BOOKMARK — AMBIL WATCHLIST (PLANNING & CURRENT) DARI AKUN ANILIST
+   Otomatis sinkron di perangkat manapun selama login AniList yang sama
+   ========================================================= */
+async function fetchAniListBookmarks(page, loadingEl, podiumEl, gridEl, paginationEl) {
+    const token = localStorage.getItem('anilist_token');
+    const userStr = localStorage.getItem('anilist_user');
+    const user = userStr ? JSON.parse(userStr) : null;
+
+    if (!token || !user) {
+        loadingEl.classList.add('hidden');
+        gridEl.innerHTML = `
+            <div class="col-span-full flex flex-col items-center justify-center py-16 space-y-4 text-center">
+                <i class="fa-regular fa-bookmark text-3xl text-neon-yellow"></i>
+                <p class="text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-300 max-w-xs">Login dengan akun AniList dulu untuk melihat daftar bookmark kamu di sini.</p>
+                <button onclick="loginAniList()" class="px-4 py-2 rounded-full bg-neon-yellow text-black text-xs font-bold shadow-glow-yellow transition hover:opacity-90">Login AniList</button>
+            </div>`;
+        return;
+    }
+
+    try {
+        const query = `
+        query ($userId: Int) {
+            MediaListCollection(userId: $userId, type: ANIME, status_in: [PLANNING, CURRENT]) {
+                lists {
+                    entries {
+                        updatedAt
+                        media {
+                            id
+                            title { romaji english userPreferred }
+                            coverImage { extraLarge large }
+                            averageScore
+                            popularity
+                        }
+                    }
+                }
+            }
+        }`;
+
+        const res = await fetch('https://graphql.anilist.co', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({ query, variables: { userId: user.id } })
+        });
+        const json = await res.json();
+        const lists = json?.data?.MediaListCollection?.lists || [];
+        let entries = [];
+        lists.forEach(l => entries = entries.concat(l.entries || []));
+        entries.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+        loadingEl.classList.add('hidden');
+
+        if (entries.length === 0) {
+            gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Belum ada anime yang kamu bookmark. Tekan ikon <i class="fa-regular fa-bookmark"></i> di poster anime untuk menambahkan.</p>`;
+            return;
+        }
+
+        const perPage = 12;
+        const totalPageCount = Math.max(1, Math.ceil(entries.length / perPage));
+        const pageEntries = entries.slice((page - 1) * perPage, page * perPage);
+
+        gridEl.innerHTML = pageEntries.map((entry, idx) => renderRankListItem(entry.media, (page - 1) * perPage + idx + 1)).join('');
+        renderInfoPagination('bookmark', page, totalPageCount, paginationEl);
+
+    } catch (err) {
+        console.error("Gagal memuat bookmark AniList:", err);
+        loadingEl.classList.add('hidden');
+        gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat daftar bookmark. Coba lagi beberapa saat.</p>`;
+    }
 }
 
 function formatNumberShort(num) {
