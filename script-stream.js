@@ -7,6 +7,16 @@ let globalAnimeTitle = "Anime";
 let allAnimeList = [];
 let currentAnimeThumbnail = "";
 
+/* =========================================================
+   KONFIGURASI SUPABASE DATABASE
+   ========================================================= */
+const SUPABASE_URL = "https://yezdnsgypbjogzoftgmz.supabase.co";
+const SUPABASE_ANON_KEY = "MASUKKAN_ANON_KEY_SUPABASE_DI_SINI";
+
+const supabaseClient = (typeof window.supabase !== 'undefined' && window.supabase.createClient)
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
+
 const KEY_X = "LayerX_Secret2026";
 const KEY_Y = "LayerY_Secret2026";
 const KEY_Z = "LayerZ_Secret2026";
@@ -21,60 +31,170 @@ function generateSecurityToken() {
     };
 }
 
-function encryptTripleLayer(data) {
-    const jsonString = JSON.stringify(data);
-    const layer1 = CryptoJS.AES.encrypt(jsonString, KEY_X).toString();
-    const layer2 = CryptoJS.Rabbit.encrypt(layer1, KEY_Y).toString();
-    const layer3 = CryptoJS.TripleDES.encrypt(layer2, KEY_Z).toString();
-    return layer3;
-}
-
-function decryptTripleLayer(ciphertext) {
+/* =========================================================
+   HELPER SUPABASE DATA
+   ========================================================= */
+async function getSupabaseUserData(anilistId) {
+    if (!supabaseClient || !anilistId) return { history: [], bookmarks: [] };
     try {
-        const bytesZ = CryptoJS.TripleDES.decrypt(ciphertext, KEY_Z);
-        const layer2 = bytesZ.toString(CryptoJS.enc.Utf8);
-        if (!layer2) return null;
-        const bytesY = CryptoJS.Rabbit.decrypt(layer2, KEY_Y);
-        const layer1 = bytesY.toString(CryptoJS.enc.Utf8);
-        if (!layer1) return null;
-        const bytesX = CryptoJS.AES.decrypt(layer1, KEY_X);
-        const decryptedString = bytesX.toString(CryptoJS.enc.Utf8);
-        if (!decryptedString) return null;
-        return JSON.parse(decryptedString);
-    } catch (e) {
-        return null;
+        const { data, error } = await supabaseClient
+            .from('login')
+            .select('cookies')
+            .eq('anilist_id', String(anilistId))
+            .maybeSingle();
+
+        if (error || !data || !data.cookies) return { history: [], bookmarks: [] };
+        
+        let parsed = data.cookies;
+        if (typeof parsed === 'string') {
+            try { parsed = JSON.parse(parsed); } catch (e) { parsed = {}; }
+        }
+        return {
+            history: Array.isArray(parsed.history) ? parsed.history : [],
+            bookmarks: Array.isArray(parsed.bookmarks) ? parsed.bookmarks : []
+        };
+    } catch (err) {
+        console.error("Gagal membaca Supabase:", err);
+        return { history: [], bookmarks: [] };
     }
 }
 
-function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIndex, thumbnailImg) {
-    // Sumber data utama sekarang disamakan dengan index.html: 'nimedesu_history_local' (plain JSON).
-    // Kalau belum ada tapi masih ada data lama terenkripsi, migrasikan dulu sekali.
-    let history = JSON.parse(localStorage.getItem('nimedesu_history_local') || '[]');
+async function saveSupabaseUserData(anilistId, payload) {
+    if (!supabaseClient || !anilistId) return false;
+    try {
+        const { data: existing } = await supabaseClient
+            .from('login')
+            .select('id')
+            .eq('anilist_id', String(anilistId))
+            .maybeSingle();
 
-    if (history.length === 0) {
-        let encryptedOldData = localStorage.getItem('nimedesu_history_triple');
-        if (encryptedOldData) {
-            let decryptedHistory = decryptTripleLayer(encryptedOldData);
-            if (decryptedHistory && Array.isArray(decryptedHistory)) {
-                history = decryptedHistory;
-            }
+        if (existing && existing.id) {
+            await supabaseClient
+                .from('login')
+                .update({ cookies: payload })
+                .eq('anilist_id', String(anilistId));
+        } else {
+            await supabaseClient
+                .from('login')
+                .insert({
+                    anilist_id: String(anilistId),
+                    cookies: payload
+                });
+        }
+        return true;
+    } catch (err) {
+        console.error("Gagal update Supabase:", err);
+        return false;
+    }
+}
+
+/* =========================================================
+   AUTENTIKASI ANILIST DI STREAM.HTML
+   ========================================================= */
+const ANILIST_CLIENT_ID = "48567";
+
+function getLoggedInUser() {
+    const userStr = localStorage.getItem('anilist_user');
+    const token = localStorage.getItem('anilist_token');
+    if (!token || !userStr) return null;
+    try { return JSON.parse(userStr); } catch (e) { return null; }
+}
+
+function handleAniListOAuthCallback() {
+    const hash = window.location.hash;
+    if (hash && hash.includes('access_token=')) {
+        const tokenParams = new URLSearchParams(hash.replace('#', '?'));
+        const accessToken = tokenParams.get('access_token');
+        if (accessToken) {
+            localStorage.setItem('anilist_token', accessToken);
+            history.replaceState(null, document.title, window.location.pathname + window.location.search);
         }
     }
+}
 
-    const animeItem = {
-        id: animeUrl,
-        title: animeTitle,
-        url: animeUrl,
-        thumbnail: thumbnailImg || "https://placehold.co/400x600?text=No+Image",
-        lastWatchedEpisode: episodeTitle,
-        lastEpisodeIndex: episodeIndex
-    };
+function loginAniList() {
+    const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${ANILIST_CLIENT_ID}&response_type=token`;
+    window.location.href = authUrl;
+}
 
-    history = history.filter(item => item.url != animeUrl);
-    history.unshift(animeItem);
-    if (history.length > 6) history.pop();
+function logoutAniList() {
+    localStorage.removeItem('anilist_token');
+    localStorage.removeItem('anilist_user');
+    alert("Berhasil logout!");
+    location.reload();
+}
 
-    localStorage.setItem('nimedesu_history_local', JSON.stringify(history));
+async function checkAniListAuthStatus() {
+    const token = localStorage.getItem('anilist_token');
+    const headerAuthContainer = document.getElementById('headerAuthContainer');
+    if (!token) return;
+
+    const query = `query { Viewer { id name avatar { medium } } }`;
+    try {
+        const response = await fetch('https://graphql.anilist.co', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({ query: query })
+        });
+        const result = await response.json();
+        const user = result?.data?.Viewer;
+
+        if (user) {
+            localStorage.setItem('anilist_user', JSON.stringify(user));
+            if (headerAuthContainer) {
+                headerAuthContainer.innerHTML = `
+                    <div class="flex items-center gap-2 bg-white dark:bg-zinc-800/90 p-1 pr-3 rounded-full border border-neon-yellow shadow-xs">
+                        <img src="${user.avatar.medium}" class="w-6 h-6 rounded-full object-cover">
+                        <span class="text-xs font-bold text-black dark:text-neon-yellow max-w-[80px] truncate">${user.name}</span>
+                        <button onclick="logoutAniList()" class="ml-1 text-[11px] text-black dark:text-zinc-400 hover:text-red-500 transition" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
+                    </div>
+                `;
+            }
+        }
+    } catch (err) {
+        console.error("Auth check failed:", err);
+    }
+}
+
+/* =========================================================
+   SIMPAN RIWAYAT STREAM KE SUPABASE DATABASE (HANYA JIKA LOGIN)
+   ========================================================= */
+async function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIndex, thumbnailImg) {
+    const user = getLoggedInUser();
+
+    // JIKA USER TIDAK LOGIN, RIWAYAT TIDAK DISIMPAN
+    if (!user) {
+        console.log("User belum login, riwayat tontonan tidak disimpan.");
+        return;
+    }
+
+    try {
+        const userData = await getSupabaseUserData(user.id);
+        let history = userData.history || [];
+
+        const animeItem = {
+            id: animeUrl,
+            title: animeTitle,
+            url: animeUrl,
+            thumbnail: thumbnailImg || "https://placehold.co/400x600?text=No+Image",
+            lastWatchedEpisode: episodeTitle,
+            lastEpisodeIndex: episodeIndex,
+            updatedAt: new Date().toISOString()
+        };
+
+        history = history.filter(item => item.url !== animeUrl);
+        history.unshift(animeItem);
+        if (history.length > 8) history.pop();
+
+        userData.history = history;
+        await saveSupabaseUserData(user.id, userData);
+    } catch (e) {
+        console.error("Gagal menyimpan riwayat ke Supabase:", e);
+    }
 }
 
 function toggleSearchInput(event) {
@@ -256,7 +376,7 @@ async function initStream() {
 function extractEpisodeNumber(title) {
     if (!title) return 0;
     const match = title.match(/episode\s*(\d+)/i) || title.match(/eps\.?\s*(\d+)/i) || title.match(/(\d+)/);
-    return match ? parseInt(match[1]) : 0;
+    return match ? parseInt(match) : 0;
 }
 
 function scrollSlider(direction) {
@@ -281,13 +401,10 @@ function renderMixedGenreRecommendations() {
             return itemGenre.toLowerCase().includes(genre);
         });
 
-        // Mengambil secara acak (random) sebanyak 4 anime per genre
         const shuffled = filtered.sort(() => 0.5 - Math.random());
-        const sliced = shuffled.slice(0, 4);
-        selectedRecommendations = selectedRecommendations.concat(sliced);
+        selectedRecommendations = selectedRecommendations.concat(shuffled.slice(0, 4));
     });
 
-    // Acak kembali gabungan keseluruhan hasil agar tampilannya bervariasi
     selectedRecommendations.sort(() => 0.5 - Math.random());
 
     if (selectedRecommendations.length === 0) {
@@ -343,9 +460,7 @@ function renderDynamicEpisodes() {
 
     container.innerHTML = activeEpisodes.map((ep, index) => {
         const activeClass = index === activeEpisodeIndex ? 'bg-neon-yellow text-white font-bold shadow-glow-yellow' : 'bg-neon-lightBg dark:bg-neon-darkBg text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow';
-        
         let epLabel = ep.episode_title ? ep.episode_title.replace(/Sub.*$/, '').trim() : `Eps ${index + 1}`;
-        
         if (!epLabel || epLabel.toLowerCase() === globalAnimeTitle.toLowerCase()) return '';
 
         return `<button onclick='selectEpisode(${index})' class="episode-btn ${activeClass} px-3 py-1.5 rounded-lg text-xs font-semibold transition">${epLabel}</button>`;
@@ -477,5 +592,7 @@ function toggleTheme() {
 }
 
 window.onload = function() {
+    handleAniListOAuthCallback();
+    checkAniListAuthStatus();
     initStream();
 };
