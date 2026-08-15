@@ -11,7 +11,14 @@ let activeStatusFilter = "";
 let activeGenreFilter = "";
 let isBookmarkViewActive = false;
 
+// Cache bookmark & skor anime lokal
 let userBookmarksCache = [];
+let scoreLocalCache = {};
+try {
+    scoreLocalCache = JSON.parse(localStorage.getItem('nimedesu_scores_cache') || '{}');
+} catch (e) {
+    scoreLocalCache = {};
+}
 
 const RENDER_API_URL = "/api-backend";
 
@@ -29,6 +36,70 @@ function generateSecurityToken() {
     };
 }
 
+/* =========================================================
+   SISTEM AUTO-CACHE SKOR BINTANG POSTER
+   ========================================================= */
+function getCachedScore(title, defaultScore) {
+    if (defaultScore && defaultScore !== '-' && defaultScore !== 'N/A') {
+        return defaultScore;
+    }
+    if (!title) return 'N/A';
+    const cleanTitle = title.replace(/([a-zA-Z0-9])x([a-zA-Z0-9])/gi, '$1 x $2').toLowerCase().trim();
+    return scoreLocalCache[cleanTitle] || 'N/A';
+}
+
+async function fetchAniListScoreForCard(animeTitle, elementId, defaultScore) {
+    if (defaultScore && defaultScore !== '-' && defaultScore !== 'N/A') {
+        const targetEl = document.getElementById(elementId);
+        if (targetEl) targetEl.innerHTML = `⭐ ${defaultScore}`;
+        return;
+    }
+    if (!animeTitle) return;
+
+    let cleanTitle = animeTitle.replace(/([a-zA-Z0-9])x([a-zA-Z0-9])/gi, '$1 x $2').trim();
+    const cacheKey = cleanTitle.toLowerCase();
+
+    // Jika sudah ada di cache lokal, langsung tampilkan tanpa request jaringan
+    if (scoreLocalCache[cacheKey]) {
+        const targetEl = document.getElementById(elementId);
+        if (targetEl) targetEl.innerHTML = `⭐ ${scoreLocalCache[cacheKey]}`;
+        return;
+    }
+
+    const query = `
+    query ($search: String) {
+        Media (search: $search, type: ANIME) {
+            averageScore
+        }
+    }`;
+
+    try {
+        const response = await fetch('https://graphql.anilist.co', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ query: query, variables: { search: cleanTitle } })
+        });
+        const result = await response.json();
+        const score = result?.data?.Media?.averageScore;
+        const targetEl = document.getElementById(elementId);
+
+        if (score) {
+            const formatted = (score / 10).toFixed(1);
+            scoreLocalCache[cacheKey] = formatted;
+            try {
+                localStorage.setItem('nimedesu_scores_cache', JSON.stringify(scoreLocalCache));
+            } catch (e) {}
+
+            if (targetEl) {
+                targetEl.innerHTML = `⭐ ${formatted}`;
+            }
+        }
+    } catch (err) {}
+}
+
+/* =========================================================
+   HELPER PENCARI STATUS BOOKMARK
+   ========================================================= */
 function isAnimeBookmarked(anime) {
     if (!userBookmarksCache || userBookmarksCache.length === 0 || !anime) return false;
     
@@ -217,6 +288,9 @@ function addAniListBookmark(animeOrMediaId, buttonEl) {
     toggleBookmarkAnime(animeOrMediaId, buttonEl);
 }
 
+/* =========================================================
+   TAB BOOKMARK BERANDA
+   ========================================================= */
 async function loadBookmarkTab(page = 1) {
     isBookmarkViewActive = true;
     currentPage = page;
@@ -287,27 +361,36 @@ function renderBookmarkGrid(items) {
     const container = document.getElementById('animeDisplayGrid');
     const paginationBox = document.getElementById('paginationBox');
 
-    container.innerHTML = items.map(item => `
-        <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="viewDetails('${item.id}')">
-            <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
-                <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
-                <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
-                    <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
-                        <i class="fa-solid fa-circle-info ml-0.5 text-base"></i>
+    container.innerHTML = items.map(item => {
+        const scoreBadgeId = `homeScore_${item.id}`;
+        setTimeout(() => {
+            fetchAniListScoreForCard(item.title, scoreBadgeId, item.skor);
+        }, 50);
+
+        const cachedScore = getCachedScore(item.title, item.skor);
+
+        return `
+            <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="viewDetails('${item.id}')">
+                <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
+                    <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
+                    <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
+                        <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
+                            <i class="fa-solid fa-circle-info ml-0.5 text-base"></i>
+                        </div>
                     </div>
+                    <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${item.status}</span>
+                    <span id="${scoreBadgeId}" class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md text-neon-yellow text-[10px] font-bold px-2 py-0.5 rounded-full shadow z-10">⭐ ${cachedScore}</span>
+                    
+                    <button onclick="event.stopPropagation(); toggleBookmarkAnime('${item.id}', this)" title="Hapus dari Bookmark" class="absolute top-2 right-2 p-2 rounded-full bg-black/70 backdrop-blur-md text-neon-yellow hover:scale-110 transition z-20 shadow-md">
+                        <i class="fa-solid fa-bookmark text-xs"></i>
+                    </button>
                 </div>
-                <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${item.status}</span>
-                <span class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md text-neon-yellow text-[10px] font-bold px-2 py-0.5 rounded-full shadow z-10">⭐ ${item.skor && item.skor !== '-' ? item.skor : 'N/A'}</span>
-                
-                <button onclick="event.stopPropagation(); toggleBookmarkAnime('${item.id}', this)" title="Hapus dari Bookmark" class="absolute top-2 right-2 p-2 rounded-full bg-black/70 backdrop-blur-md text-neon-yellow hover:scale-110 transition z-20 shadow-md">
-                    <i class="fa-solid fa-bookmark text-xs"></i>
-                </button>
+                <div class="p-3">
+                    <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
+                </div>
             </div>
-            <div class="p-3">
-                <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 
     let paginationHTML = '';
     const baseBtnClass = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow transition shadow-xs';
@@ -330,6 +413,9 @@ function renderBookmarkGrid(items) {
     paginationBox.innerHTML = paginationHTML;
 }
 
+/* =========================================================
+   AUTENTIKASI ANILIST
+   ========================================================= */
 const ANILIST_CLIENT_ID = "48567";
 
 function getLoggedInUser() {
@@ -417,6 +503,9 @@ async function checkAniListAuthStatus() {
     }
 }
 
+/* =========================================================
+   RIWAYAT TONTONAN
+   ========================================================= */
 async function renderHistory() {
     const historySection = document.getElementById('historySection');
     const historyGrid = document.getElementById('historyGrid');
@@ -477,6 +566,9 @@ async function clearHistory() {
     }
 }
 
+/* =========================================================
+   PENCARIAN & DETAIL VIEW
+   ========================================================= */
 async function openDetailFromAniListTitle(title) {
     if (!title) return;
     try {
@@ -508,6 +600,8 @@ async function openDetailFromAniListTitle(title) {
             }
             if (!matchedItem) matchedItem = matchedList[0];
 
+            const cachedScore = getCachedScore(matchedItem.title, matchedItem.score);
+
             const animeObj = {
                 id: matchedItem.id,
                 title: matchedItem.title || title,
@@ -517,7 +611,7 @@ async function openDetailFromAniListTitle(title) {
                 synopsis: matchedItem.sinopsis || "Sinopsis belum tersedia.",
                 thumbnail: matchedItem.img_url || matchedItem.image_url || "https://placehold.co/400x600?text=No+Image",
                 japanese: matchedItem.japanese || "-",
-                skor: matchedItem.score || "-",
+                skor: cachedScore,
                 statusText: matchedItem.status || "-",
                 totalEpisode: matchedItem.total_episodes || "-",
                 durasi: matchedItem.duration || "-",
@@ -643,7 +737,15 @@ function displayAnimeWithPagination() {
     }
 
     container.innerHTML = currentData.map(item => {
+        const scoreBadgeId = `homeScore_${item.id}`;
+        
+        // Panggil fetch skor (dengan sistem Local Cache agar tidak membebani network)
+        setTimeout(() => {
+            fetchAniListScoreForCard(item.title, scoreBadgeId, item.skor);
+        }, 50);
+
         const isBookmarked = isAnimeBookmarked(item);
+        const cachedScore = getCachedScore(item.title, item.skor);
 
         return `
             <div class="group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer" onclick="viewDetails('${item.id}')">
@@ -655,7 +757,7 @@ function displayAnimeWithPagination() {
                         </div>
                     </div>
                     <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${item.status}</span>
-                    <span class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md text-neon-yellow text-[10px] font-bold px-2 py-0.5 rounded-full shadow z-10">⭐ ${item.skor && item.skor !== '-' ? item.skor : 'N/A'}</span>
+                    <span id="${scoreBadgeId}" class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md text-neon-yellow text-[10px] font-bold px-2 py-0.5 rounded-full shadow z-10">⭐ ${cachedScore}</span>
                     
                     <button onclick="event.stopPropagation(); toggleBookmarkAnime('${item.id}', this)" title="Simpan Bookmark" class="absolute top-2 right-2 p-2 rounded-full bg-black/70 backdrop-blur-md hover:scale-110 transition z-20 shadow-md">
                         <i class="${isBookmarked ? 'fa-solid fa-bookmark text-neon-yellow' : 'fa-regular fa-bookmark text-zinc-300'} text-xs"></i>
@@ -867,13 +969,15 @@ function viewDetails(id) {
 
     switchView('detail');
 
+    const cachedScore = getCachedScore(anime.title, anime.skor);
+
     document.getElementById('detTitle').innerText = anime.title;
     document.getElementById('detThumbnail').src = anime.thumbnail;
     document.getElementById('detStatusBadge').innerText = anime.status;
     document.getElementById('synopsisText').innerText = anime.synopsis;
 
     document.getElementById('detJapanese').innerText = anime.japanese;
-    document.getElementById('detSkor').innerText = anime.skor;
+    document.getElementById('detSkor').innerText = cachedScore;
     document.getElementById('detStatus').innerText = anime.statusText;
     document.getElementById('detTotalEpisode').innerText = anime.totalEpisode;
     document.getElementById('detDurasi').innerText = anime.durasi;
@@ -912,6 +1016,9 @@ function toggleTheme() {
     }
 }
 
+/* =========================================================
+   INFORMASI & PERINGKAT VIA BACKEND (CACHED)
+   ========================================================= */
 let currentInfoType = 'bypopularity';
 let currentInfoPage = 1;
 
