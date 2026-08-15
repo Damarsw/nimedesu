@@ -10,6 +10,7 @@ let activeSearchQuery = "";
 let activeStatusFilter = "";
 let activeGenreFilter = "";
 let isBookmarkViewActive = false;
+let searchDebounceTimer = null;
 
 // Cache bookmark & skor anime lokal
 let userBookmarksCache = [];
@@ -37,7 +38,7 @@ function generateSecurityToken() {
 }
 
 /* =========================================================
-   SISTEM AUTO-CACHE SKOR BINTANG POSTER
+   SISTEM SKOR CERDAS DENGAN LOCAL CACHING
    ========================================================= */
 function getCachedScore(title, defaultScore) {
     if (defaultScore && defaultScore !== '-' && defaultScore !== 'N/A') {
@@ -59,19 +60,13 @@ async function fetchAniListScoreForCard(animeTitle, elementId, defaultScore) {
     let cleanTitle = animeTitle.replace(/([a-zA-Z0-9])x([a-zA-Z0-9])/gi, '$1 x $2').trim();
     const cacheKey = cleanTitle.toLowerCase();
 
-    // Jika sudah ada di cache lokal, langsung tampilkan tanpa request jaringan
     if (scoreLocalCache[cacheKey]) {
         const targetEl = document.getElementById(elementId);
         if (targetEl) targetEl.innerHTML = `⭐ ${scoreLocalCache[cacheKey]}`;
         return;
     }
 
-    const query = `
-    query ($search: String) {
-        Media (search: $search, type: ANIME) {
-            averageScore
-        }
-    }`;
+    const query = `query ($search: String) { Media (search: $search, type: ANIME) { averageScore } }`;
 
     try {
         const response = await fetch('https://graphql.anilist.co', {
@@ -97,9 +92,6 @@ async function fetchAniListScoreForCard(animeTitle, elementId, defaultScore) {
     } catch (err) {}
 }
 
-/* =========================================================
-   HELPER PENCARI STATUS BOOKMARK
-   ========================================================= */
 function isAnimeBookmarked(anime) {
     if (!userBookmarksCache || userBookmarksCache.length === 0 || !anime) return false;
     
@@ -363,9 +355,7 @@ function renderBookmarkGrid(items) {
 
     container.innerHTML = items.map(item => {
         const scoreBadgeId = `homeScore_${item.id}`;
-        setTimeout(() => {
-            fetchAniListScoreForCard(item.title, scoreBadgeId, item.skor);
-        }, 50);
+        setTimeout(() => { fetchAniListScoreForCard(item.title, scoreBadgeId, item.skor); }, 50);
 
         const cachedScore = getCachedScore(item.title, item.skor);
 
@@ -738,11 +728,7 @@ function displayAnimeWithPagination() {
 
     container.innerHTML = currentData.map(item => {
         const scoreBadgeId = `homeScore_${item.id}`;
-        
-        // Panggil fetch skor (dengan sistem Local Cache agar tidak membebani network)
-        setTimeout(() => {
-            fetchAniListScoreForCard(item.title, scoreBadgeId, item.skor);
-        }, 50);
+        setTimeout(() => { fetchAniListScoreForCard(item.title, scoreBadgeId, item.skor); }, 50);
 
         const isBookmarked = isAnimeBookmarked(item);
         const cachedScore = getCachedScore(item.title, item.skor);
@@ -813,66 +799,70 @@ function toggleSearchInput(event) {
     }
 }
 
-async function liveSearchAnime() {
-    const query = document.getElementById('searchField').value.trim();
-    const suggestionsBox = document.getElementById('searchSuggestions');
+// Pencarian dengan Debounce 300ms (Hemat request)
+function liveSearchAnime() {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(async () => {
+        const query = document.getElementById('searchField').value.trim();
+        const suggestionsBox = document.getElementById('searchSuggestions');
 
-    if (!query) {
-        suggestionsBox.classList.add('hidden');
-        suggestionsBox.innerHTML = '';
-        return;
-    }
-
-    try {
-        const sec = generateSecurityToken();
-        const res = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(query)}&per_page=6`, {
-            headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
-            }
-        });
-        const result = await res.json();
-        const matched = result.data || [];
-
-        if (matched.length === 0) {
-            suggestionsBox.innerHTML = `<p class="text-xs text-center text-zinc-500 py-3">Anime tidak ditemukan</p>`;
-            suggestionsBox.classList.remove('hidden');
+        if (!query) {
+            suggestionsBox.classList.add('hidden');
+            suggestionsBox.innerHTML = '';
             return;
         }
 
-        suggestionsBox.innerHTML = matched.map(anime => {
-            const genres = anime.genre ? anime.genre.split(',').map(g => g.trim()).join(', ') : '-';
-            const img = anime.img_url || anime.image_url || "https://placehold.co/100x150?text=No+Image";
-            
-            const animeData = JSON.stringify({
-                id: anime.id,
-                title: anime.title || "Tanpa Judul",
-                url: anime.url ? anime.url.trim() : "",
-                status: anime.status || "Ongoing",
-                genres: anime.genre ? anime.genre.split(',').map(g => g.trim()) : [],
-                synopsis: anime.sinopsis || "Sinopsis belum tersedia.",
-                thumbnail: img,
-                japanese: anime.japanese || "-",
-                skor: anime.score || "-",
-                statusText: anime.status || "-",
-                totalEpisode: anime.total_episodes || "-",
-                durasi: anime.duration || "-",
-                tanggalRilis: anime.release_date || "-",
-                studio: anime.studio || "-"
-            }).replace(/'/g, "&apos;").replace(/"/g, '&quot;');
+        try {
+            const sec = generateSecurityToken();
+            const res = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(query)}&per_page=6`, {
+                headers: {
+                    "X-Client-Token": sec.token,
+                    "X-Client-Time": sec.time
+                }
+            });
+            const result = await res.json();
+            const matched = result.data || [];
 
-            return `
-                <div onclick="selectLiveSearchItem(${animeData})" class="flex items-center gap-3 p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer transition">
-                    <img src="${img}" class="w-10 h-14 object-cover rounded-lg shrink-0">
-                    <div class="overflow-hidden">
-                        <h4 class="text-xs font-semibold text-black dark:text-white truncate">${anime.title}</h4>
-                        <span class="text-[10px] text-zinc-500 dark:text-zinc-400 truncate block">${genres}</span>
+            if (matched.length === 0) {
+                suggestionsBox.innerHTML = `<p class="text-xs text-center text-zinc-500 py-3">Anime tidak ditemukan</p>`;
+                suggestionsBox.classList.remove('hidden');
+                return;
+            }
+
+            suggestionsBox.innerHTML = matched.map(anime => {
+                const genres = anime.genre ? anime.genre.split(',').map(g => g.trim()).join(', ') : '-';
+                const img = anime.img_url || anime.image_url || "https://placehold.co/100x150?text=No+Image";
+                
+                const animeData = JSON.stringify({
+                    id: anime.id,
+                    title: anime.title || "Tanpa Judul",
+                    url: anime.url ? anime.url.trim() : "",
+                    status: anime.status || "Ongoing",
+                    genres: anime.genre ? anime.genre.split(',').map(g => g.trim()) : [],
+                    synopsis: anime.sinopsis || "Sinopsis belum tersedia.",
+                    thumbnail: img,
+                    japanese: anime.japanese || "-",
+                    skor: anime.score || "-",
+                    statusText: anime.status || "-",
+                    totalEpisode: anime.total_episodes || "-",
+                    durasi: anime.duration || "-",
+                    tanggalRilis: anime.release_date || "-",
+                    studio: anime.studio || "-"
+                }).replace(/'/g, "&apos;").replace(/"/g, '&quot;');
+
+                return `
+                    <div onclick="selectLiveSearchItem(${animeData})" class="flex items-center gap-3 p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer transition">
+                        <img src="${img}" class="w-10 h-14 object-cover rounded-lg shrink-0">
+                        <div class="overflow-hidden">
+                            <h4 class="text-xs font-semibold text-black dark:text-white truncate">${anime.title}</h4>
+                            <span class="text-[10px] text-zinc-500 dark:text-zinc-400 truncate block">${genres}</span>
+                        </div>
                     </div>
-                </div>
-            `;
-        }).join('');
-        suggestionsBox.classList.remove('hidden');
-    } catch (e) { console.error(e); }
+                `;
+            }).join('');
+            suggestionsBox.classList.remove('hidden');
+        } catch (e) { console.error(e); }
+    }, 300);
 }
 
 function selectLiveSearchItem(anime) {
@@ -1017,7 +1007,7 @@ function toggleTheme() {
 }
 
 /* =========================================================
-   INFORMASI & PERINGKAT VIA BACKEND (CACHED)
+   INFORMASI & PERINGKAT VIA BACKEND (CACHED 2 JAM)
    ========================================================= */
 let currentInfoType = 'bypopularity';
 let currentInfoPage = 1;
