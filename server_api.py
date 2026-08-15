@@ -46,13 +46,13 @@ SRV_KEY_LABEL = "keterangan"
 SRV_KEY_SERVER_NAME = "server"
 
 # ---------------------------------------------------------------------------
-# CACHING MEMORI (HEMAT KUOTA ANILIST, JIKAN & SUPABASE)
+# CACHING MEMORI
 # ---------------------------------------------------------------------------
 RANKING_CACHE = {}
 ANIME_LIST_CACHE = {}
 SCORE_CACHE = {}
 
-CACHE_TTL_RANKING = 7200  # 2 Jam untuk Peringkat AniList
+CACHE_TTL_RANKING = 7200  # 2 Jam untuk Peringkat
 CACHE_TTL_ANIME = 300     # 5 Menit untuk Daftar Anime
 
 # ---------------------------------------------------------------------------
@@ -268,7 +268,7 @@ def api_anime_detail():
 
 
 # ---------------------------------------------------------------------------
-# PROXY ENDPOINT FOR ANILIST SCORES (MENGHINDARI CORS DI FRONTEND)
+# PROXY ENDPOINT UNTUK SKOR (AniList -> Jikan -> Kitsu)
 # ---------------------------------------------------------------------------
 @app.route("/api/anilist-score", methods=["GET"])
 def api_anilist_score():
@@ -280,26 +280,27 @@ def api_anilist_score():
     if cache_key in SCORE_CACHE:
         return jsonify({"score": SCORE_CACHE[cache_key]}), 200
 
+    # 1. AniList
     query_str = "query ($search: String) { Media (search: $search, type: ANIME) { averageScore } }"
     try:
         resp = requests.post(
             "https://graphql.anilist.co",
             json={"query": query_str, "variables": {"search": title}},
             headers={"Content-Type": "application/json", "Accept": "application/json"},
-            timeout=4
+            timeout=3
         )
         if resp.status_code == 200:
-            json_data = resp.json()
-            avg_score = json_data.get("data", {}).get("Media", {}).get("averageScore")
-            score_formatted = f"{(avg_score / 10):.1f}" if avg_score else "N/A"
-            SCORE_CACHE[cache_key] = score_formatted
-            return jsonify({"score": score_formatted}), 200
+            avg_score = resp.json().get("data", {}).get("Media", {}).get("averageScore")
+            if avg_score:
+                score_formatted = f"{(avg_score / 10):.1f}"
+                SCORE_CACHE[cache_key] = score_formatted
+                return jsonify({"score": score_formatted}), 200
     except Exception:
         pass
 
-    # Fallback score via Jikan API jika AniList down
+    # 2. Backup: Jikan API (MAL)
     try:
-        j_resp = requests.get(f"https://api.jikan.moe/v4/anime?q={requests.utils.quote(title)}&limit=1", timeout=4)
+        j_resp = requests.get(f"https://api.jikan.moe/v4/anime?q={requests.utils.quote(title)}&limit=1", timeout=3)
         if j_resp.status_code == 200:
             j_data = j_resp.json().get("data", [])
             if j_data and j_data[0].get("score"):
@@ -309,11 +310,25 @@ def api_anilist_score():
     except Exception:
         pass
 
+    # 3. Backup: Kitsu API
+    try:
+        k_resp = requests.get(f"https://kitsu.io/api/edge/anime?filter[text]={requests.utils.quote(title)}&page[limit]=1", timeout=3)
+        if k_resp.status_code == 200:
+            k_data = k_resp.json().get("data", [])
+            if k_data:
+                avg_rating = k_data[0].get("attributes", {}).get("averageRating")
+                if avg_rating:
+                    score_formatted = f"{(float(avg_rating) / 10):.1f}"
+                    SCORE_CACHE[cache_key] = score_formatted
+                    return jsonify({"score": score_formatted}), 200
+    except Exception:
+        pass
+
     return jsonify({"score": "N/A"}), 200
 
 
 # ---------------------------------------------------------------------------
-# PROXY ENDPOINT RANKING DENGAN DUAL BACKUP (AniList -> Jikan MAL -> Supabase)
+# PROXY RANKING MULTI-BACKUP (AniList -> Jikan MAL -> Kitsu API)
 # ---------------------------------------------------------------------------
 @app.route("/api/ranking", methods=["GET"])
 def api_ranking():
@@ -323,7 +338,6 @@ def api_ranking():
     cache_key = f"{category}_{page}"
     current_time = time.time()
 
-    # 1. Cek Cache
     if cache_key in RANKING_CACHE:
         cached_entry = RANKING_CACHE[cache_key]
         if current_time - cached_entry["timestamp"] < CACHE_TTL_RANKING:
@@ -389,7 +403,7 @@ def api_ranking():
                 RANKING_CACHE[cache_key] = {"timestamp": current_time, "data": payload}
                 return jsonify(payload), 200
     except Exception:
-        pass  # Lanjut ke Backup Jikan MAL
+        pass
 
     # =========================================================
     # OPTION 2: SECONDARY BACKUP - JIKAN API v4 (MYANIMELIST)
@@ -402,7 +416,7 @@ def api_ranking():
             jikan_filter = "favorite"
 
         jikan_url = f"https://api.jikan.moe/v4/top/anime?filter={jikan_filter}&page={page}&limit=12"
-        j_resp = requests.get(jikan_url, timeout=5)
+        j_resp = requests.get(jikan_url, timeout=4)
 
         if j_resp.status_code == 200:
             j_data = j_resp.json()
@@ -439,46 +453,68 @@ def api_ranking():
             RANKING_CACHE[cache_key] = {"timestamp": current_time, "data": payload}
             return jsonify(payload), 200
     except Exception:
-        pass  # Lanjut ke Backup Supabase Local
+        pass
 
     # =========================================================
-    # OPTION 3: TERAKHIR - FALLBACK DATABASE LOKAL (SUPABASE)
+    # OPTION 3: THIRD BACKUP - KITSU API (PUBLIC ANIME API)
     # =========================================================
     try:
-        per_page = 12
-        start = (page - 1) * per_page
-        end = start + per_page - 1
-
-        db_query = client_obj.table(TABLE_ANIME).select("*", count="exact")
+        sort_param = "-userCount"
+        filter_param = ""
         if category == "upcoming":
-            db_query = db_query.ilike(COL_ANIME_STATUS, "%upcoming%")
-        
-        db_res = db_query.order(COL_ANIME_ID).range(start, end).execute()
-        raw_items = db_res.data or []
-        total_count = db_res.count or len(raw_items)
-        last_page = -(-total_count // per_page) if total_count > 0 else 1
+            filter_param = "&filter[status]=upcoming"
+            sort_param = "-userCount"
+        elif category == "favorite":
+            sort_param = "-averageRating"
 
-        fallback_list = []
-        for item in raw_items:
-            fallback_list.append({
-                "id": item.get(COL_ANIME_ID),
-                "title": {"romaji": item.get(COL_ANIME_TITLE), "userPreferred": item.get(COL_ANIME_TITLE)},
-                "coverImage": {"extraLarge": item.get(COL_ANIME_IMAGE), "large": item.get(COL_ANIME_IMAGE)},
-                "averageScore": 80,
-                "popularity": 10000
-            })
+        offset = (page - 1) * 12
+        kitsu_url = f"https://kitsu.io/api/edge/anime?page[limit]=12&page[offset]={offset}&sort={sort_param}{filter_param}"
+        k_resp = requests.get(kitsu_url, timeout=4)
 
-        fallback_top3 = fallback_list[:3] if page == 1 else []
+        if k_resp.status_code == 200:
+            k_data = k_resp.json()
+            raw_list = k_data.get("data", [])
+            total_records = k_data.get("meta", {}).get("count", 120)
+            last_page = -(-total_records // 12)
 
-        return jsonify({
-            "top3": fallback_top3,
-            "list": fallback_list,
-            "last_page": last_page,
-            "source": "supabase_local"
-        }), 200
+            parsed_list = []
+            for item in raw_list:
+                attr = item.get("attributes", {})
+                titles = attr.get("titles", {})
+                img = attr.get("posterImage", {})
+                avg_r = attr.get("averageRating")
 
-    except Exception as db_err:
-        return jsonify({"top3": [], "list": [], "last_page": 1, "error": str(db_err)}), 200
+                parsed_list.append({
+                    "id": item.get("id"),
+                    "title": {
+                        "romaji": attr.get("canonicalTitle") or titles.get("en_jp"),
+                        "english": titles.get("en"),
+                        "userPreferred": attr.get("canonicalTitle")
+                    },
+                    "coverImage": {
+                        "extraLarge": img.get("original") or img.get("large"),
+                        "large": img.get("medium") or img.get("small")
+                    },
+                    "averageScore": int(float(avg_r)) if avg_r else 0,
+                    "popularity": attr.get("userCount", 0)
+                })
+
+            parsed_top3 = parsed_list[:3] if page == 1 else []
+
+            payload = {
+                "top3": parsed_top3,
+                "list": parsed_list,
+                "last_page": last_page,
+                "source": "kitsu"
+            }
+
+            RANKING_CACHE[cache_key] = {"timestamp": current_time, "data": payload}
+            return jsonify(payload), 200
+    except Exception:
+        pass
+
+    # Fallback Terakhir jika ketiga API publik timeout total
+    return jsonify({"top3": [], "list": [], "last_page": 1, "error": "All anime APIs unavailable"}), 200
 
 
 @app.route("/api/user-sync", methods=["POST"])
