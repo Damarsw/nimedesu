@@ -11,7 +11,7 @@ let currentAnimeThumbnail = "";
    KONFIGURASI SUPABASE DATABASE
    ========================================================= */
 const SUPABASE_URL = "https://yezdnsgypbjogzoftgmz.supabase.co";
-const SUPABASE_ANON_KEY = "MASUKKAN_ANON_KEY_SUPABASE_DI_SINI";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllemRuc2d5cGJqY2d6b2Z0Z216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4ODc4OTUsImV4cCI6MjEwMDQ2Mzg5NX0.oTp6v4ahm0Ta654CuB7a13l9apBtUrD-Wyn-YTKYl7I";
 
 const supabaseClient = (typeof window.supabase !== 'undefined' && window.supabase.createClient)
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
@@ -34,13 +34,64 @@ function generateSecurityToken() {
 /* =========================================================
    HELPER SUPABASE DATA
    ========================================================= */
-async function getSupabaseUserData(anilistId) {
-    if (!supabaseClient || !anilistId) return { history: [], bookmarks: [] };
+function getUserIdentifier(user) {
+    if (!user) return null;
+    return user.name || String(user.id);
+}
+
+async function syncUserWithSupabase(user) {
+    if (!supabaseClient || !user) return null;
+    const identifier = getUserIdentifier(user);
+
+    try {
+        const { data: existingRow, error: selectErr } = await supabaseClient
+            .from('login')
+            .select('*')
+            .or(`anilist_id.eq.${identifier},anilist_id.eq.${user.id}`)
+            .maybeSingle();
+
+        if (!existingRow) {
+            const initialCookies = {
+                history: [],
+                bookmarks: [],
+                user_info: {
+                    id: user.id,
+                    name: user.name,
+                    avatar: user.avatar?.medium || "",
+                    first_login: new Date().toISOString()
+                }
+            };
+
+            await supabaseClient
+                .from('login')
+                .insert({
+                    anilist_id: identifier,
+                    cookies: initialCookies
+                });
+
+            return initialCookies;
+        } else {
+            let cookiesData = existingRow.cookies || {};
+            if (typeof cookiesData === 'string') {
+                try { cookiesData = JSON.parse(cookiesData); } catch (e) { cookiesData = {}; }
+            }
+            return cookiesData;
+        }
+    } catch (err) {
+        console.error("Gagal sinkronisasi user di stream:", err);
+        return null;
+    }
+}
+
+async function getSupabaseUserData(user) {
+    if (!supabaseClient || !user) return { history: [], bookmarks: [] };
+    const identifier = getUserIdentifier(user);
+
     try {
         const { data, error } = await supabaseClient
             .from('login')
             .select('cookies')
-            .eq('anilist_id', String(anilistId))
+            .or(`anilist_id.eq.${identifier},anilist_id.eq.${user.id}`)
             .maybeSingle();
 
         if (error || !data || !data.cookies) return { history: [], bookmarks: [] };
@@ -51,7 +102,8 @@ async function getSupabaseUserData(anilistId) {
         }
         return {
             history: Array.isArray(parsed.history) ? parsed.history : [],
-            bookmarks: Array.isArray(parsed.bookmarks) ? parsed.bookmarks : []
+            bookmarks: Array.isArray(parsed.bookmarks) ? parsed.bookmarks : [],
+            user_info: parsed.user_info || {}
         };
     } catch (err) {
         console.error("Gagal membaca Supabase:", err);
@@ -59,25 +111,36 @@ async function getSupabaseUserData(anilistId) {
     }
 }
 
-async function saveSupabaseUserData(anilistId, payload) {
-    if (!supabaseClient || !anilistId) return false;
+async function saveSupabaseUserData(user, payload) {
+    if (!supabaseClient || !user) return false;
+    const identifier = getUserIdentifier(user);
+
     try {
         const { data: existing } = await supabaseClient
             .from('login')
             .select('id')
-            .eq('anilist_id', String(anilistId))
+            .or(`anilist_id.eq.${identifier},anilist_id.eq.${user.id}`)
             .maybeSingle();
+
+        if (!payload.user_info) {
+            payload.user_info = {
+                id: user.id,
+                name: user.name,
+                avatar: user.avatar?.medium || "",
+                last_updated: new Date().toISOString()
+            };
+        }
 
         if (existing && existing.id) {
             await supabaseClient
                 .from('login')
                 .update({ cookies: payload })
-                .eq('anilist_id', String(anilistId));
+                .eq('id', existing.id);
         } else {
             await supabaseClient
                 .from('login')
                 .insert({
-                    anilist_id: String(anilistId),
+                    anilist_id: identifier,
                     cookies: payload
                 });
         }
@@ -154,6 +217,7 @@ async function checkAniListAuthStatus() {
                     </div>
                 `;
             }
+            await syncUserWithSupabase(user);
         }
     } catch (err) {
         console.error("Auth check failed:", err);
@@ -166,14 +230,14 @@ async function checkAniListAuthStatus() {
 async function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIndex, thumbnailImg) {
     const user = getLoggedInUser();
 
-    // JIKA USER TIDAK LOGIN, RIWAYAT TIDAK DISIMPAN
+    // JIKA USER TIDAK LOGIN, RIWAYAT TIDAK AKAN DISIMPAN
     if (!user) {
         console.log("User belum login, riwayat tontonan tidak disimpan.");
         return;
     }
 
     try {
-        const userData = await getSupabaseUserData(user.id);
+        const userData = await getSupabaseUserData(user);
         let history = userData.history || [];
 
         const animeItem = {
@@ -191,7 +255,7 @@ async function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIn
         if (history.length > 8) history.pop();
 
         userData.history = history;
-        await saveSupabaseUserData(user.id, userData);
+        await saveSupabaseUserData(user, userData);
     } catch (e) {
         console.error("Gagal menyimpan riwayat ke Supabase:", e);
     }
