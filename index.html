@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NimeDesu - Nonton Anime Sub Indo</title>
+    <title>Streaming - NimeDesu</title>
     <link rel="icon" href="https://i.ibb.co.com/Ld2r8ZLS/logo.png" type="image/png" />
-
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -14,9 +13,9 @@
                 extend: {
                     colors: {
                         neon: {
-                            lightBg: '#F8F9FA',        
-                            lightCard: '#FFFFFF',      
-                            lightBorder: '#d99b00',    
+                            lightBg: '#FFFAF0',        
+                            lightCard: '#FFF78D',      
+                            lightBorder: '#FFF78D',    
                             darkBg: '#0f0e0a',         
                             darkCard: '#1a1912',       
                             darkBorder: '#33311f',     
@@ -26,18 +25,25 @@
                     },
                     boxShadow: {
                         'glow-yellow': '0 0 15px rgba(217, 155, 0, 0.4), inset 0 0 5px rgba(217, 155, 0, 0.2)'
+                    },
+                    maxWidth: {
+                        '8xl': '90rem'
                     }
                 }
             }
         }
     </script>
-
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style> 
-        body { font-family: 'Inter', sans-serif; -webkit-user-select: none; user-select: none; } 
-
+        body { 
+            font-family: 'Inter', sans-serif; 
+            -webkit-user-select: none; 
+            user-select: none; 
+        } 
         .poster-hover-container .play-overlay {
             opacity: 0;
             transition: opacity 0.6s ease-in-out;
@@ -48,7 +54,6 @@
         .poster-hover-container:hover img {
             transform: scale(1.08);
         }
-
         .no-scrollbar::-webkit-scrollbar {
             display: none;
         }
@@ -56,485 +61,113 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
-
-        /* DUAL NEON RUNNING BEAM & PODIUM GLOW */
-        @property --angle {
-            syntax: '<angle>';
-            initial-value: 0deg;
-            inherits: false;
-        }
-
-        @keyframes rotateBeam {
-            to { --angle: 360deg; }
-        }
-
-        @keyframes pulseGold {
-            0%, 100% { box-shadow: 0 0 12px rgba(217, 155, 0, 0.4), inset 0 0 4px rgba(217, 155, 0, 0.2); }
-            50% { box-shadow: 0 0 25px rgba(255, 215, 0, 0.9), inset 0 0 8px rgba(255, 215, 0, 0.4); }
-        }
-
-        @keyframes pulseSilver {
-            0%, 100% { box-shadow: 0 0 10px rgba(161, 161, 170, 0.3), inset 0 0 3px rgba(161, 161, 170, 0.15); }
-            50% { box-shadow: 0 0 22px rgba(228, 228, 231, 0.85), inset 0 0 6px rgba(228, 228, 231, 0.35); }
-        }
-
-        @keyframes pulseBronze {
-            0%, 100% { box-shadow: 0 0 10px rgba(180, 83, 9, 0.3), inset 0 0 3px rgba(180, 83, 9, 0.15); }
-            50% { box-shadow: 0 0 22px rgba(245, 158, 11, 0.85), inset 0 0 6px rgba(245, 158, 11, 0.35); }
-        }
-
-        .podium-card-neon { position: relative; z-index: 0; }
-        .podium-neon-border { position: absolute; inset: 0; border-radius: 1rem; overflow: hidden; z-index: -1; }
-        .podium-neon-border::before { content: ''; position: absolute; inset: -60%; z-index: -2; }
-        .podium-neon-border::after { content: ''; position: absolute; inset: 2px; border-radius: 0.9rem; z-index: -1; background: inherit; }
-
-        .podium-gold-glow { animation: pulseGold 2s infinite ease-in-out; }
-        .podium-gold-glow .podium-neon-border::before {
-            background: conic-gradient(from var(--angle), transparent 35%, #d99b00 45%, #ffe066 48%, #ffffff 50%, transparent 85%, #d99b00 95%, #ffe066 98%, #ffffff 100%);
-            animation: rotateBeam 2.5s linear infinite;
-        }
-
-        .podium-silver-glow { animation: pulseSilver 2.6s infinite ease-in-out 0.6s; }
-        .podium-silver-glow .podium-neon-border::before {
-            background: conic-gradient(from var(--angle), transparent 35%, #71717a 45%, #e4e4e7 48%, #ffffff 50%, transparent 85%, #71717a 95%, #e4e4e7 98%, #ffffff 100%);
-            animation: rotateBeam 3.1s linear infinite 0.6s;
-        }
-
-        .podium-bronze-glow { animation: pulseBronze 3.2s infinite ease-in-out 1.2s; }
-        .podium-bronze-glow .podium-neon-border::before {
-            background: conic-gradient(from var(--angle), transparent 35%, #b45309 45%, #f59e0b 48%, #ffffff 50%, transparent 85%, #b45309 95%, #f59e0b 98%, #ffffff 100%);
-            animation: rotateBeam 3.7s linear infinite 1.2s;
-        }
     </style>
 </head>
-<body class="bg-neon-lightBg text-black dark:bg-neon-darkBg dark:text-white transition-colors duration-300 min-h-screen flex flex-col">
+<body class="bg-neon-lightBg text-zinc-900 dark:bg-neon-darkBg dark:text-white transition-colors duration-300 min-h-screen flex flex-col">
 
-    <header id="mainHeader" class="fixed top-0 left-0 right-0 z-50 bg-[#F6BE00]/90 dark:bg-[#14130e]/90 backdrop-blur-md border-b border-neon-yellow/50 dark:border-neon-darkBorder shadow-sm dark:shadow-[0_4px_20px_rgba(217,155,0,0.15)] transition-transform duration-300">
+    <header id="mainHeader" class="fixed top-0 left-0 right-0 z-50 bg-[#FFF78D]/90 dark:bg-[#14130e]/90 backdrop-blur-md border-b border-neon-lightBorder dark:border-neon-darkBorder shadow-md dark:shadow-[0_4px_20px_rgba(217,155,0,0.15)] transition-transform duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <button onclick="toggleSidebar()" class="p-2.5 rounded-full bg-transparent hover:bg-black/10 dark:hover:bg-yellow-500/25 transition text-black dark:text-neon-yellow" title="Menu">
-                    <i class="fa-solid fa-bars text-base"></i>
-                </button>
-                <div class="flex items-center space-x-3 cursor-pointer group" onclick="switchView('home')">
-                    <span class="text-xl sm:text-2xl font-bold tracking-tight text-black dark:text-neon-yellow">NimeDesu</span>
+            <div class="flex items-center space-x-1 sm:space-x-2">
+                <div class="flex items-center space-x-3 cursor-pointer group ml-1" onclick="window.location.href='index.html'">
+                    <span class="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-neon-yellow">NimeDesu</span>
                 </div>
             </div>
 
             <div class="hidden md:flex items-center space-x-6 text-sm font-medium">
-                <span class="text-xs text-zinc-600 dark:text-zinc-300">Selamat Datang di Indeks Peringkat NimeDesu</span>
+                <p>Butuh bantuan atau kirim masukan? <a href="mailto:damdesu@proton.me" class="text-neon-yellow hover:underline font-medium">Hubungi saya</a></p>
             </div>
 
             <div class="flex items-center space-x-2">
+                <!-- Status Auth di Stream Header -->
                 <div id="headerAuthContainer">
                     <button onclick="loginAniList()" class="px-3 py-1.5 rounded-full bg-zinc-900 text-white dark:bg-neon-yellow dark:text-black font-bold text-xs flex items-center gap-1.5 hover:opacity-90 transition">
                         <i class="fa-solid fa-user text-xs"></i> Login AniList
                     </button>
                 </div>
 
-                <button id="btnSearchToggle" onclick="toggleSearchInput(event)" class="p-2.5 rounded-full bg-transparent hover:bg-black/10 dark:hover:bg-yellow-500/25 transition text-black dark:text-neon-yellow" title="Cari Anime">
+                <button id="btnSearchToggle" onclick="toggleSearchInput(event)" class="p-2.5 rounded-full bg-transparent hover:bg-yellow-500/20 transition text-zinc-900 dark:text-neon-yellow" title="Cari Anime">
                     <i class="fa-solid fa-magnifying-glass text-sm"></i>
                 </button>
-                <button onclick="toggleTheme()" class="p-2.5 rounded-full bg-transparent hover:bg-black/10 dark:hover:bg-yellow-500/25 transition text-black dark:text-neon-yellow" title="Ganti Tema">
+                <button onclick="toggleTheme()" class="p-2.5 rounded-full bg-transparent hover:bg-yellow-500/20 transition text-zinc-900 dark:text-neon-yellow" title="Ganti Tema">
                     <i id="themeIcon" class="fa-solid fa-moon text-sm"></i>
                 </button>
             </div>
         </div>
     </header>
 
-    <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 hidden transition-opacity" onclick="toggleSidebar()"></div>
-    <div id="sidebarMenu" class="fixed top-0 left-0 bottom-0 w-72 bg-white dark:bg-[#14130e] border-r border-zinc-200 dark:border-neon-darkBorder z-50 transform -translate-x-full transition-transform duration-300 flex flex-col p-5 shadow-2xl">
-        <div class="flex items-center justify-between mb-8 pb-3 border-b border-zinc-200 dark:border-zinc-800">
-            <span class="text-lg font-bold text-black dark:text-neon-yellow">Menu Utama</span>
-            <button onclick="toggleSidebar()" class="p-2 rounded-lg text-black dark:text-white">
-                <i class="fa-solid fa-xmark text-lg"></i>
-            </button>
-        </div>
+    <main class="flex-grow max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full mt-16 space-y-6">
 
-        <div class="flex flex-col space-y-2 text-sm font-medium">
-            <button onclick="switchView('home'); toggleSidebar();" class="flex items-center gap-3 p-3 rounded-xl hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left">
-                <i class="fa-solid fa-house text-black dark:text-neon-yellow w-5 text-center"></i> Beranda
-            </button>
-
-            <div>
-                <button id="btnInformationMenu" onclick="toggleInformationSubmenu(event)" class="w-full flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left">
-                    <span class="flex items-center gap-3">
-                        <i class="fa-solid fa-circle-info text-black dark:text-neon-yellow w-5 text-center"></i> Informasi & Peringkat
-                    </span>
-                    <i id="informationMenuIcon" class="fa-solid fa-chevron-down text-[11px] transition-transform"></i>
-                </button>
-
-                <div id="informationSubmenu" class="hidden ml-3 mt-1 pl-5 border-l border-neon-yellow/30 space-y-1">
-                    <button onclick="openInformation('upcoming'); toggleSidebar();" class="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left text-xs">
-                        <i class="fa-solid fa-calendar-days text-black dark:text-neon-yellow w-4 text-center"></i> Upcoming
-                    </button>
-                    <button onclick="openInformation('bypopularity'); toggleSidebar();" class="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left text-xs">
-                        <i class="fa-solid fa-fire text-black dark:text-neon-yellow w-4 text-center"></i> By Popularity
-                    </button>
-                    <button onclick="openInformation('favorite'); toggleSidebar();" class="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left text-xs">
-                        <i class="fa-solid fa-heart text-black dark:text-neon-yellow w-4 text-center"></i> Favorite
-                    </button>
-                    <button onclick="openInformation('bookmark'); toggleSidebar();" class="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left text-xs">
-                        <i class="fa-solid fa-bookmark text-black dark:text-neon-yellow w-4 text-center"></i> Bookmark
-                    </button>
-                </div>
-            </div>
-
-            <button onclick="switchView('dmca'); toggleSidebar();" class="flex items-center gap-3 p-3 rounded-xl hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left">
-                <i class="fa-solid fa-lock text-black dark:text-neon-yellow w-5 text-center"></i> DMCA
-            </button>
-
-            <div id="sidebarAuthBtn">
-                <button onclick="loginAniList()" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left">
-                    <i class="fa-solid fa-right-to-bracket text-black dark:text-neon-yellow w-5 text-center"></i> Login AniList
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full mt-16 text-black dark:text-white">
-
-        <div id="searchContainer" class="hidden relative mb-8 transition-all duration-300 z-40">
+        <div id="searchContainer" class="hidden relative mb-8 transition-all duration-300 z-50">
             <div id="searchBoxWrapper" class="relative max-w-xl mx-auto flex items-center bg-white dark:bg-zinc-900 rounded-full border-2 border-neon-yellow shadow-glow-yellow overflow-hidden">
-                <input type="text" id="searchField" placeholder="Ketik nama anime disini" oninput="liveSearchAnime()" onkeypress="if(event.key === 'Enter') searchAnime()" class="w-full bg-transparent text-sm pl-6 pr-4 py-3.5 focus:outline-none placeholder:text-zinc-400 font-medium text-black dark:text-white">
-                <button onclick="searchAnime()" class="bg-neon-yellow hover:bg-yellow-600 px-6 py-3.5 h-full flex items-center justify-center text-black transition">
+                <input type="text" id="searchField" placeholder="Ketik nama anime disini" oninput="liveSearchAnime()" onkeypress="if(event.key === 'Enter') executeSearch()" class="w-full bg-transparent text-sm pl-6 pr-4 py-3.5 focus:outline-none placeholder:text-zinc-500 font-medium text-zinc-900 dark:text-white">
+                <button onclick="executeSearch()" class="bg-neon-yellow dark:bg-neon-yellow hover:bg-yellow-600 px-6 py-3.5 h-full flex items-center justify-center text-white dark:text-black transition">
                     <i class="fa-solid fa-magnifying-glass text-sm"></i>
                 </button>
             </div>
             <div id="searchSuggestions" class="hidden absolute left-1/2 -translate-x-1/2 mt-2 w-full max-w-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-h-80 overflow-y-auto p-2 z-50"></div>
         </div>
 
-        <!-- HOME VIEW -->
-        <div id="homeView">
-            <div id="historySection" class="mb-10 hidden">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg sm:text-xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-black dark:text-white flex items-center gap-2">
-                        <i class="fa-solid fa-clock-rotate-left text-black dark:text-neon-yellow"></i> Terakhir Ditonton
-                    </h2>
-                    <button onclick="clearHistory()" class="text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-red-500 transition">Hapus Riwayat</button>
-                </div>
-                <div id="historyGrid" class="flex gap-4 overflow-x-auto no-scrollbar scroll-smooth pb-2 pt-1"></div>
-            </div>
-
-            <div class="flex items-center gap-2 mb-6 relative flex-wrap">
-                <button id="btnSemua" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs" onclick="changeTab('all', this)">Semua</button>
-                <button id="btnOngoing" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs" onclick="changeTab('ongoing', this)">Ongoing</button>
-                <button id="btnCompleted" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs" onclick="changeTab('completed', this)">Completed</button>
-                
-                <div class="relative inline-block">
-                    <button id="btnGenre" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs" onclick="toggleDropdown(event)">Genre ▾</button>
-                    <div class="hidden absolute left-0 top-12 bg-white dark:bg-[#14130e] w-48 max-w-[calc(100vw-2rem)] max-h-[280px] overflow-y-auto shadow-2xl rounded-xl p-1.5 z-30 flex flex-col gap-1 border border-neon-yellow dark:border-neon-darkBorder" id="genreDropdown">
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Action')">Action</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Adventure')">Adventure</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Anthropomorphic')">Anthropomorphic</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Avant Garde')">Avant Garde</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Cars')">Cars</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('CGDCT')">CGDCT</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Childcare')">Childcare</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Comedy')">Comedy</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Crossdressing')">Crossdressing</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Delinquents')">Delinquents</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Dementia')">Dementia</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Demons')">Demons</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Detective')">Detective</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Donghua')">Donghua</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Drama')">Drama</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Ecchi')">Ecchi</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Educational')">Educational</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Erotica')">Erotica</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Family')">Family</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Fantasy')">Fantasy</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Gag Humor')">Gag Humor</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Game')">Game</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Girls Love')">Girls Love</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Gore')">Gore</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Gourmet')">Gourmet</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Harem')">Harem</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('High Stakes Game')">High Stakes Game</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Historical')">Historical</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Horror')">Horror</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Idols (Female)')">Idols (Female)</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Idols (Male)')">Idols (Male)</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Isekai')">Isekai</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Iyashikei')">Iyashikei</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Josei')">Josei</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Kids')">Kids</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Life')">Life</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Live Action')">Live Action</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Love Polygon')">Love Polygon</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Love Status Quo')">Love Status Quo</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Magic')">Magic</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Magical Sex Shift')">Magical Sex Shift</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Mahou Shoujo')">Mahou Shoujo</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Martial Arts')">Martial Arts</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Mecha')">Mecha</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Medical')">Medical</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Military')">Military</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Music')">Music</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Mystery')">Mystery</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Mythology')">Mythology</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Organized Crime')">Organized Crime</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Otaku Culture')">Otaku Culture</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Parody')">Parody</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Performing Arts')">Performing Arts</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Pets')">Pets</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Police')">Police</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Psychological')">Psychological</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Racing')">Racing</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Reincarnation')">Reincarnation</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Reverse Harem')">Reverse Harem</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Romance')">Romance</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Romantic Subtext')">Romantic Subtext</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Samurai')">Samurai</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('School')">School</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Sci-Fi')">Sci-Fi</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Seinen')">Seinen</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Shoujo')">Shoujo</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Shoujo Ai')">Shoujo Ai</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Shounen')">Shounen</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Shounen Ai')">Shounen Ai</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Showbiz')">Showbiz</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Slice of Life')">Slice of Life</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Space')">Space</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Sports')">Sports</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Strategy Game')">Strategy Game</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Super Power')">Super Power</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Supernatural')">Supernatural</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Survival')">Survival</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Suspense')">Suspense</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Team Sports')">Team Sports</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Thriller')">Thriller</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Time Travel')">Time Travel</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Tokusatsu')">Tokusatsu</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Urban Fantasy')">Urban Fantasy</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Vampire')">Vampire</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Video Game')">Video Game</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Villainess')">Villainess</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Visual Arts')">Visual Arts</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Work Life')">Work Life</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Workplace')">Workplace</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Yaoi')">Yaoi</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="mb-6 pb-2">
-                <h2 id="sectionHeader" class="text-xl sm:text-2xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-black dark:text-white">Semua Daftar Anime</h2>
-            </div>
-
-            <div id="animeDisplayGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 sm:gap-5">
-                <div class="col-span-full flex flex-col items-center justify-center py-16 space-y-3">
-                    <i class="fa-solid fa-spinner fa-spin text-2xl text-black dark:text-neon-yellow"></i>
-                    <p class="text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-300">Memuat Data Anime...</p>
-                </div>
-            </div>
-
-            <div id="paginationBox" class="flex justify-center items-center space-x-1.5 sm:space-x-2 mt-8 flex-wrap gap-y-2"></div>
-        </div>
-
-        <!-- INFORMATION & RANKING VIEW -->
-        <div id="informationView" class="hidden">
-            <div class="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-                <div>
-                    <div class="flex items-center gap-2 mb-2">
-                        <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neon-yellow text-black text-[10px] font-bold uppercase tracking-wider">
-                            <i class="fa-solid fa-server text-xs"></i> Server NimeDesu
-                        </span>
-                    </div>
-                    <h2 id="informationHeader" class="text-xl sm:text-2xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-black dark:text-white">Peringkat & Informasi Anime</h2>
-                    <p id="informationDescription" class="text-xs text-zinc-600 dark:text-zinc-400 mt-2 pl-4">Daftar anime dengan nilai dan popularitas tertinggi berdasarkan database AniList.</p>
-                </div>
-            </div>
-
-            <div class="flex items-center justify-start gap-2 mb-8">
-                <button id="infoBtnUpcoming" onclick="openInformation('upcoming')" class="info-tab-btn px-4 py-2 rounded-full bg-neon-lightCard dark:bg-neon-darkCard text-xs font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs">
-                    <i class="fa-solid fa-calendar-days mr-1.5 text-neon-yellow"></i> Upcoming
-                </button>
-                <button id="infoBtnPopularity" onclick="openInformation('bypopularity')" class="info-tab-btn px-4 py-2 rounded-full bg-neon-lightCard dark:bg-neon-darkCard text-xs font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs">
-                    <i class="fa-solid fa-fire mr-1.5 text-neon-yellow"></i> Top Trending
-                </button>
-                <button id="infoBtnFavorite" onclick="openInformation('favorite')" class="info-tab-btn px-4 py-2 rounded-full bg-neon-lightCard dark:bg-neon-darkCard text-xs font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs">
-                    <i class="fa-solid fa-heart mr-1.5 text-neon-yellow"></i> Highest Rated
-                </button>
-                <button id="infoBtnBookmark" onclick="openInformation('bookmark')" class="info-tab-btn px-4 py-2 rounded-full bg-neon-lightCard dark:bg-neon-darkCard text-xs font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs">
-                    <i class="fa-solid fa-bookmark mr-1.5 text-neon-yellow"></i> Bookmark
-                </button>
-            </div>
-
-            <div id="informationLoading" class="hidden col-span-full flex flex-col items-center justify-center py-16 space-y-3">
-                <i class="fa-solid fa-spinner fa-spin text-2xl text-black dark:text-neon-yellow"></i>
-                <p class="text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-300">Memuat data peringkat anime...</p>
-            </div>
-
-            <!-- PODIUM SECTION (TOP 3 RANK WITH DUAL RUNNING NEON BEAM & BOOKMARK BUTTON) -->
-            <div id="podiumSection" class="grid grid-cols-3 gap-3 sm:gap-6 items-end mb-10 max-w-3xl mx-auto pt-6">
-                
-                <!-- RANK #2 (PERAK / SILVER) -->
-                <div class="podium-card-neon podium-silver-glow relative bg-neon-lightCard dark:bg-neon-darkCard rounded-2xl p-2.5 sm:p-3 flex flex-col items-center">
-                    <div class="podium-neon-border bg-neon-lightCard dark:bg-neon-darkCard"></div>
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 bg-zinc-700 text-white font-bold rounded-full flex items-center justify-center text-xs sm:text-sm border-2 border-zinc-400 -mt-6 sm:-mt-7 mb-2 shadow-md z-10">#2</div>
-                    <div id="podium2ClickArea" class="w-full aspect-[3/4] rounded-xl overflow-hidden mb-2 relative group bg-zinc-800 z-10 cursor-pointer poster-hover-container">
-                        <img id="podium2Img" src="https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80" alt="Rank 2" class="w-full h-full object-cover">
-                        <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
-                            <div class="w-10 h-10 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
-                                <i class="fa-solid fa-circle-info text-sm ml-0.5"></i>
-                            </div>
-                        </div>
-                        <button id="podium2BookmarkBtn" onclick="" title="Tambah ke Bookmark AniList" class="absolute bottom-2 right-2 p-1.5 rounded-full bg-black/60 backdrop-blur-md text-zinc-300 hover:text-neon-yellow transition z-20 shadow-md">
-                            <i class="fa-regular fa-bookmark text-xs"></i>
-                        </button>
-                    </div>
-                    <h3 id="podium2Title" class="font-bold text-xs sm:text-sm text-center text-black dark:text-white truncate w-full z-10 cursor-pointer">Hunter × Hunter</h3>
-                    <div class="flex items-center gap-2 mt-1.5 text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 z-10">
-                        <span id="podium2Score" class="flex items-center gap-1 text-neon-yellow font-semibold"><i class="fa-solid fa-star text-[10px]"></i> 8.9</span>
-                        <span id="podium2Pop" class="flex items-center gap-1"><i class="fa-solid fa-bookmark text-[10px]"></i> 2.1M</span>
-                    </div>
-                </div>
-
-                <!-- RANK #1 (EMAS / GOLD) -->
-                <div class="podium-card-neon podium-gold-glow relative bg-neon-lightCard dark:bg-neon-darkCard rounded-2xl p-3 sm:p-4 flex flex-col items-center -translate-y-3">
-                    <div class="podium-neon-border bg-neon-lightCard dark:bg-neon-darkCard"></div>
-                    <div class="absolute -top-7 flex flex-col items-center z-10">
-                        <i class="fa-solid fa-crown text-neon-yellow text-sm -mb-1 drop-shadow-md"></i>
-                        <div class="w-8 h-8 sm:w-9 sm:h-9 bg-neon-yellow text-black font-extrabold rounded-full flex items-center justify-center text-sm sm:text-base border-2 border-yellow-200 shadow-lg">#1</div>
-                    </div>
-                    <div id="podium1ClickArea" class="w-full aspect-[3/4] rounded-xl overflow-hidden mb-2.5 mt-3 relative group bg-zinc-800 z-10 cursor-pointer poster-hover-container">
-                        <img id="podium1Img" src="https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80" alt="Rank 1" class="w-full h-full object-cover">
-                        <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
-                            <div class="w-11 h-11 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
-                                <i class="fa-solid fa-circle-info text-sm ml-0.5"></i>
-                            </div>
-                        </div>
-                        <button id="podium1BookmarkBtn" onclick="" title="Tambah ke Bookmark AniList" class="absolute bottom-2 right-2 p-1.5 rounded-full bg-black/60 backdrop-blur-md text-zinc-300 hover:text-neon-yellow transition z-20 shadow-md">
-                            <i class="fa-regular fa-bookmark text-xs"></i>
-                        </button>
-                    </div>
-                    <h3 id="podium1Title" class="font-bold text-xs sm:text-base text-center text-neon-yellow truncate w-full z-10 cursor-pointer">One Piece</h3>
-                    <div class="flex items-center gap-2 sm:gap-3 mt-1.5 text-[10px] sm:text-xs text-zinc-600 dark:text-zinc-300 z-10">
-                        <span id="podium1Score" class="flex items-center gap-1 text-neon-yellow font-bold"><i class="fa-solid fa-star text-[10px]"></i> 9.1</span>
-                        <span id="podium1Pop" class="flex items-center gap-1"><i class="fa-solid fa-bookmark text-[10px]"></i> 2.5M</span>
-                    </div>
-                </div>
-
-                <!-- RANK #3 (PERUNGGU / BRONZE) -->
-                <div class="podium-card-neon podium-bronze-glow relative bg-neon-lightCard dark:bg-neon-darkCard rounded-2xl p-2.5 sm:p-3 flex flex-col items-center">
-                    <div class="podium-neon-border bg-neon-lightCard dark:bg-neon-darkCard"></div>
-                    <div class="w-7 h-7 sm:w-8 sm:h-8 bg-amber-800 text-amber-100 font-bold rounded-full flex items-center justify-center text-xs sm:text-sm border-2 border-amber-600 -mt-6 sm:-mt-7 mb-2 shadow-md z-10">#3</div>
-                    <div id="podium3ClickArea" class="w-full aspect-[3/4] rounded-xl overflow-hidden mb-2 relative group bg-zinc-800 z-10 cursor-pointer poster-hover-container">
-                        <img id="podium3Img" src="https://images.unsplash.com/photo-1534447677768-be436bb09401?w=400&q=80" alt="Rank 3" class="w-full h-full object-cover">
-                        <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
-                            <div class="w-10 h-10 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
-                                <i class="fa-solid fa-circle-info text-sm ml-0.5"></i>
-                            </div>
-                        </div>
-                        <button id="podium3BookmarkBtn" onclick="" title="Tambah ke Bookmark AniList" class="absolute bottom-2 right-2 p-1.5 rounded-full bg-black/60 backdrop-blur-md text-zinc-300 hover:text-neon-yellow transition z-20 shadow-md">
-                            <i class="fa-regular fa-bookmark text-xs"></i>
-                        </button>
-                    </div>
-                    <h3 id="podium3Title" class="font-bold text-xs sm:text-sm text-center text-black dark:text-white truncate w-full z-10 cursor-pointer">Shingeki no Kyojin</h3>
-                    <div class="flex items-center gap-2 mt-1.5 text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 z-10">
-                        <span id="podium3Score" class="flex items-center gap-1 text-neon-yellow font-semibold"><i class="fa-solid fa-star text-[10px]"></i> 8.8</span>
-                        <span id="podium3Pop" class="flex items-center gap-1"><i class="fa-solid fa-bookmark text-[10px]"></i> 2.3M</span>
-                    </div>
-                </div>
-
-            </div>
-
-            <div id="informationGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3.5"></div>
-            <div id="informationPagination" class="flex justify-center items-center space-x-1.5 sm:space-x-2 mt-8 flex-wrap gap-y-2"></div>
-        </div>
-
-        <!-- DETAIL VIEW -->
-        <div id="detailView" class="hidden">
-            <div class="mb-6">
-                <button onclick="switchView('home')" class="px-4 py-2 rounded-xl text-xs font-bold bg-neon-lightCard dark:bg-neon-darkCard border border-neon-yellow text-black dark:text-white hover:bg-neon-yellow hover:text-black transition flex items-center gap-2 cursor-pointer shadow-xs">
-                    <i class="fa-solid fa-arrow-left"></i> Kembali ke Beranda
-                </button>
-            </div>
-
-            <div class="flex flex-col sm:flex-row gap-5 items-center sm:items-start mb-8 bg-neon-lightCard dark:bg-neon-darkCard p-5 rounded-2xl border border-neon-yellow dark:border-neon-darkBorder shadow-sm">
-                <div class="w-32 sm:w-36 aspect-[3/4] rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-darkBorder bg-zinc-200 dark:bg-zinc-800 shadow-md shrink-0">
-                    <img id="detThumbnail" src="" alt="" class="w-full h-full object-cover">
-                </div>
-
-                <div class="flex flex-col justify-center w-full space-y-3 text-center sm:text-left">
-                    <div>
-                        <span id="detStatusBadge" class="bg-neon-yellow text-black text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase">Ongoing</span>
-                        <h1 id="detTitle" class="text-xl sm:text-2xl font-bold text-black dark:text-white mt-1.5">Judul Anime</h1>
-                        <div id="detGenreLinks" class="flex flex-wrap gap-1.5 mt-2 justify-center sm:justify-start"></div>
-                    </div>
-
-                    <p class="text-xs text-zinc-600 dark:text-zinc-400">Pilih menu:</p>
-
-                    <div class="flex flex-wrap gap-2 justify-center sm:justify-start">
-                        <span class="py-2 px-4 rounded-xl text-xs font-bold bg-neon-yellow text-black shadow-glow-yellow flex items-center gap-2">
-                            <i class="fa-solid fa-circle-info"></i> Detail & Sinopsis
-                        </span>
-                        <button id="streamingBtn" onclick="openStreamingTab()" class="py-2 px-4 rounded-xl text-xs font-bold bg-neon-lightBg dark:bg-neon-darkBg text-black dark:text-white border border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow transition flex items-center gap-2 cursor-pointer">
-                            <i class="fa-solid fa-play"></i> Streaming <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="w-full space-y-6">
-                <div class="bg-neon-lightCard dark:bg-neon-darkCard p-6 rounded-xl border border-neon-yellow dark:border-neon-darkBorder shadow-sm">
-                    <h3 class="text-sm font-bold text-black dark:text-neon-yellow uppercase tracking-wider mb-2">Sinopsis</h3>
-                    <p id="synopsisText" class="text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">-</p>
-                </div>
-
-                <div class="bg-neon-lightCard dark:bg-neon-darkCard rounded-xl border border-neon-yellow dark:border-neon-darkBorder overflow-hidden text-xs shadow-sm">
-                    <div class="grid grid-cols-2 border-b border-neon-yellow dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-600 dark:text-zinc-400 font-medium">Japanese</span>
-                        <span id="detJapanese" class="font-bold text-black dark:text-white text-right">-</span>
-                    </div>
-                    <div class="grid grid-cols-2 border-b border-neon-yellow dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-600 dark:text-zinc-400 font-medium">Skor</span>
-                        <span id="detSkor" class="font-bold text-black dark:text-white text-right">-</span>
-                    </div>
-                    <div class="grid grid-cols-2 border-b border-neon-yellow dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-600 dark:text-zinc-400 font-medium">Status</span>
-                        <span id="detStatus" class="font-bold text-black dark:text-white text-right">-</span>
-                    </div>
-                    <div class="grid grid-cols-2 border-b border-neon-yellow dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-600 dark:text-zinc-400 font-medium">Total Episode</span>
-                        <span id="detTotalEpisode" class="font-bold text-black dark:text-white text-right">-</span>
-                    </div>
-                    <div class="grid grid-cols-2 border-b border-neon-yellow dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-600 dark:text-zinc-400 font-medium">Durasi</span>
-                        <span id="detDurasi" class="font-bold text-black dark:text-white text-right">-</span>
-                    </div>
-                    <div class="grid grid-cols-2 border-b border-neon-yellow dark:border-neon-darkBorder py-3 px-4">
-                        <span class="text-zinc-600 dark:text-zinc-400 font-medium">Tanggal Rilis</span>
-                        <span id="detTanggalRilis" class="font-bold text-black dark:text-white text-right">-</span>
-                    </div>
-                    <div class="grid grid-cols-2 py-3 px-4">
-                        <span class="text-zinc-600 dark:text-zinc-400 font-medium">Studio</span>
-                        <span id="detStudio" class="font-bold text-black dark:text-white text-right">-</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- DMCA VIEW -->
-        <div id="dmcaView" class="hidden max-w-3xl mx-auto bg-neon-lightCard dark:bg-neon-darkCard p-6 sm:p-8 rounded-2xl border border-neon-yellow dark:border-neon-darkBorder shadow-sm space-y-4 text-xs sm:text-sm leading-relaxed text-zinc-700 dark:text-white">
-            <h2 class="text-xl font-bold border-l-4 border-neon-yellow pl-3 text-black dark:text-white">PEMBERITAHUAN KEPADA PENGUNJUNG</h2>
-            <p>Diberitahukan kepada seluruh pengunjung situs ini,<br>Perlu kami sampaikan bahwa situs web ini murni dikembangkan secara mandiri dan tidak mengambil keuntungan finansial (tidak ada profit/komersil) sepeser pun dari penayangan konten yang ada di dalamnya.</p>
-            <p>Terkait dengan konten anime yang tersedia di situs ini, kami menyatakan sikap kooperatif dan siap menghapus anime terkait secara cepat apabila ada teguran, klaim, atau laporan hak cipta (DMCA) dari pihak pemegang hak cipta melalui email <a href="mailto:damdesu@proton.me" class="text-black dark:text-neon-yellow underline font-semibold">damdesu@proton.me</a>.</p>
-            <p>Jika Anda adalah pemilik hak cipta atau perwakilan resmi yang mendapati konten Anda ditayangkan tanpa izin di situs ini, silakan hubungi kami melalui halaman kontak agar dapat segera kami tindak lanjuti dan hapus. Terima kasih atas pengertian dan kerja samanya.</p>
+        <div class="px-1 py-0 mb-2 flex items-center justify-between flex-wrap gap-3">
+            <h1 id="streamTitle" class="text-xl sm:text-2xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-zinc-900 dark:text-white">Memuat Data Streaming...</h1>
             
-            <div class="pt-6 font-semibold space-y-2 text-black dark:text-white">
-                <p>Hormat kami,</p>
-                <p class="mt-4 text-black dark:text-neon-yellow">Pengelola Situs</p>
+            <div id="episodeNavContainer" class="flex items-center gap-2 hidden">
+                <button id="prevEpBtn" onclick="changeEpisodeRelative(-1)" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-neon-lightCard dark:bg-neon-darkCard border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrow-left text-[10px]"></i> Previous
+                </button>
+                <button id="nextEpBtn" onclick="changeEpisodeRelative(1)" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-neon-lightCard dark:bg-neon-darkCard border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition flex items-center gap-1.5">
+                    Next <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-black rounded-xl overflow-hidden border border-neon-darkBorder shadow-2xl aspect-video relative flex items-center justify-center" oncontextmenu="return false;">
+            <iframe id="videoIframe" src="" class="w-full h-full border-0 select-none" sandbox="allow-scripts allow-same-origin allow-presentation" allowfullscreen></iframe>
+        </div>
+
+        <div class="bg-neon-lightCard dark:bg-neon-darkCard p-4 rounded-xl border border-neon-lightBorder dark:border-neon-darkBorder space-y-3">
+            <div class="flex justify-between items-center cursor-pointer select-none pb-2 border-b border-neon-lightBorder dark:border-neon-darkBorder" onclick="toggleMainServerBox()">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-server text-neon-yellow text-xs"></i>
+                    <span class="text-xs text-zinc-900 dark:text-white font-semibold">Pilih Server: <span id="currentServerLabel" class="text-black dark:text-white font-bold">-</span></span>
+                </div>
+                <i id="mainServerArrow" class="fa-solid fa-chevron-down text-xs text-zinc-500 transition-transform duration-300 -rotate-90"></i>
+            </div>
+
+            <div id="mainServerContainer" class="space-y-3 pt-1 hidden"></div>
+        </div>
+
+        <div class="bg-neon-lightCard dark:bg-neon-darkCard p-4 rounded-xl border border-neon-lightBorder dark:border-neon-darkBorder space-y-3">
+            <div class="flex justify-between items-center cursor-pointer select-none pb-2 border-b border-neon-lightBorder dark:border-neon-darkBorder" onclick="toggleEpisodeBox()">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-list text-neon-yellow text-xs"></i>
+                    <span class="text-xs text-zinc-900 dark:text-white font-semibold" id="episodeBoxLabel">Daftar Episode</span>
+                </div>
+                <i id="episodeBoxArrow" class="fa-solid fa-chevron-down text-xs text-zinc-500 transition-transform duration-300"></i>
+            </div>
+
+            <div id="episodeBoxContainer" class="flex gap-2 flex-wrap pt-1"></div>
+        </div>
+
+        <div class="space-y-4 pt-6 border-t border-neon-lightBorder dark:border-neon-darkBorder">
+            <div class="flex items-center justify-between">
+                <h3 class="text-base font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-zinc-900 dark:text-white">Rekomendasi Anime Serupa</h3>
+                <div class="flex gap-1.5">
+                    <button onclick="scrollSlider(-1)" class="w-8 h-8 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow flex items-center justify-center text-xs transition"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button onclick="scrollSlider(1)" class="w-8 h-8 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow flex items-center justify-center text-xs transition"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+            </div>
+            
+            <div id="recommendationSlider" class="flex gap-4 overflow-x-auto no-scrollbar scroll-smooth pb-2 pt-1">
+                <p class="text-xs text-zinc-500">Memuat rekomendasi...</p>
             </div>
         </div>
 
     </main>
 
-    <footer class="border-t border-neon-yellow dark:border-neon-darkBorder py-6 mt-12 text-center text-xs text-zinc-600 dark:text-zinc-400">
+    <footer class="border-t border-neon-lightBorder dark:border-neon-darkBorder py-6 mt-12 text-center text-xs text-zinc-700 dark:text-zinc-400">
         <p>NimeDesu - Nonton Anime Sub Indonesia</p>
-        <p class="mt-1">Butuh bantuan atau kirim masukan? <a href="mailto:damdesu@proton.me" class="text-black dark:text-neon-yellow underline font-medium">Hubungi saya</a></p>
     </footer>
 
-    <script src="script-index.js"></script>
+    <script src="script-stream.js"></script>
 </body>
 </html>
