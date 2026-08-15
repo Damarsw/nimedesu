@@ -36,6 +36,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style> 
         body { 
             font-family: 'Inter', sans-serif; 
@@ -76,6 +78,13 @@
             </div>
 
             <div class="flex items-center space-x-2">
+                <!-- Status Auth di Stream Header -->
+                <div id="headerAuthContainer">
+                    <button onclick="loginAniList()" class="px-3 py-1.5 rounded-full bg-zinc-900 text-white dark:bg-neon-yellow dark:text-black font-bold text-xs flex items-center gap-1.5 hover:opacity-90 transition">
+                        <i class="fa-solid fa-user text-xs"></i> Login AniList
+                    </button>
+                </div>
+
                 <button id="btnSearchToggle" onclick="toggleSearchInput(event)" class="p-2.5 rounded-full bg-transparent hover:bg-yellow-500/20 transition text-zinc-900 dark:text-neon-yellow" title="Cari Anime">
                     <i class="fa-solid fa-magnifying-glass text-sm"></i>
                 </button>
@@ -159,7 +168,6 @@
         <p>NimeDesu - Nonton Anime Sub Indonesia</p>
     </footer>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="script-stream.js"></script>
 </body>
 </html>
