@@ -391,8 +391,19 @@ function renderBookmarkGrid(items) {
     paginationHTML += `<button class="${currentPage > 1 ? baseBtnClass : disabledBtnClass}" ${currentPage <= 1 ? 'disabled' : ''} onclick="loadBookmarkTab(1)">&laquo;</button>`;
     paginationHTML += `<button class="${currentPage > 1 ? baseBtnClass : disabledBtnClass}" ${currentPage <= 1 ? 'disabled' : ''} onclick="loadBookmarkTab(${currentPage - 1})">&lsaquo;</button>`;
 
-    let startPage = Math.max(1, currentPage - 2);
-    let endPage = Math.min(totalPages, currentPage + 2);
+    const isMobile = window.innerWidth < 640;
+    const maxVisibleRange = isMobile ? 1 : 2;
+
+    let startPage = Math.max(1, currentPage - maxVisibleRange);
+    let endPage = Math.min(totalPages, currentPage + maxVisibleRange);
+
+    if (isMobile) {
+        if (currentPage === 1) {
+            endPage = Math.min(totalPages, 3);
+        } else if (currentPage === totalPages) {
+            startPage = Math.max(1, totalPages - 2);
+        }
+    }
 
     for (let i = startPage; i <= endPage; i++) {
         const activeClass = i === currentPage ? 'bg-neon-yellow text-black font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder shadow-xs';
@@ -449,8 +460,14 @@ async function checkAniListAuthStatus() {
     const token = localStorage.getItem('anilist_token');
     const headerAuthContainer = document.getElementById('headerAuthContainer');
     const sidebarAuthBtn = document.getElementById('sidebarAuthBtn');
+    const userWelcomeBanner = document.getElementById('userWelcomeBanner');
+    const userWelcomeName = document.getElementById('userWelcomeName');
+    const userWelcomeAvatarContainer = document.getElementById('userWelcomeAvatarContainer');
 
-    if (!token) return;
+    if (!token) {
+        if (userWelcomeBanner) userWelcomeBanner.classList.add('hidden');
+        return;
+    }
 
     const query = `query { Viewer { id name avatar { medium } } }`;
     try {
@@ -471,10 +488,9 @@ async function checkAniListAuthStatus() {
 
             if (headerAuthContainer) {
                 headerAuthContainer.innerHTML = `
-                    <div class="flex items-center gap-2 bg-white dark:bg-zinc-800/90 p-1 pr-3 rounded-full border border-neon-yellow shadow-xs">
+                    <div class="flex items-center gap-1.5 bg-white dark:bg-zinc-800/90 p-1 pr-2 rounded-full border border-neon-yellow shadow-xs">
                         <img src="${user.avatar.medium}" class="w-6 h-6 rounded-full object-cover">
-                        <span class="text-xs font-bold text-black dark:text-neon-yellow max-w-[80px] truncate">${user.name}</span>
-                        <button onclick="logoutAniList()" class="ml-1 text-[11px] text-black dark:text-zinc-400 hover:text-red-500 transition" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
+                        <button onclick="logoutAniList()" class="text-[11px] text-black dark:text-zinc-400 hover:text-red-500 transition p-0.5" title="Logout (${user.name})"><i class="fa-solid fa-right-from-bracket"></i></button>
                     </div>
                 `;
             }
@@ -485,6 +501,15 @@ async function checkAniListAuthStatus() {
                         <i class="fa-solid fa-right-from-bracket w-5 text-center"></i> Logout (${user.name})
                     </button>
                 `;
+            }
+
+            // BANNER UCAPAN SELAMAT DATANG DI BERANDA
+            if (userWelcomeBanner && userWelcomeName) {
+                userWelcomeName.innerText = user.name;
+                if (userWelcomeAvatarContainer) {
+                    userWelcomeAvatarContainer.innerHTML = `<img src="${user.avatar.medium}" class="w-10 h-10 rounded-full border border-neon-yellow object-cover shadow-sm">`;
+                }
+                userWelcomeBanner.classList.remove('hidden');
             }
 
             await syncUserWithSupabase(user);
@@ -788,8 +813,19 @@ function displayAnimeWithPagination() {
     paginationHTML += `<button class="${currentPage > 1 ? baseBtnClass : disabledBtnClass}" ${currentPage <= 1 ? 'disabled' : ''} onclick="goToPage(1)">&laquo;</button>`;
     paginationHTML += `<button class="${currentPage > 1 ? baseBtnClass : disabledBtnClass}" ${currentPage <= 1 ? 'disabled' : ''} onclick="goToPage(${currentPage - 1})">&lsaquo;</button>`;
 
-    let startPage = Math.max(1, currentPage - 2);
-    let endPage = Math.min(totalPages, currentPage + 2);
+    const isMobile = window.innerWidth < 640;
+    const maxVisibleRange = isMobile ? 1 : 2;
+
+    let startPage = Math.max(1, currentPage - maxVisibleRange);
+    let endPage = Math.min(totalPages, currentPage + maxVisibleRange);
+
+    if (isMobile) {
+        if (currentPage === 1) {
+            endPage = Math.min(totalPages, 3);
+        } else if (currentPage === totalPages) {
+            startPage = Math.max(1, totalPages - 2);
+        }
+    }
 
     for (let i = startPage; i <= endPage; i++) {
         const activeClass = i === currentPage ? 'bg-neon-yellow text-black font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder shadow-xs';
@@ -812,13 +848,15 @@ function goToPage(pageNumber) {
 }
 
 /* =========================================================
-   SEARCH BAR TOGGLE & OUTSIDE CLICK
+   SEARCH BAR TOGGLE (MENYEMBUL DARI BAWAH HEADER)
    ========================================================= */
 function toggleSearchInput(event) {
     if(event) event.stopPropagation();
     const container = document.getElementById('searchContainer');
     const field = document.getElementById('searchField');
     const suggestions = document.getElementById('searchSuggestions');
+
+    if (!container || !field) return;
 
     if (container.classList.contains('hidden')) {
         container.classList.remove('hidden');
@@ -839,27 +877,16 @@ function toggleSearchInput(event) {
 document.addEventListener('click', function(e) {
     const container = document.getElementById('searchContainer');
     const searchBoxWrapper = document.getElementById('searchBoxWrapper');
-    const searchSuggestions = document.getElementById('searchSuggestions');
     const btnToggle = document.getElementById('btnSearchToggle');
-    const dropdown = document.getElementById('genreDropdown');
-    const btnGenre = document.getElementById('btnGenre');
 
     if (container && !container.classList.contains('hidden')) {
         const isClickInside = (searchBoxWrapper && searchBoxWrapper.contains(e.target)) ||
-                              (searchSuggestions && searchSuggestions.contains(e.target)) ||
                               (btnToggle && btnToggle.contains(e.target));
         
         if (!isClickInside) {
             container.classList.add('hidden');
+            const searchSuggestions = document.getElementById('searchSuggestions');
             if (searchSuggestions) searchSuggestions.classList.add('hidden');
-        }
-    }
-
-    if (dropdown && dropdown.style.display === 'flex') {
-        if (!btnGenre || !btnGenre.contains(e.target)) {
-            if (!dropdown.contains(e.target)) {
-                dropdown.style.display = 'none';
-            }
         }
     }
 });
@@ -950,16 +977,62 @@ function resetTabActiveStyles() {
         b.classList.add('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
 
         const icon = b.querySelector('i');
-        if (icon) {
-            icon.classList.remove('text-black');
-            icon.classList.add('text-neon-yellow');
+        if (icon && icon.id !== 'genreArrow') {
+            icon.classList.remove('text-neon-yellow');
+            icon.classList.add('text-black', 'dark:text-neon-yellow');
         }
     });
+}
+
+function toggleGenreContainer(e) {
+    if (e) e.stopPropagation();
+    const container = document.getElementById('genreContainer');
+    const arrow = document.getElementById('genreArrow');
+    const genreBtn = document.getElementById('btnGenre');
+
+    if (!container) return;
+
+    if (container.classList.contains('hidden')) {
+        container.classList.remove('hidden');
+        if (arrow) arrow.style.transform = 'rotate(180deg)';
+
+        resetTabActiveStyles();
+        if (genreBtn) {
+            genreBtn.classList.remove('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
+            genreBtn.classList.add('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
+            
+            const icon = genreBtn.querySelector('i');
+            if (icon && icon.id !== 'genreArrow') icon.classList.remove('text-neon-yellow');
+        }
+
+        setTimeout(() => {
+            const navbarOffset = 80;
+            const targetPosition = container.getBoundingClientRect().top + window.pageYOffset - navbarOffset;
+            window.scrollTo({
+                top: targetPosition,
+                behavior: 'smooth'
+            });
+        }, 50);
+
+    } else {
+        container.classList.add('hidden');
+        if (arrow) arrow.style.transform = 'rotate(0deg)';
+
+        if (!activeGenreFilter && genreBtn) {
+            genreBtn.classList.remove('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
+            genreBtn.classList.add('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
+        }
+    }
 }
 
 function changeTab(type, element) {
     switchView('home');
     resetTabActiveStyles();
+
+    const genreContainer = document.getElementById('genreContainer');
+    const arrow = document.getElementById('genreArrow');
+    if (genreContainer) genreContainer.classList.add('hidden');
+    if (arrow) arrow.style.transform = 'rotate(0deg)';
 
     if (element) {
         element.classList.remove('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
@@ -971,8 +1044,6 @@ function changeTab(type, element) {
             icon.classList.add('text-black');
         }
     }
-    const dropdown = document.getElementById('genreDropdown');
-    if (dropdown) dropdown.style.display = 'none';
 
     activeSearchQuery = "";
     activeGenreFilter = "";
@@ -997,27 +1068,18 @@ function changeTab(type, element) {
     loadAnimeDatabase(1);
 }
 
-function toggleDropdown(e) {
-    e.stopPropagation();
-    const dropdown = document.getElementById('genreDropdown');
-    dropdown.style.display = dropdown.style.display === 'flex' ? 'none' : 'flex';
-}
-
 function filterGenre(genre) {
     switchView('home');
-    const dropdown = document.getElementById('genreDropdown');
-    if (dropdown) dropdown.style.display = 'none';
+    const genreContainer = document.getElementById('genreContainer');
+    const arrow = document.getElementById('genreArrow');
+    if (genreContainer) genreContainer.classList.add('hidden');
+    if (arrow) arrow.style.transform = 'rotate(0deg)';
     
     resetTabActiveStyles();
     const genreBtn = document.getElementById('btnGenre');
     if (genreBtn) {
         genreBtn.classList.remove('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
         genreBtn.classList.add('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
-        const icon = genreBtn.querySelector('i');
-        if (icon) {
-            icon.classList.remove('text-neon-yellow');
-            icon.classList.add('text-black');
-        }
     }
 
     activeSearchQuery = "";
@@ -1025,6 +1087,8 @@ function filterGenre(genre) {
     activeGenreFilter = genre;
     document.getElementById('sectionHeader').innerText = `Genre: ${genre}`;
     loadAnimeDatabase(1);
+
+    scrollToSearchResults();
 }
 
 function searchAnime() {
@@ -1106,13 +1170,16 @@ function openStreamingTab() {
 
 function toggleTheme() {
     const html = document.documentElement;
-    const icon = document.getElementById('themeIcon');
-    if (html.classList.contains('dark')) {
+    const isDark = html.classList.contains('dark');
+    
+    const floatingIcon = document.getElementById('floatingThemeIcon');
+
+    if (isDark) {
         html.classList.remove('dark');
-        icon.classList.replace('fa-moon', 'fa-sun');
+        if (floatingIcon) floatingIcon.classList.replace('fa-sun', 'fa-moon');
     } else {
         html.classList.add('dark');
-        icon.classList.replace('fa-sun', 'fa-moon');
+        if (floatingIcon) floatingIcon.classList.replace('fa-moon', 'fa-sun');
     }
 }
 
@@ -1125,7 +1192,7 @@ function setInfoTabActive(type) {
         const icon = b.querySelector('i');
         if (icon) {
             icon.classList.remove('text-black');
-            icon.classList.add('text-neon-yellow');
+            icon.classList.add('text-black', 'dark:text-neon-yellow');
         }
     });
     
@@ -1138,7 +1205,7 @@ function setInfoTabActive(type) {
         activeBtn.className = 'info-tab-btn px-4 py-2 rounded-full bg-neon-yellow text-black text-xs font-bold shadow-glow-yellow transition';
         const activeIcon = activeBtn.querySelector('i');
         if (activeIcon) {
-            activeIcon.classList.remove('text-neon-yellow');
+            activeIcon.classList.remove('dark:text-neon-yellow');
             activeIcon.classList.add('text-black');
         }
     }
@@ -1258,8 +1325,19 @@ function renderSearchInfoPagination(query, type, page, totalPageCount, paginatio
 
     pagHTML += `<button class="${page > 1 ? baseBtn : disBtn}" ${page <= 1 ? 'disabled' : ''} onclick="searchInformationRanking('${escapedQuery}', '${type}', ${page - 1})">&lsaquo;</button>`;
     
-    let sPage = Math.max(1, page - 2);
-    let ePage = Math.min(totalPageCount, page + 2);
+    const isMobile = window.innerWidth < 640;
+    const maxVisibleRange = isMobile ? 1 : 2;
+
+    let sPage = Math.max(1, page - maxVisibleRange);
+    let ePage = Math.min(totalPageCount, page + maxVisibleRange);
+
+    if (isMobile) {
+        if (page === 1) {
+            ePage = Math.min(totalPageCount, 3);
+        } else if (page === totalPageCount) {
+            sPage = Math.max(1, totalPageCount - 2);
+        }
+    }
     
     for (let i = sPage; i <= ePage; i++) {
         let actClass = i === page ? 'bg-neon-yellow text-black font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder shadow-xs';
@@ -1391,8 +1469,19 @@ function renderInfoPagination(type, page, totalPageCount, paginationEl) {
     
     pagHTML += `<button class="${page > 1 ? baseBtn : disBtn}" ${page <= 1 ? 'disabled' : ''} onclick="openInformation('${type}', ${page - 1})">&lsaquo;</button>`;
     
-    let sPage = Math.max(1, page - 2);
-    let ePage = Math.min(totalPageCount, page + 2);
+    const isMobile = window.innerWidth < 640;
+    const maxVisibleRange = isMobile ? 1 : 2;
+
+    let sPage = Math.max(1, page - maxVisibleRange);
+    let ePage = Math.min(totalPageCount, page + maxVisibleRange);
+
+    if (isMobile) {
+        if (page === 1) {
+            ePage = Math.min(totalPageCount, 3);
+        } else if (page === totalPageCount) {
+            sPage = Math.max(1, totalPageCount - 2);
+        }
+    }
     
     for (let i = sPage; i <= ePage; i++) {
         let actClass = i === page ? 'bg-neon-yellow text-black font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder shadow-xs';
