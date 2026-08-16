@@ -5,7 +5,7 @@ let activeEpisodes = [];
 let activeEpisodeIndex = 0;
 let globalAnimeTitle = "Anime";
 let currentAnimeThumbnail = "";
-let currentAnimeGenres = []; 
+let currentAnimeGenres = []; // Array simpan genre anime aktif
 let searchDebounceTimer = null;
 
 function generateSecurityToken() {
@@ -162,10 +162,8 @@ async function checkAniListAuthStatus() {
             localStorage.setItem('anilist_user', JSON.stringify(user));
             if (headerAuthContainer) {
                 headerAuthContainer.innerHTML = `
-                    <div class="flex items-center gap-2 bg-white dark:bg-zinc-800/90 p-1 pr-3 rounded-full border border-neon-yellow shadow-xs">
-                        <img src="${user.avatar.medium}" class="w-6 h-6 rounded-full object-cover">
-                        <span class="text-xs font-bold text-black dark:text-neon-yellow max-w-[80px] truncate">${user.name}</span>
-                        <button onclick="logoutAniList()" class="ml-1 text-[11px] text-black dark:text-zinc-400 hover:text-red-500 transition" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
+                    <div class="flex items-center bg-white dark:bg-zinc-800/90 p-0.5 rounded-full border border-neon-yellow shadow-xs">
+                        <img src="${user.avatar.medium}" class="w-7 h-7 rounded-full object-cover">
                     </div>
                 `;
             }
@@ -304,14 +302,6 @@ function executeSearch() {
     }
 }
 
-// EKSTRAKSI SLUG UTAMA DARI URL
-function extractSlugFromUrl(fullUrl) {
-    if (!fullUrl) return "";
-    let clean = fullUrl.split('?')[0].replace(/\/+$/, '');
-    let parts = clean.split('/');
-    return parts[parts.length - 1] || fullUrl;
-}
-
 async function initStream() {
     const urlParams = new URLSearchParams(window.location.search);
     const animeUrl = urlParams.get('url');
@@ -324,27 +314,13 @@ async function initStream() {
 
     try {
         const sec = generateSecurityToken();
-        
-        // Pemanggilan API Pertama menggunakan Slug Unik
-        const targetSlug = extractSlugFromUrl(animeUrl);
-        let response = await fetch(`${RENDER_API_URL}/anime-detail?url=${encodeURIComponent(targetSlug)}`, {
+        const response = await fetch(`${RENDER_API_URL}/anime-detail?url=${encodeURIComponent(animeUrl)}`, {
             headers: {
                 "X-Client-Token": sec.token,
                 "X-Client-Time": sec.time
             }
         });
-        let data = await response.json();
-
-        // Fallback jika pencarian via slug kosong, coba panggil dengan full URL
-        if (!data || !data.episodes || data.episodes.length === 0) {
-            response = await fetch(`${RENDER_API_URL}/anime-detail?url=${encodeURIComponent(animeUrl)}`, {
-                headers: {
-                    "X-Client-Token": sec.token,
-                    "X-Client-Time": sec.time
-                }
-            });
-            data = await response.json();
-        }
+        const data = await response.json();
 
         currentAnimeThumbnail = data.img_url || data.image_url || data.thumbnail || "";
 
@@ -367,9 +343,6 @@ async function initStream() {
                 const searchData = await searchRes.json();
                 if (searchData.data && searchData.data.length > 0) {
                     currentAnimeThumbnail = searchData.data[0].img_url || searchData.data[0].image_url || "";
-                    if (!currentAnimeGenres.length && searchData.data[0].genre) {
-                        currentAnimeGenres = searchData.data[0].genre.split(',').map(g => g.trim()).filter(Boolean);
-                    }
                 }
             } catch (e) {}
         }
@@ -403,6 +376,7 @@ async function initStream() {
             document.getElementById('episodeNavContainer').classList.remove('hidden');
             renderDynamicEpisodes();
 
+            // Panggil rekomendasi acak berbasis genre
             renderMixedGenreRecommendations();
         } else {
             document.getElementById('streamTitle').innerText = "Data Episode Tidak Tersedia.";
@@ -424,6 +398,7 @@ function scrollSlider(direction) {
     slider.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
 }
 
+/* REKOMENDASI ACAK PER GENRE (MAKSIMAL 12 ANIME) */
 async function renderMixedGenreRecommendations() {
     const recSlider = document.getElementById('recommendationSlider');
     if (!recSlider) return;
