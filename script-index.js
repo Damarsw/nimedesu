@@ -6,8 +6,7 @@ let totalPages = 1;
 let activeAnime = null;
 const itemsPerPage = 12;
 
-// State view dan filter
-let currentView = 'home'; // 'home' | 'information' | 'detail' | 'dmca'
+let currentView = 'home';
 let activeSearchQuery = "";
 let activeInfoSearchQuery = "";
 let activeStatusFilter = "";
@@ -15,11 +14,9 @@ let activeGenreFilter = "";
 let isBookmarkViewActive = false;
 let searchDebounceTimer = null;
 
-// State Informasi & Peringkat
-let currentInfoType = 'bypopularity'; // 'upcoming' | 'bypopularity' | 'favorite'
+let currentInfoType = 'bypopularity';
 let currentInfoPage = 1;
 
-// Cache bookmark & skor anime lokal
 let userBookmarksCache = [];
 let scoreLocalCache = {};
 try {
@@ -40,11 +37,6 @@ function generateSecurityToken() {
     };
 }
 
-/* =========================================================
-   SISTEM SKOR CERDAS DENGAN LOCAL CACHING (RESET MINGGU 00.00)
-   ========================================================= */
-
-// Hitung timestamp milidetik untuk hari Minggu jam 00:00:00 berikutnya
 function getNextSundayMidnightTimestamp() {
     const now = new Date();
     const result = new Date(now);
@@ -61,7 +53,6 @@ function getNextSundayMidnightTimestamp() {
     return result.getTime();
 }
 
-// Dapatkan cache skor dengan validasi expired tiap Hari Minggu jam 00.00
 function getCachedScore(title, defaultScore) {
     if (defaultScore && defaultScore !== '-' && defaultScore !== 'N/A') {
         return defaultScore;
@@ -76,7 +67,7 @@ function getCachedScore(title, defaultScore) {
 
         const now = Date.now();
         if (cachedData.expiresAt && now < cachedData.expiresAt) {
-            return cachedData.score; // Masih valid (belum lewat Minggu 00.00)
+            return cachedData.score;
         }
     }
     return 'N/A';
@@ -115,7 +106,7 @@ async function fetchAniListScoreForCard(animeTitle, elementId, defaultScore) {
         if (score && score !== 'N/A') {
             scoreLocalCache[cacheKey] = {
                 score: score,
-                expiresAt: getNextSundayMidnightTimestamp() // Tanggal reset Minggu 00.00
+                expiresAt: getNextSundayMidnightTimestamp()
             };
 
             try {
@@ -317,9 +308,6 @@ function addAniListBookmark(animeOrMediaId, buttonEl) {
     toggleBookmarkAnime(animeOrMediaId, buttonEl);
 }
 
-/* =========================================================
-   TAB BOOKMARK BERANDA
-   ========================================================= */
 async function loadBookmarkTab(page = 1) {
     isBookmarkViewActive = true;
     currentPage = page;
@@ -451,9 +439,6 @@ function renderBookmarkGrid(items) {
     paginationBox.innerHTML = paginationHTML;
 }
 
-/* =========================================================
-   AUTENTIKASI ANILIST
-   ========================================================= */
 const ANILIST_CLIENT_ID = "48567";
 
 function getLoggedInUser() {
@@ -521,7 +506,6 @@ async function checkAniListAuthStatus() {
         if (user) {
             localStorage.setItem('anilist_user', JSON.stringify(user));
 
-            // DI HEADER: Hanya tampilkan foto avatar user polos (tanpa tombol logout kecil)
             if (headerAuthContainer) {
                 headerAuthContainer.innerHTML = `
                     <div class="flex items-center bg-white dark:bg-zinc-800/90 p-0.5 rounded-full border border-neon-yellow shadow-xs">
@@ -530,7 +514,6 @@ async function checkAniListAuthStatus() {
                 `;
             }
 
-            // DI SIDEBAR MENU: Sediakan tombol Logout untuk logout akun
             if (sidebarAuthBtn) {
                 sidebarAuthBtn.innerHTML = `
                     <button onclick="logoutAniList()" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-500/20 text-red-500 transition text-left">
@@ -539,14 +522,12 @@ async function checkAniListAuthStatus() {
                 `;
             }
 
-            // DI BANNER GREETING BERANDA: Tampilkan nama & avatar (tombol logout merah dihilangkan)
             if (userWelcomeBanner && userWelcomeName) {
                 userWelcomeName.innerText = user.name;
                 if (userWelcomeAvatarContainer) {
                     userWelcomeAvatarContainer.innerHTML = `<img src="${user.avatar.medium}" class="w-10 h-10 rounded-full border border-neon-yellow object-cover shadow-sm">`;
                 }
                 
-                // Pastikan tombol logout merah di dalam banner dihilangkan
                 const bannerLogoutBtn = userWelcomeBanner.querySelector('button');
                 if (bannerLogoutBtn) bannerLogoutBtn.style.display = 'none';
 
@@ -562,7 +543,7 @@ async function checkAniListAuthStatus() {
 }
 
 /* =========================================================
-   RIWAYAT TONTONAN
+   RIWAYAT TONTONAN (AUTO-REPAIR GAMBAR KOSONG)
    ========================================================= */
 async function renderHistory() {
     const historySection = document.getElementById('historySection');
@@ -586,24 +567,51 @@ async function renderHistory() {
 
         if (historySection) historySection.classList.remove('hidden');
         if (historyGrid) {
-            historyGrid.innerHTML = history.map(item => `
-                <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?url=${encodeURIComponent(item.url)}&eps=${item.lastEpisodeIndex || 0}'">
-                    <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
-                        <img src="${item.thumbnail}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
-                        <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
-                            <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
-                                <i class="fa-solid fa-play ml-0.5 text-base"></i>
+            historyGrid.innerHTML = history.map((item, idx) => {
+                const uniqueImgId = `histImg_${idx}_${Date.now()}`;
+                const isNoImage = !item.thumbnail || item.thumbnail.includes('placehold.co') || item.thumbnail === '';
+
+                if (isNoImage && item.url) {
+                    setTimeout(async () => {
+                        try {
+                            const sec = generateSecurityToken();
+                            const res = await fetch(`${RENDER_API_URL}/anime-detail?url=${encodeURIComponent(item.url)}`, {
+                                headers: {
+                                    "X-Client-Token": sec.token,
+                                    "X-Client-Time": sec.time
+                                }
+                            });
+                            const data = await res.json();
+                            const realImg = data.img_url || data.image_url || data.thumbnail;
+                            if (realImg) {
+                                const el = document.getElementById(uniqueImgId);
+                                if (el) el.src = realImg;
+                            }
+                        } catch (e) {}
+                    }, 50);
+                }
+
+                const displayImg = isNoImage ? "https://placehold.co/400x600?text=Memuat..." : item.thumbnail;
+
+                return `
+                    <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?url=${encodeURIComponent(item.url)}&eps=${item.lastEpisodeIndex || 0}'">
+                        <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
+                            <img id="${uniqueImgId}" src="${displayImg}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
+                            <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
+                                <div class="w-12 h-12 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
+                                    <i class="fa-solid fa-play ml-0.5 text-base"></i>
+                                </div>
                             </div>
+                            <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">
+                                ${item.lastWatchedEpisode || 'Eps 1'}
+                            </span>
                         </div>
-                        <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">
-                            ${item.lastWatchedEpisode || 'Eps 1'}
-                        </span>
+                        <div class="p-3">
+                            <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
+                        </div>
                     </div>
-                    <div class="p-3">
-                        <h4 class="font-semibold text-xs sm:text-sm line-clamp-2 text-black dark:text-white">${item.title}</h4>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
     } catch (err) {
         console.error("Gagal mengambil riwayat:", err);
@@ -626,9 +634,6 @@ async function clearHistory() {
     }
 }
 
-/* =========================================================
-   PENCARIAN, DETAIL VIEW & SCROLL HELPER
-   ========================================================= */
 function scrollToSearchResults() {
     const target = document.getElementById('btnBookmarkTab')?.parentElement || 
                    document.getElementById('btnSemua')?.parentElement || 
@@ -888,9 +893,6 @@ function goToPage(pageNumber) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-/* =========================================================
-   SEARCH BAR OVERLAY TOGGLE & MODAL BEHAVIOR
-   ========================================================= */
 function toggleSearchInput(event) {
     if(event) event.stopPropagation();
     const container = document.getElementById('searchContainer');
@@ -1012,7 +1014,6 @@ function selectLiveSearchItem(anime) {
     viewDetails(anime.id);
 }
 
-// RESET STYLE TOMBOL NAVIGASI (IKON SELALU HITAM DI TEMA TERANG)
 function resetTabActiveStyles() {
     document.querySelectorAll('.nav-tab-btn').forEach(b => {
         b.classList.remove('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
@@ -1225,9 +1226,6 @@ function toggleTheme() {
     }
 }
 
-/* =========================================================
-   SISTEM PERINGKAT & INFORMASI
-   ========================================================= */
 function setInfoTabActive(type) {
     document.querySelectorAll('.info-tab-btn').forEach(b => {
         b.className = 'info-tab-btn px-4 py-2 rounded-full bg-neon-lightCard dark:bg-neon-darkCard text-xs font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs';
@@ -1417,7 +1415,6 @@ async function fetchRankingFromBackend(type, page, loadingEl, podiumEl, gridEl, 
         const listData = json.list || [];
         const lastPage = json.last_page || 1;
 
-        // SELALU TAMPILKAN PODIUM DI SEMUA HALAMAN (PAGE 1, 2, 3, DST)
         if (top3Data.length >= 3) {
             renderPodiumData(top3Data);
             podiumEl.classList.remove('hidden');
