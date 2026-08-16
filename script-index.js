@@ -41,8 +41,27 @@ function generateSecurityToken() {
 }
 
 /* =========================================================
-   SISTEM SKOR CERDAS DENGAN LOCAL CACHING (EXPIRE 7 HARI)
+   SISTEM SKOR CERDAS DENGAN LOCAL CACHING (RESET MINGGU 00.00)
    ========================================================= */
+
+// Hitung timestamp milidetik untuk hari Minggu jam 00:00:00 berikutnya
+function getNextSundayMidnightTimestamp() {
+    const now = new Date();
+    const result = new Date(now);
+    
+    const dayOfWeek = now.getDay();
+    let daysUntilSunday = (7 - dayOfWeek) % 7;
+    
+    if (daysUntilSunday === 0) {
+        daysUntilSunday = 7;
+    }
+    
+    result.setDate(now.getDate() + daysUntilSunday);
+    result.setHours(0, 0, 0, 0);
+    return result.getTime();
+}
+
+// Dapatkan cache skor dengan validasi expired tiap Hari Minggu jam 00.00
 function getCachedScore(title, defaultScore) {
     if (defaultScore && defaultScore !== '-' && defaultScore !== 'N/A') {
         return defaultScore;
@@ -55,12 +74,9 @@ function getCachedScore(title, defaultScore) {
     if (cachedData) {
         if (typeof cachedData === 'string') return cachedData;
 
-        // Validasi expired 7 Hari (604.800.000 ms)
         const now = Date.now();
-        const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-        
-        if (now - cachedData.timestamp < SEVEN_DAYS_MS) {
-            return cachedData.score;
+        if (cachedData.expiresAt && now < cachedData.expiresAt) {
+            return cachedData.score; // Masih valid (belum lewat Minggu 00.00)
         }
     }
     return 'N/A';
@@ -99,7 +115,7 @@ async function fetchAniListScoreForCard(animeTitle, elementId, defaultScore) {
         if (score && score !== 'N/A') {
             scoreLocalCache[cacheKey] = {
                 score: score,
-                timestamp: Date.now() // Simpan timestamp waktu sekarang
+                expiresAt: getNextSundayMidnightTimestamp() // Tanggal reset Minggu 00.00
             };
 
             try {
@@ -522,7 +538,6 @@ async function checkAniListAuthStatus() {
                 `;
             }
 
-            // BANNER UCAPAN SELAMAT DATANG DI BERANDA
             if (userWelcomeBanner && userWelcomeName) {
                 userWelcomeName.innerText = user.name;
                 if (userWelcomeAvatarContainer) {
@@ -990,7 +1005,7 @@ function selectLiveSearchItem(anime) {
     viewDetails(anime.id);
 }
 
-// RESET STYLE TOMBOL NAVIGASI (IKON HITAM DI TEMA TERANG)
+// RESET STYLE TOMBOL NAVIGASI (IKON SELALU HITAM DI TEMA TERANG)
 function resetTabActiveStyles() {
     document.querySelectorAll('.nav-tab-btn').forEach(b => {
         b.classList.remove('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
@@ -1345,7 +1360,7 @@ function renderSearchInfoPagination(query, type, page, totalPageCount, paginatio
     const disBtn = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border-zinc-200 dark:border-zinc-800 cursor-not-allowed';
     const escapedQuery = query.replace(/'/g, "\\'");
 
-    pagHTML += `<button class="${page > 1 ? baseBtn : disBtn}" ${page <= 1 ? 'disabled' : ''} onclick="searchInformationRanking('${escapedQuery}', '${type}', ${page - 1})">&lsaquo;</button>`;
+    pagHTML += `<button class="${page > 1 ? baseBtn : disBtn}" ${page <= 1 ? 'disabled' : ''} onclick="openInformation('${type}', ${page - 1})">&lsaquo;</button>`;
     
     const isMobile = window.innerWidth < 640;
     const maxVisibleRange = isMobile ? 1 : 2;
@@ -1366,7 +1381,7 @@ function renderSearchInfoPagination(query, type, page, totalPageCount, paginatio
         pagHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${actClass} transition" onclick="searchInformationRanking('${escapedQuery}', '${type}', ${i})">${i}</button>`;
     }
     
-    pagHTML += `<button class="${page < totalPageCount ? baseBtn : disBtn}" ${page >= totalPageCount ? 'disabled' : ''} onclick="searchInformationRanking('${escapedQuery}', '${type}', ${page + 1})">&rsaquo;</button>`;
+    pagHTML += `<button class="${page < totalPageCount ? baseBtn : disBtn}" ${page >= totalPageCount ? 'disabled' : ''} onclick="openInformation('${type}', ${page + 1})">&rsaquo;</button>`;
     
     paginationEl.innerHTML = pagHTML;
 }
@@ -1492,7 +1507,6 @@ function renderInfoPagination(type, page, totalPageCount, paginationEl) {
     let pagHTML = '';
     const baseBtn = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow transition shadow-xs';
     const disBtn = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border-zinc-200 dark:border-zinc-800 cursor-not-allowed';
-    const escapedQuery = query.replace(/'/g, "\\'");
 
     pagHTML += `<button class="${page > 1 ? baseBtn : disBtn}" ${page <= 1 ? 'disabled' : ''} onclick="openInformation('${type}', ${page - 1})">&lsaquo;</button>`;
     
