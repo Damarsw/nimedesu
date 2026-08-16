@@ -105,9 +105,6 @@ async function saveSupabaseUserData(user, payload) {
     }
 }
 
-/* =========================================================
-   AUTENTIKASI ANILIST DI STREAM
-   ========================================================= */
 const ANILIST_CLIENT_ID = "48567";
 
 function getLoggedInUser() {
@@ -178,9 +175,6 @@ async function checkAniListAuthStatus() {
     }
 }
 
-/* =========================================================
-   SIMPAN RIWAYAT STREAM KE SUPABASE
-   ========================================================= */
 async function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIndex, thumbnailImg) {
     const user = getLoggedInUser();
 
@@ -211,9 +205,6 @@ async function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIn
     }
 }
 
-/* =========================================================
-   SEARCH BAR TOGGLE & LIVE SEARCH
-   ========================================================= */
 function toggleSearchInput(event) {
     if(event) event.stopPropagation();
     const container = document.getElementById('searchContainer');
@@ -332,8 +323,22 @@ async function initStream() {
         });
         const data = await response.json();
 
-        // Tangkap gambar thumbnail dari backend
         currentAnimeThumbnail = data.img_url || data.image_url || data.thumbnail || "";
+
+        if (!currentAnimeThumbnail && data.title) {
+            try {
+                const searchRes = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(data.title)}&per_page=1`, {
+                    headers: {
+                        "X-Client-Token": sec.token,
+                        "X-Client-Time": sec.time
+                    }
+                });
+                const searchData = await searchRes.json();
+                if (searchData.data && searchData.data.length > 0) {
+                    currentAnimeThumbnail = searchData.data[0].img_url || searchData.data[0].image_url || "";
+                }
+            } catch (e) {}
+        }
 
         if (data && data.episodes && data.episodes.length > 0) {
             activeEpisodes = data.episodes.filter(ep => ep && (ep.episode_title || ep.video_servers));
