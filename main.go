@@ -507,9 +507,10 @@ func animeDetailHandler(c *gin.Context) {
 
 	c.Header("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=3600")
 	c.JSON(http.StatusOK, gin.H{
-		"title":    animeItem["title"],
-		"url":      animeItem["url"],
-		"episodes": episodesList,
+		"title":     animeItem["title"],
+		"url":       animeItem["url"],
+		"img_url":   animeItem["img_url"], // Sertakan img_url agar tersimpan di riwayat
+		"episodes":  episodesList,
 	})
 }
 
