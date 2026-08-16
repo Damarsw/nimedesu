@@ -5,7 +5,8 @@ let activeEpisodes = [];
 let activeEpisodeIndex = 0;
 let globalAnimeTitle = "Anime";
 let currentAnimeThumbnail = "";
-let currentAnimeGenres = []; // Array simpan genre anime aktif
+let currentAnimeGenres = []; 
+let currentAnimeId = null;
 let searchDebounceTimer = null;
 
 function generateSecurityToken() {
@@ -184,7 +185,7 @@ async function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIn
         let history = userData.history || [];
 
         const animeItem = {
-            id: animeUrl,
+            id: currentAnimeId || animeUrl,
             title: animeTitle,
             url: animeUrl,
             thumbnail: thumbnailImg || "https://placehold.co/400x600?text=No+Image",
@@ -193,7 +194,7 @@ async function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIn
             updatedAt: new Date().toISOString()
         };
 
-        history = history.filter(item => item.url !== animeUrl);
+        history = history.filter(item => item.url !== animeUrl && String(item.id) !== String(currentAnimeId));
         history.unshift(animeItem);
         if (history.length > 8) history.pop();
 
@@ -275,11 +276,12 @@ function liveSearchAnime() {
                 const title = anime.title || "Tanpa Judul";
                 const thumb = anime.image_url || anime.img_url || anime.thumbnail || "https://placehold.co/100x150?text=No+Image";
                 const animeUrl = anime.url ? anime.url.trim() : "";
+                const animeId = anime.id || "";
                 const rawGenre = anime.genre || "";
                 const genres = rawGenre ? rawGenre.split(',').map(g => g.trim()).join(', ') : '-';
 
                 return `
-                    <div onclick="window.location.href='stream.html?url=${encodeURIComponent(animeUrl)}&eps=0'" class="flex items-center gap-3 p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer transition">
+                    <div onclick="window.location.href='stream.html?id=${animeId}&url=${encodeURIComponent(animeUrl)}&eps=0'" class="flex items-center gap-3 p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer transition">
                         <img src="${thumb}" class="w-10 h-14 object-cover rounded-lg shrink-0">
                         <div class="overflow-hidden">
                             <h4 class="text-xs font-semibold text-black dark:text-white truncate">${title}</h4>
@@ -304,17 +306,25 @@ function executeSearch() {
 
 async function initStream() {
     const urlParams = new URLSearchParams(window.location.search);
+    const animeId = urlParams.get('id');
     const animeUrl = urlParams.get('url');
     const targetEps = parseInt(urlParams.get('eps')) || 0; 
 
-    if (!animeUrl) {
+    if (!animeId && !animeUrl) {
         document.getElementById('streamTitle').innerText = "URL Anime Tidak Ditemukan!";
         return;
     }
 
     try {
         const sec = generateSecurityToken();
-        const response = await fetch(`${RENDER_API_URL}/anime-detail?url=${encodeURIComponent(animeUrl)}`, {
+        let apiEndpoint = `${RENDER_API_URL}/anime-detail?`;
+        if (animeId) {
+            apiEndpoint += `id=${encodeURIComponent(animeId)}`;
+        } else {
+            apiEndpoint += `url=${encodeURIComponent(animeUrl)}`;
+        }
+
+        const response = await fetch(apiEndpoint, {
             headers: {
                 "X-Client-Token": sec.token,
                 "X-Client-Time": sec.time
@@ -322,6 +332,7 @@ async function initStream() {
         });
         const data = await response.json();
 
+        currentAnimeId = data.id || animeId;
         currentAnimeThumbnail = data.img_url || data.image_url || data.thumbnail || "";
 
         if (data.genre) {
@@ -368,7 +379,7 @@ async function initStream() {
             activeEpisodeIndex = (targetEps >= 0 && targetEps < activeEpisodes.length) ? targetEps : 0;
 
             globalAnimeTitle = data.title;
-            if (!globalAnimeTitle) {
+            if (!globalAnimeTitle && animeUrl) {
                 const segments = animeUrl.split('/').filter(Boolean);
                 globalAnimeTitle = segments[segments.length - 1].replace(/-/g, ' ');
             }
@@ -376,7 +387,6 @@ async function initStream() {
             document.getElementById('episodeNavContainer').classList.remove('hidden');
             renderDynamicEpisodes();
 
-            // Panggil rekomendasi acak berbasis genre
             renderMixedGenreRecommendations();
         } else {
             document.getElementById('streamTitle').innerText = "Data Episode Tidak Tersedia.";
@@ -406,7 +416,6 @@ async function renderMixedGenreRecommendations() {
     try {
         const sec = generateSecurityToken();
         let recommendedAnimeList = [];
-        const currentUrlParam = new URLSearchParams(window.location.search).get('url');
 
         let targetGenres = currentAnimeGenres.slice(0, 3);
         if (targetGenres.length === 0) {
@@ -425,7 +434,7 @@ async function renderMixedGenreRecommendations() {
             const result = await res.json();
             let items = result.data || [];
 
-            items = items.filter(a => a.url !== currentUrlParam);
+            items = items.filter(a => String(a.id) !== String(currentAnimeId));
             items.sort(() => 0.5 - Math.random());
 
             const picked = items.slice(0, itemsPerGenre);
@@ -448,10 +457,11 @@ async function renderMixedGenreRecommendations() {
             const title = rec.title || "Tanpa Judul";
             const thumb = rec.image_url || rec.img_url || rec.thumbnail || "https://placehold.co/300x400?text=No+Image";
             const recUrl = rec.url ? rec.url.trim() : "";
+            const recId = rec.id || "";
             const status = rec.status || "Ongoing";
 
             return `
-                <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow/60 dark:border-neon-darkBorder hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?url=${encodeURIComponent(recUrl)}&eps=0'">
+                <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow/60 dark:border-neon-darkBorder hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?id=${recId}&url=${encodeURIComponent(recUrl)}&eps=0'">
                     <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
                         <img src="${thumb}" alt="${title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
                         <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
