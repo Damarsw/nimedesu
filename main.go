@@ -23,6 +23,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Config & Structs
 var (
 	supabaseURL     = os.Getenv("SUPABASE_URL")
 	supabaseKey     = os.Getenv("SUPABASE_KEY")
@@ -56,8 +57,8 @@ var (
 	apiCallMutex      sync.Mutex
 	minCallInterval   = 750 * time.Millisecond
 	
-	// CACHE SET KE 24 JAM (86400 Detik)
-	CACHE_TTL_ANIME   = int64(86400) 
+	// Cache 24 Jam di RAM Server
+	CACHE_TTL_ANIME   = int64(86400)
 )
 
 func getEnvOrDefault(key, defaultValue string) string {
@@ -272,7 +273,6 @@ func main() {
 	r.GET("/api/user-data", userDataHandler)
 	r.POST("/api/user-update", userUpdateHandler)
 
-	// ENDPOINT MANUAL PURGE CACHE (BUAT JIKA HABIS UPDATE SUPABASE)
 	r.GET("/api/clear-cache", func(c *gin.Context) {
 		localCache.Lock()
 		localCache.AnimeList = make(map[string]CacheItem)
@@ -507,10 +507,10 @@ func animeDetailHandler(c *gin.Context) {
 
 	c.Header("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=3600")
 	c.JSON(http.StatusOK, gin.H{
-		"title":     animeItem["title"],
-		"url":       animeItem["url"],
-		"img_url":   animeItem["img_url"], // Sertakan img_url agar tersimpan di riwayat
-		"episodes":  episodesList,
+		"title":    animeItem["title"],
+		"url":      animeItem["url"],
+		"img_url":  animeItem["img_url"],
+		"episodes": episodesList,
 	})
 }
 
