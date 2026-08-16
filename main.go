@@ -429,44 +429,43 @@ func animeListHandler(c *gin.Context) {
 }
 
 func animeDetailHandler(c *gin.Context) {
+	animeIDParam := strings.TrimSpace(c.Query("id"))
 	rawURL := strings.TrimSpace(c.Query("url"))
-	if rawURL == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "URL tidak valid"})
-		return
-	}
 
-	// Unescape URL terlebih dahulu jika ter-encode dari frontend
-	decodedURL, errUnescape := url.QueryUnescape(rawURL)
-	if errUnescape != nil {
-		decodedURL = rawURL
+	if animeIDParam == "" && rawURL == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID atau URL anime tidak valid"})
+		return
 	}
 
 	var animeList []map[string]interface{}
 
-	// 1. Ekstrak Slug/Path Utama (Menghilangkan https:// dan slash berlebih)
-	// Contoh: 'https://anime-indo.lol/anime/naruto-shippuden/' -> 'naruto-shippuden'
-	cleanPath := strings.TrimPrefix(decodedURL, "https://")
-	cleanPath = strings.TrimPrefix(cleanPath, "http://")
-	cleanPath = strings.Trim(cleanPath, "/")
-
-	parts := strings.Split(cleanPath, "/")
-	targetSlug := parts[len(parts)-1] // Ambil slug anime paling belakang
-
-	// 2. Pencarian ke Supabase menggunakan ilike pada slug URL
-	query := fmt.Sprintf("anime?url=ilike.*%s*&select=*", url.QueryEscape(targetSlug))
-	resp, err := supabaseRequest("GET", query, nil, nil)
-	if err == nil {
-		json.NewDecoder(resp.Body).Decode(&animeList)
-		resp.Body.Close()
+	// 1. UTAMA: Cari berdasarkan ID Anime (Exact Match & Sangat Presisi)
+	if animeIDParam != "" {
+		idResp, err := supabaseRequest("GET", fmt.Sprintf("anime?id=eq.%s&select=*", url.QueryEscape(animeIDParam)), nil, nil)
+		if err == nil {
+			json.NewDecoder(idResp.Body).Decode(&animeList)
+			idResp.Body.Close()
+		}
 	}
 
-	// 3. Fallback: Exact Match (eq) jika ilike slug tidak mengembalikan hasil
-	if len(animeList) == 0 {
-		exactQuery := fmt.Sprintf("anime?url=eq.%s&select=*", url.QueryEscape(decodedURL))
-		fbResp, fbErr := supabaseRequest("GET", exactQuery, nil, nil)
-		if fbErr == nil {
-			json.NewDecoder(fbResp.Body).Decode(&animeList)
-			fbResp.Body.Close()
+	// 2. FALLBACK: Jika ID tidak dikirim/tidak ada, cari menggunakan Slug URL
+	if len(animeList) == 0 && rawURL != "" {
+		decodedURL, errUnescape := url.QueryUnescape(rawURL)
+		if errUnescape != nil {
+			decodedURL = rawURL
+		}
+
+		cleanPath := strings.TrimPrefix(decodedURL, "https://")
+		cleanPath = strings.TrimPrefix(cleanPath, "http://")
+		cleanPath = strings.Trim(cleanPath, "/")
+
+		parts := strings.Split(cleanPath, "/")
+		targetSlug := parts[len(parts)-1]
+
+		resp, err := supabaseRequest("GET", fmt.Sprintf("anime?url=ilike.*%s*&select=*", url.QueryEscape(targetSlug)), nil, nil)
+		if err == nil {
+			json.NewDecoder(resp.Body).Decode(&animeList)
+			resp.Body.Close()
 		}
 	}
 
@@ -478,7 +477,7 @@ func animeDetailHandler(c *gin.Context) {
 	animeItem := animeList[0]
 	animeID := animeItem["id"]
 
-	// 4. Ambil Episode berdasarkan anime_id (Pastikan Relasi Foreign Key Berjalan)
+	// 3. Ambil daftar episode berdasarkan anime_id
 	epResp, err := supabaseRequest("GET", fmt.Sprintf("episode?anime_id=eq.%v&order=id.asc&select=*", animeID), nil, nil)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"episodes": []interface{}{}})
@@ -533,6 +532,7 @@ func animeDetailHandler(c *gin.Context) {
 
 	c.Header("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=3600")
 	c.JSON(http.StatusOK, gin.H{
+		"id":       animeItem["id"],
 		"title":    animeItem["title"],
 		"url":      animeItem["url"],
 		"img_url":  animeItem["img_url"],
