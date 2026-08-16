@@ -521,15 +521,16 @@ async function checkAniListAuthStatus() {
         if (user) {
             localStorage.setItem('anilist_user', JSON.stringify(user));
 
+            // DI HEADER: Hanya tampilkan foto avatar user polos (tanpa tombol logout kecil)
             if (headerAuthContainer) {
                 headerAuthContainer.innerHTML = `
-                    <div class="flex items-center gap-1.5 bg-white dark:bg-zinc-800/90 p-1 pr-2 rounded-full border border-neon-yellow shadow-xs">
-                        <img src="${user.avatar.medium}" class="w-6 h-6 rounded-full object-cover">
-                        <button onclick="logoutAniList()" class="text-[11px] text-black dark:text-zinc-400 hover:text-red-500 transition p-0.5" title="Logout (${user.name})"><i class="fa-solid fa-right-from-bracket"></i></button>
+                    <div class="flex items-center bg-white dark:bg-zinc-800/90 p-0.5 rounded-full border border-neon-yellow shadow-xs">
+                        <img src="${user.avatar.medium}" class="w-7 h-7 rounded-full object-cover">
                     </div>
                 `;
             }
 
+            // DI SIDEBAR MENU: Sediakan tombol Logout untuk logout akun
             if (sidebarAuthBtn) {
                 sidebarAuthBtn.innerHTML = `
                     <button onclick="logoutAniList()" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-500/20 text-red-500 transition text-left">
@@ -538,11 +539,17 @@ async function checkAniListAuthStatus() {
                 `;
             }
 
+            // DI BANNER GREETING BERANDA: Tampilkan nama & avatar (tombol logout merah dihilangkan)
             if (userWelcomeBanner && userWelcomeName) {
                 userWelcomeName.innerText = user.name;
                 if (userWelcomeAvatarContainer) {
                     userWelcomeAvatarContainer.innerHTML = `<img src="${user.avatar.medium}" class="w-10 h-10 rounded-full border border-neon-yellow object-cover shadow-sm">`;
                 }
+                
+                // Pastikan tombol logout merah di dalam banner dihilangkan
+                const bannerLogoutBtn = userWelcomeBanner.querySelector('button');
+                if (bannerLogoutBtn) bannerLogoutBtn.style.display = 'none';
+
                 userWelcomeBanner.classList.remove('hidden');
             }
 
