@@ -1107,6 +1107,7 @@ function searchAnime() {
         searchField.blur();
     }
 
+    // Jika pengguna sedang berada di tampilan Peringkat/Informasi
     if (currentView === 'information') {
         activeInfoSearchQuery = query;
         const targetType = currentInfoType || 'bypopularity';
@@ -1129,7 +1130,6 @@ function searchAnime() {
     loadAnimeDatabase(1).then(() => {
         scrollToSearchResults();
     });
-    scrollToSearchResults();
 }
 
 function viewDetails(id) {
