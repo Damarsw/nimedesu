@@ -7,30 +7,30 @@
     <link rel="icon" href="https://i.ibb.co.com/Ld2r8ZLS/logo.png" type="image/png" />
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        neon: {
-                            lightBg: '#F8F9FA',        
-                            lightCard: '#FFFFFF',      
-                            lightBorder: '#d99b00',    
-                            darkBg: '#0f0e0a',         
-                            darkCard: '#1a1912',       
-                            darkBorder: '#33311f',     
-                            yellow: '#d99b00',         
-                            yellowHover: '#b88200'     
-                        }
-                    },
-                    boxShadow: {
-                        'glow-yellow': '0 0 15px rgba(217, 155, 0, 0.4), inset 0 0 5px rgba(217, 155, 0, 0.2)'
+<script>
+    tailwind.config = {
+        darkMode: 'class',
+        theme: {
+            extend: {
+                colors: {
+                    neon: {
+                        lightBg: '#F8F9FA',        
+                        lightCard: '#FFFFFF',      
+                        lightBorder: '#F6BE00',    
+                        darkBg: '#0f0e0a',         
+                        darkCard: '#1a1912',       
+                        darkBorder: '#33311f',     
+                        yellow: '#F6BE00',         /* Warna Kuning Header Cerah */
+                        yellowHover: '#d4a000'     
                     }
+                },
+                boxShadow: {
+                    'glow-yellow': '0 0 15px rgba(246, 190, 0, 0.4), inset 0 0 5px rgba(246, 190, 0, 0.2)'
                 }
             }
         }
-    </script>
+    }
+</script>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -108,8 +108,9 @@
 </head>
 <body class="bg-neon-lightBg text-black dark:bg-neon-darkBg dark:text-white transition-colors duration-300 min-h-screen flex flex-col">
 
+    <!-- FIXED HEADER -->
     <header id="mainHeader" class="fixed top-0 left-0 right-0 z-50 bg-[#F6BE00]/90 dark:bg-[#14130e]/90 backdrop-blur-md border-b border-neon-yellow/50 dark:border-neon-darkBorder shadow-sm dark:shadow-[0_4px_20px_rgba(217,155,0,0.15)] transition-transform duration-300">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-3">
                 <button onclick="toggleSidebar()" class="p-2.5 rounded-full bg-transparent hover:bg-black/10 dark:hover:bg-yellow-500/25 transition text-black dark:text-neon-yellow" title="Menu">
                     <i class="fa-solid fa-bars text-base"></i>
@@ -124,18 +125,34 @@
             </div>
 
             <div class="flex items-center space-x-2">
-                <div id="headerAuthContainer">
-                    <button onclick="loginAniList()" class="px-3 py-1.5 rounded-full bg-zinc-900 text-white dark:bg-neon-yellow dark:text-black font-bold text-xs flex items-center gap-1.5 hover:opacity-90 transition">
-                        <i class="fa-solid fa-user text-xs"></i> Login AniList
-                    </button>
-                </div>
-
+                <!-- Tombol Search (Kiri) -->
                 <button id="btnSearchToggle" onclick="toggleSearchInput(event)" class="p-2.5 rounded-full bg-transparent hover:bg-black/10 dark:hover:bg-yellow-500/25 transition text-black dark:text-neon-yellow" title="Cari Anime">
                     <i class="fa-solid fa-magnifying-glass text-sm"></i>
                 </button>
-                <button onclick="toggleTheme()" class="p-2.5 rounded-full bg-transparent hover:bg-black/10 dark:hover:bg-yellow-500/25 transition text-black dark:text-neon-yellow" title="Ganti Tema">
-                    <i id="themeIcon" class="fa-solid fa-moon text-sm"></i>
-                </button>
+
+                <!-- Tombol Login / User Icon (Kanan) -->
+                <div id="headerAuthContainer">
+                    <button onclick="loginAniList()" class="p-2.5 rounded-full bg-transparent hover:bg-black/10 dark:hover:bg-yellow-500/25 transition text-black dark:text-neon-yellow" title="Login AniList">
+                        <i class="fa-solid fa-user text-sm"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SEARCH BAR TOGGLE (NONGTOL / MENYEMBUL LANGSUNG DARI BAWAH HEADER) -->
+        <div id="searchContainer" class="hidden w-full bg-white/95 dark:bg-[#1a1912]/95 border-b-2 border-neon-yellow shadow-xl py-3 px-4 sm:px-8 transition-all duration-300 relative z-50">
+            <div id="searchBoxWrapper" class="relative max-w-2xl mx-auto flex flex-col">
+                <div class="flex items-center bg-zinc-100 dark:bg-zinc-900 rounded-2xl border border-neon-yellow/60 overflow-hidden px-2 py-1 shadow-inner">
+                    <input type="text" id="searchField" placeholder="Ketik nama anime disini..." oninput="liveSearchAnime()" onkeypress="if(event.key === 'Enter') searchAnime()" class="w-full bg-transparent text-sm sm:text-base pl-4 pr-3 py-2.5 focus:outline-none placeholder:text-zinc-400 font-medium text-black dark:text-white">
+                    <button onclick="searchAnime()" class="bg-neon-yellow hover:bg-yellow-600 px-5 py-2.5 rounded-xl flex items-center justify-center text-black font-bold transition shrink-0">
+                        <i class="fa-solid fa-magnifying-glass text-xs sm:text-sm"></i>
+                    </button>
+                    <button onclick="toggleSearchInput(event)" class="p-2.5 text-zinc-400 hover:text-red-500 transition ml-1" title="Tutup">
+                        <i class="fa-solid fa-xmark text-base"></i>
+                    </button>
+                </div>
+                <!-- Live Search Suggestions Dropdown di Bawah Input Search Header -->
+                <div id="searchSuggestions" class="hidden w-full bg-white dark:bg-[#1a1912] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-h-72 overflow-y-auto mt-2 p-2 z-50"></div>
             </div>
         </div>
     </header>
@@ -189,18 +206,22 @@
 
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full mt-16 text-black dark:text-white">
 
-        <div id="searchContainer" class="hidden relative mb-8 transition-all duration-300 z-40">
-            <div id="searchBoxWrapper" class="relative max-w-xl mx-auto flex items-center bg-white dark:bg-zinc-900 rounded-full border-2 border-neon-yellow shadow-glow-yellow overflow-hidden">
-                <input type="text" id="searchField" placeholder="Ketik nama anime disini" oninput="liveSearchAnime()" onkeypress="if(event.key === 'Enter') searchAnime()" class="w-full bg-transparent text-sm pl-6 pr-4 py-3.5 focus:outline-none placeholder:text-zinc-400 font-medium text-black dark:text-white">
-                <button onclick="searchAnime()" class="bg-neon-yellow hover:bg-yellow-600 px-6 py-3.5 h-full flex items-center justify-center text-black transition">
-                    <i class="fa-solid fa-magnifying-glass text-sm"></i>
-                </button>
-            </div>
-            <div id="searchSuggestions" class="hidden absolute left-1/2 -translate-x-1/2 mt-2 w-full max-w-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-h-80 overflow-y-auto p-2 z-50"></div>
-        </div>
-
         <!-- HOME VIEW -->
         <div id="homeView">
+            <!-- UCAPAN SELAMAT DATANG USER (GREETING BANNER) -->
+            <div id="userWelcomeBanner" class="hidden mb-6 p-4 rounded-2xl bg-neon-lightCard dark:bg-neon-darkCard border border-neon-yellow/50 shadow-sm flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div id="userWelcomeAvatarContainer"></div>
+                    <div>
+                        <span class="text-[10px] font-bold tracking-wider uppercase text-zinc-500 dark:text-zinc-400">Selamat Datang</span>
+                        <h3 id="userWelcomeName" class="text-base sm:text-lg font-extrabold text-black dark:text-neon-yellow leading-tight">-</h3>
+                    </div>
+                </div>
+                <button onclick="logoutAniList()" class="px-3 py-1.5 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-bold transition flex items-center gap-1.5" title="Logout">
+                    <i class="fa-solid fa-right-from-bracket text-xs"></i> <span class="hidden sm:inline">Logout</span>
+                </button>
+            </div>
+
             <div id="historySection" class="mb-10 hidden">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-lg sm:text-xl font-bold tracking-tight border-l-4 border-neon-yellow pl-3 text-black dark:text-white flex items-center gap-2">
@@ -211,114 +232,131 @@
                 <div id="historyGrid" class="flex gap-4 overflow-x-auto no-scrollbar scroll-smooth pb-2 pt-1"></div>
             </div>
 
-            <!-- TAB NAVIGASI BERANDA -->
-            <div class="flex items-center gap-2 mb-6 relative flex-wrap">
-                <!-- TOMBOL BOOKMARK (IKON SAJA, DI PALING KIRI) -->
-                <button id="btnBookmarkTab"
-                    class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs flex items-center gap-2 hover:border-neon-yellow"
-                    onclick="changeTab('bookmark', this)"
-                    title="Daftar Bookmark">
-                    <i class="fa-solid fa-bookmark text-neon-yellow text-sm"></i>
-                </button>
+            <!-- TAB NAVIGASI BERANDA DENGAN TOGGLE CONTAINER -->
+            <div class="relative mb-6">
+                <!-- Baris Tombol Utama (Scrollable Horisontal di HP) -->
+                <div class="flex items-center gap-2 overflow-x-auto no-scrollbar flex-nowrap pb-1 pr-8 scroll-smooth" id="navTabScrollContainer">
+                    <!-- TOMBOL BOOKMARK -->
+                    <button id="btnBookmarkTab"
+                        class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs flex items-center gap-2 hover:border-neon-yellow shrink-0"
+                        onclick="changeTab('bookmark', this)"
+                        title="Daftar Bookmark">
+                        <i class="fa-solid fa-bookmark text-black dark:text-neon-yellow text-sm"></i>
+                    </button>
 
-                <button id="btnSemua" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs" onclick="changeTab('all', this)">Semua</button>
-                <button id="btnOngoing" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs" onclick="changeTab('ongoing', this)">Ongoing</button>
-                <button id="btnFinished" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs" onclick="changeTab('finished', this)">Finished</button>
-                
-                <div class="relative inline-block">
-                    <button id="btnGenre" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs" onclick="toggleDropdown(event)">Genre ▾</button>
-                    <div class="hidden absolute left-0 top-12 bg-white dark:bg-[#14130e] w-48 max-w-[calc(100vw-2rem)] max-h-[280px] overflow-y-auto shadow-2xl rounded-xl p-1.5 z-30 flex flex-col gap-1 border border-neon-yellow dark:border-neon-darkBorder" id="genreDropdown">
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Action')">Action</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Adventure')">Adventure</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Anthropomorphic')">Anthropomorphic</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Avant Garde')">Avant Garde</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Cars')">Cars</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('CGDCT')">CGDCT</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Childcare')">Childcare</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Comedy')">Comedy</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Crossdressing')">Crossdressing</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Delinquents')">Delinquents</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Dementia')">Dementia</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Demons')">Demons</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Detective')">Detective</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Donghua')">Donghua</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Drama')">Drama</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Ecchi')">Ecchi</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Educational')">Educational</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Erotica')">Erotica</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Family')">Family</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Fantasy')">Fantasy</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Gag Humor')">Gag Humor</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Game')">Game</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Girls Love')">Girls Love</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Gore')">Gore</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Gourmet')">Gourmet</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Harem')">Harem</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('High Stakes Game')">High Stakes Game</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Historical')">Historical</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Horror')">Horror</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Idols (Female)')">Idols (Female)</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Idols (Male)')">Idols (Male)</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Isekai')">Isekai</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Iyashikei')">Iyashikei</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Josei')">Josei</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Kids')">Kids</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Life')">Life</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Live Action')">Live Action</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Love Polygon')">Love Polygon</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Love Status Quo')">Love Status Quo</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Magic')">Magic</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Magical Sex Shift')">Magical Sex Shift</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Mahou Shoujo')">Mahou Shoujo</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Martial Arts')">Martial Arts</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Mecha')">Mecha</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Medical')">Medical</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Military')">Military</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Music')">Music</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Mystery')">Mystery</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Mythology')">Mythology</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Organized Crime')">Organized Crime</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Otaku Culture')">Otaku Culture</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Parody')">Parody</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Performing Arts')">Performing Arts</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Pets')">Pets</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Police')">Police</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Psychological')">Psychological</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Racing')">Racing</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Reincarnation')">Reincarnation</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Reverse Harem')">Reverse Harem</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Romance')">Romance</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Romantic Subtext')">Romantic Subtext</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Samurai')">Samurai</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('School')">School</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Sci-Fi')">Sci-Fi</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Seinen')">Seinen</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Shoujo')">Shoujo</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Shoujo Ai')">Shoujo Ai</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Shounen')">Shounen</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Shounen Ai')">Shounen Ai</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Showbiz')">Showbiz</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Slice of Life')">Slice of Life</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Space')">Space</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Sports')">Sports</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Strategy Game')">Strategy Game</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Super Power')">Super Power</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Supernatural')">Supernatural</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Survival')">Survival</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Suspense')">Suspense</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Team Sports')">Team Sports</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Thriller')">Thriller</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Time Travel')">Time Travel</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Tokusatsu')">Tokusatsu</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Urban Fantasy')">Urban Fantasy</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Vampire')">Vampire</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Video Game')">Video Game</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Villainess')">Villainess</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Visual Arts')">Visual Arts</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Work Life')">Work Life</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Workplace')">Workplace</button>
-                        <button class="text-left text-xs font-semibold text-black dark:text-white hover:text-black hover:bg-neon-yellow p-1.5 rounded transition" onclick="filterGenre('Yaoi')">Yaoi</button>
-                    </div>
+                    <button id="btnSemua" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs shrink-0" onclick="changeTab('all', this)">Semua</button>
+                    <button id="btnOngoing" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs shrink-0" onclick="changeTab('ongoing', this)">Ongoing</button>
+                    <button id="btnFinished" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs shrink-0" onclick="changeTab('finished', this)">Finished</button>
+                    <button id="btnGenre" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs shrink-0 flex items-center gap-1.5" onclick="toggleGenreContainer(event)">
+                        Genre <i id="genreArrow" class="fa-solid fa-chevron-down text-xs transition-transform duration-200"></i>
+                    </button>
+                </div>
+
+                <!-- Petunjuk Panah Scroll Kanan di HP -->
+                <div class="pointer-events-none absolute right-0 top-0 bottom-1 w-12 bg-gradient-to-l from-neon-lightBg dark:from-neon-darkBg to-transparent flex items-center justify-end pr-0.5 sm:hidden">
+                    <i class="fa-solid fa-chevron-right text-neon-yellow text-xs animate-pulse drop-shadow-md"></i>
+                </div>
+            </div>
+
+            <!-- CONTAINER LIST GENRE (GRID TABEL SIMETRIS RAPI) -->
+            <div id="genreContainer" class="hidden mb-6 p-4 bg-neon-lightCard dark:bg-neon-darkCard rounded-2xl border border-neon-yellow dark:border-neon-darkBorder shadow-md">
+                <div class="flex items-center justify-between mb-3 pb-2 border-b border-zinc-200 dark:border-zinc-800">
+                    <span class="text-xs font-bold text-black dark:text-neon-yellow uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-tags text-xs"></i> Genre List
+                    </span>
+                    <button onclick="toggleGenreContainer(event)" class="text-xs text-zinc-500 hover:text-red-500 transition font-semibold">Tutup <i class="fa-solid fa-xmark ml-1"></i></button>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-72 overflow-y-auto pr-1">
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Action')">Action</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Adventure')">Adventure</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Anthropomorphic')">Anthropomorphic</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Avant Garde')">Avant Garde</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Cars')">Cars</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('CGDCT')">CGDCT</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Childcare')">Childcare</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Comedy')">Comedy</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Crossdressing')">Crossdressing</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Delinquents')">Delinquents</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Dementia')">Dementia</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Demons')">Demons</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Detective')">Detective</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Donghua')">Donghua</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Drama')">Drama</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Ecchi')">Ecchi</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Educational')">Educational</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Erotica')">Erotica</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Family')">Family</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Fantasy')">Fantasy</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Gag Humor')">Gag Humor</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Game')">Game</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Girls Love')">Girls Love</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Gore')">Gore</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Gourmet')">Gourmet</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Harem')">Harem</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('High Stakes Game')">High Stakes Game</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Historical')">Historical</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Horror')">Horror</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Idols (Female)')">Idols (Female)</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Idols (Male)')">Idols (Male)</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Isekai')">Isekai</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Iyashikei')">Iyashikei</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Josei')">Josei</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Kids')">Kids</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Life')">Life</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Live Action')">Live Action</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Love Polygon')">Love Polygon</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Love Status Quo')">Love Status Quo</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Magic')">Magic</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Magical Sex Shift')">Magical Sex Shift</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Mahou Shoujo')">Mahou Shoujo</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Martial Arts')">Martial Arts</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Mecha')">Mecha</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Medical')">Medical</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Military')">Military</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Music')">Music</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Mystery')">Mystery</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Mythology')">Mythology</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Organized Crime')">Organized Crime</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Otaku Culture')">Otaku Culture</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Parody')">Parody</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Performing Arts')">Performing Arts</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Pets')">Pets</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Police')">Police</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Psychological')">Psychological</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Racing')">Racing</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Reincarnation')">Reincarnation</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Reverse Harem')">Reverse Harem</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Romance')">Romance</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Romantic Subtext')">Romantic Subtext</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Samurai')">Samurai</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('School')">School</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Sci-Fi')">Sci-Fi</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Seinen')">Seinen</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Shoujo')">Shoujo</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Shoujo Ai')">Shoujo Ai</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Shounen')">Shounen</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Shounen Ai')">Shounen Ai</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Showbiz')">Showbiz</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Slice of Life')">Slice of Life</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Space')">Space</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Sports')">Sports</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Strategy Game')">Strategy Game</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Super Power')">Super Power</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Supernatural')">Supernatural</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Survival')">Survival</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Suspense')">Suspense</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Team Sports')">Team Sports</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Thriller')">Thriller</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Time Travel')">Time Travel</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Tokusatsu')">Tokusatsu</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Urban Fantasy')">Urban Fantasy</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Vampire')">Vampire</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Video Game')">Video Game</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Villainess')">Villainess</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Visual Arts')">Visual Arts</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Work Life')">Work Life</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Workplace')">Workplace</button>
+                    <button class="w-full text-center bg-neon-lightBg dark:bg-neon-darkBg border border-neon-yellow/40 hover:border-neon-yellow text-black dark:text-white hover:text-black hover:bg-neon-yellow text-xs font-semibold py-2.5 rounded-lg transition shadow-xs truncate px-1" onclick="filterGenre('Yaoi')">Yaoi</button>
                 </div>
             </div>
 
@@ -352,13 +390,13 @@
 
             <div class="flex items-center justify-start gap-2 mb-8">
                 <button id="infoBtnUpcoming" onclick="openInformation('upcoming')" class="info-tab-btn px-4 py-2 rounded-full bg-neon-lightCard dark:bg-neon-darkCard text-xs font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs">
-                    <i class="fa-solid fa-calendar-days mr-1.5 text-neon-yellow"></i> Upcoming
+                    <i class="fa-solid fa-calendar-days mr-1.5 text-black dark:text-neon-yellow"></i> Upcoming
                 </button>
                 <button id="infoBtnPopularity" onclick="openInformation('bypopularity')" class="info-tab-btn px-4 py-2 rounded-full bg-neon-lightCard dark:bg-neon-darkCard text-xs font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs">
-                    <i class="fa-solid fa-fire mr-1.5 text-neon-yellow"></i> Top Trending
+                    <i class="fa-solid fa-fire mr-1.5 text-black dark:text-neon-yellow"></i> Top Trending
                 </button>
                 <button id="infoBtnFavorite" onclick="openInformation('favorite')" class="info-tab-btn px-4 py-2 rounded-full bg-neon-lightCard dark:bg-neon-darkCard text-xs font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs">
-                    <i class="fa-solid fa-heart mr-1.5 text-neon-yellow"></i> Highest Rated
+                    <i class="fa-solid fa-heart mr-1.5 text-black dark:text-neon-yellow"></i> Highest Rated
                 </button>
             </div>
 
@@ -536,6 +574,13 @@
         <p>NimeDesu - Nonton Anime Sub Indonesia</p>
         <p class="mt-1">Butuh bantuan atau kirim masukan? <a href="mailto:damdesu@proton.me" class="text-black dark:text-neon-yellow underline font-medium">Hubungi saya</a></p>
     </footer>
+
+    <!-- Floating Theme Switcher Button (Kanan Bawah Kontras) -->
+    <button onclick="toggleTheme()" 
+            class="fixed bottom-10 right-6 z-50 w-12 h-12 rounded-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-neon-yellow border-2 border-neon-yellow shadow-lg shadow-black/40 flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-300" 
+            title="Ganti Tema">
+        <i id="floatingThemeIcon" class="fa-solid fa-sun text-lg"></i>
+    </button>
 
     <script src="script-index.js"></script>
 </body>
