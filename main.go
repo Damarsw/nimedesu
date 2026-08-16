@@ -55,7 +55,8 @@ var (
 	localCache        = &LocalCache{AnimeList: make(map[string]CacheItem), ScoreMap: make(map[string]string)}
 	lastAPICallTime   time.Time
 	apiCallMutex      sync.Mutex
-	minCallInterval   = 750 * time.Millisecond // Limit ~80 calls/min
+	minCallInterval   = 750 * time.Millisecond
+	CACHE_TTL_ANIME   = int64(1800) // Cache 30 Menit di RAM Server untuk Hemat Egress Supabase
 )
 
 func getEnvOrDefault(key, defaultValue string) string {
@@ -245,7 +246,6 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery())
 
-	// CORS Setup
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"https://nimedesu.vercel.app"},
 		AllowMethods:     []string{"GET", "POST", "OPTIONS"},
@@ -344,10 +344,25 @@ func animeListHandler(c *gin.Context) {
 	statusFilter := strings.TrimSpace(c.Query("status"))
 	genreFilter := strings.TrimSpace(c.Query("genre"))
 
+	cacheKey := fmt.Sprintf("%d_%d_%s_%s_%s", page, perPage, searchQuery, statusFilter, genreFilter)
+	now := time.Now().Unix()
+
+	localCache.RLock()
+	if item, found := localCache.AnimeList[cacheKey]; found {
+		if now-item.Timestamp < CACHE_TTL_ANIME {
+			localCache.RUnlock()
+			c.Header("Cache-Control", "public, s-maxage=1800, stale-while-revalidate=600")
+			c.JSON(http.StatusOK, item.Data)
+			return
+		}
+	}
+	localCache.RUnlock()
+
 	offset := (page - 1) * perPage
 	limit := perPage
 
-	query := fmt.Sprintf("select=*&order=id.asc&offset=%d&limit=%d", offset, limit)
+	// Hanya select kolom spesifik, tanpa menyedot kolom sinopsis yang besar
+	query := fmt.Sprintf("select=id,title,url,status,genre,img_url&order=id.asc&offset=%d&limit=%d", offset, limit)
 	if searchQuery != "" {
 		query += fmt.Sprintf("&title=ilike.*%s*", url.QueryEscape(searchQuery))
 	}
@@ -387,13 +402,22 @@ func animeListHandler(c *gin.Context) {
 		totalPages = int(math.Ceil(float64(totalRecords) / float64(perPage)))
 	}
 
-	c.Header("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600")
-	c.JSON(http.StatusOK, gin.H{
+	payload := gin.H{
 		"data":        data,
 		"total":       totalRecords,
 		"page":        page,
 		"total_pages": totalPages,
-	})
+	}
+
+	localCache.Lock()
+	localCache.AnimeList[cacheKey] = CacheItem{
+		Timestamp: now,
+		Data:      payload,
+	}
+	localCache.Unlock()
+
+	c.Header("Cache-Control", "public, s-maxage=1800, stale-while-revalidate=600")
+	c.JSON(http.StatusOK, payload)
 }
 
 func animeDetailHandler(c *gin.Context) {
@@ -473,7 +497,7 @@ func animeDetailHandler(c *gin.Context) {
 		})
 	}
 
-	c.Header("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600")
+	c.Header("Cache-Control", "public, s-maxage=1800, stale-while-revalidate=600")
 	c.JSON(http.StatusOK, gin.H{
 		"title":    animeItem["title"],
 		"url":      animeItem["url"],
@@ -569,7 +593,7 @@ func rankingHandler(c *gin.Context) {
 	totalItems := int(math.Max(float64(len(allMedia)-3), 1))
 	lastPage := int(math.Ceil(float64(totalItems) / 12.0))
 
-	c.Header("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600")
+	c.Header("Cache-Control", "public, s-maxage=1800, stale-while-revalidate=600")
 	c.JSON(http.StatusOK, gin.H{
 		"top3":      top3,
 		"list":      pageMedia,
