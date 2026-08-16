@@ -47,7 +47,7 @@ SRV_KEY_LABEL = "keterangan"
 SRV_KEY_SERVER_NAME = "server"
 
 # ---------------------------------------------------------------------------
-# BATCH CACHING MEMORI (STORE HINGGA 100+ ANIME DARI API BATCH)
+# BATCH CACHING MEMORI & DYNAMIC RATE LIMITER (MAX 80 REQ / MENIT)
 # ---------------------------------------------------------------------------
 BATCH_RANKING_STORE = {
     "bypopularity": [],
@@ -61,11 +61,24 @@ SCORE_CACHE = {}
 
 CACHE_TTL_ANIME = 300     # 5 Menit untuk Daftar Anime Lokal
 
+# PENYESUAIAN RATE LIMITER KE 80 CALLS / MENIT
+# 60 detik / 80 panggilan = 0.75 detik jeda minimum antar request API luar
+LAST_API_CALL_TIME = 0
+MIN_CALL_INTERVAL = 0.75  # Jeda minimum 0.75 detik (Kapasitas: 80 request/menit)
+
 # ---------------------------------------------------------------------------
-# BACKGROUND SCHEDULER: MAKSIMALKAN API DENGAN BATCH REQUEST (100 ANIME/CALL)
+# BACKGROUND SCHEDULER: BATCH INGESTION DENGAN LIMIT 80 CALLS/MENIT
 # ---------------------------------------------------------------------------
 def fetch_anilist_ranking_batch(category):
     """Memanggil API AniList sekali jalan untuk menyedot 100 anime sekaligus."""
+    global LAST_API_CALL_TIME
+    now = time.time()
+
+    # Kontrol Rate Limiter: Jika panggilan terlalu rapat (< 0.75 detik), tahan sejenak
+    elapsed = now - LAST_API_CALL_TIME
+    if elapsed < MIN_CALL_INTERVAL:
+        time.sleep(MIN_CALL_INTERVAL - elapsed)
+
     sort_query = "POPULARITY_DESC"
     status_query = ""
 
@@ -75,7 +88,6 @@ def fetch_anilist_ranking_batch(category):
     elif category == "favorite":
         sort_query = "SCORE_DESC"
 
-    # Query GraphQL menyedot 100 anime sekaligus (Batas Maksimal Batch per Page AniList)
     query_str = f"""
     query {{
         Page(page: 1, perPage: 100) {{
@@ -88,6 +100,7 @@ def fetch_anilist_ranking_batch(category):
     }}
     """
     try:
+        LAST_API_CALL_TIME = time.time() # Update timestamp sebelum request sent
         resp = requests.post(
             "https://graphql.anilist.co",
             json={"query": query_str},
@@ -102,30 +115,32 @@ def fetch_anilist_ranking_batch(category):
     return []
 
 def background_ranking_cron():
-    """Fungsi latar belakang yang berjalan tiap menit untuk memperbarui store."""
+    """Fungsi latar belakang yang memperbarui store secara berkala dengan jeda aman."""
     while True:
         try:
-            print("[Cron Worker] Memulai sinkronisasi batch ranking...")
+            print("[Cron Worker] Melakukan refresh batch ranking (Limit 80 req/min)...")
+            
             pop_data = fetch_anilist_ranking_batch("bypopularity")
+            time.sleep(1) # Jeda aman antar kategori
+            
             upc_data = fetch_anilist_ranking_batch("upcoming")
+            time.sleep(1)
+            
             fav_data = fetch_anilist_ranking_batch("favorite")
 
-            if pop_data:
-                BATCH_RANKING_STORE["bypopularity"] = pop_data
-            if upc_data:
-                BATCH_RANKING_STORE["upcoming"] = upc_data
-            if fav_data:
-                BATCH_RANKING_STORE["favorite"] = fav_data
+            if pop_data: BATCH_RANKING_STORE["bypopularity"] = pop_data
+            if upc_data: BATCH_RANKING_STORE["upcoming"] = upc_data
+            if fav_data: BATCH_RANKING_STORE["favorite"] = fav_data
 
             BATCH_RANKING_STORE["last_updated"] = time.time()
-            print("[Cron Worker] Sinkronisasi batch ranking sukses!")
+            print("[Cron Worker] Refresh batch data sukses!")
         except Exception as e:
             print(f"[Cron Worker Error]: {e}")
 
-        # Jalankan sinkronisasi batch setiap 5 menit (300 detik) untuk menjaga ketersediaan kuota
+        # Jalankan sinkronisasi ulang tiap 5 menit (300 detik)
         time.sleep(300)
 
-# Jalankan Background Cron Thread saat server startup
+# Jalankan Background Thread
 cron_thread = threading.Thread(target=background_ranking_cron, daemon=True)
 cron_thread.start()
 
@@ -181,7 +196,8 @@ def home():
     return jsonify({
         "status": "online", 
         "service": "NimeDesu API", 
-        "batch_store_items": len(BATCH_RANKING_STORE["bypopularity"]),
+        "max_api_rate_limit": "80 calls/min",
+        "batch_items_loaded": len(BATCH_RANKING_STORE["bypopularity"]),
         "timestamp": int(time.time())
     }), 200
 
@@ -390,17 +406,16 @@ def api_anilist_score():
 
 
 # ---------------------------------------------------------------------------
-# ENDPOINT PERINGKAT (MENGAMBIL INSTAN DARI IN-MEMORY BATCH STORE)
+# ENDPOINT PERINGKAT (INSTAN DARI MEMORI STORE)
 # ---------------------------------------------------------------------------
 @app.route("/api/ranking", methods=["GET"])
 def api_ranking():
     category = request.args.get("type", "bypopularity").strip()
     page = int(request.args.get("page", 1))
 
-    # Cek ketersediaan data di Batch Store
     all_category_media = BATCH_RANKING_STORE.get(category, [])
 
-    # Jika store belum terisi (saat cold start server), panggil batch darurat
+    # Cold start fallback
     if not all_category_media:
         all_category_media = fetch_anilist_ranking_batch(category)
         if all_category_media:
@@ -408,9 +423,6 @@ def api_ranking():
 
     top3 = all_category_media[:3] if len(all_category_media) >= 3 else []
 
-    # Memotong (slice) data instan berdasarkan halaman tanpa nembak API lagi
-    # Page 1: Ambil 12 item (#4 - #15)
-    # Page 2: Ambil 12 item (#16 - #27)
     if page == 1:
         start_idx = 3
         end_idx = 15
