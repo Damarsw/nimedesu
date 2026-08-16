@@ -510,6 +510,7 @@ func animeDetailHandler(c *gin.Context) {
 		"title":    animeItem["title"],
 		"url":      animeItem["url"],
 		"img_url":  animeItem["img_url"],
+		"genre":    animeItem["genre"], // KIRIM GENRE ANIME KE FRONTEND
 		"episodes": episodesList,
 	})
 }
