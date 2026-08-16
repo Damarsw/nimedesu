@@ -393,9 +393,10 @@ def api_ranking():
                 list_media = list_obj.get("media", [])
                 page_info = list_obj.get("pageInfo", {})
 
+# KODE BARU (Sudah di-slice agar tidak mengulang)
                 payload = {
-                    "top3": top3,
-                    "list": list_media,
+                    "top3": top3 if page == 1 else [],
+                    "list": list_media[3:] if page == 1 else list_media,  # <--- Potong 3 teratas hanya di hal 1
                     "last_page": page_info.get("lastPage", 1),
                     "source": "anilist"
                 }
