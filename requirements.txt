@@ -3,4 +3,3 @@ flask-cors
 requests
 supabase
 beautifulsoup4
-requests
