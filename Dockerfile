@@ -1,12 +1,22 @@
-FROM python:3.10-slim
+FROM golang:1.22-alpine AS builder
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY go.mod go.sum ./
+RUN go mod download
 
 COPY . .
 
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o main .
+
+FROM alpine:latest
+
+RUN apk --no-cache add ca-certificates tzdata
+
+WORKDIR /app
+
+COPY --from=builder /app/main .
+
 EXPOSE 10000
 
-CMD ["python", "server_api.py"]
+CMD ["./main"]
