@@ -283,7 +283,7 @@ function liveSearchAnime() {
 
             suggestionsBox.innerHTML = matched.map(anime => {
                 const title = anime.title || "Tanpa Judul";
-                const thumb = anime.image_url || anime.thumbnail || "https://placehold.co/100x150?text=No+Image";
+                const thumb = anime.image_url || anime.img_url || anime.thumbnail || "https://placehold.co/100x150?text=No+Image";
                 const animeUrl = anime.url ? anime.url.trim() : "";
                 const rawGenre = anime.genre || "";
                 const genres = rawGenre ? rawGenre.split(',').map(g => g.trim()).join(', ') : '-';
@@ -331,6 +331,9 @@ async function initStream() {
             }
         });
         const data = await response.json();
+
+        // Tangkap gambar thumbnail dari backend
+        currentAnimeThumbnail = data.img_url || data.image_url || data.thumbnail || "";
 
         if (data && data.episodes && data.episodes.length > 0) {
             activeEpisodes = data.episodes.filter(ep => ep && (ep.episode_title || ep.video_servers));
@@ -406,7 +409,7 @@ async function renderMixedGenreRecommendations() {
 
         recSlider.innerHTML = items.map(rec => {
             const title = rec.title || "Tanpa Judul";
-            const thumb = rec.image_url || rec.thumbnail || "https://placehold.co/300x400?text=No+Image";
+            const thumb = rec.image_url || rec.img_url || rec.thumbnail || "https://placehold.co/300x400?text=No+Image";
             const recUrl = rec.url ? rec.url.trim() : "";
             const status = rec.status || "Ongoing";
 
