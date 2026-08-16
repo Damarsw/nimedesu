@@ -23,7 +23,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Config & Structs
 var (
 	supabaseURL     = os.Getenv("SUPABASE_URL")
 	supabaseKey     = os.Getenv("SUPABASE_KEY")
@@ -56,7 +55,9 @@ var (
 	lastAPICallTime   time.Time
 	apiCallMutex      sync.Mutex
 	minCallInterval   = 750 * time.Millisecond
-	CACHE_TTL_ANIME   = int64(1800) // Cache 30 Menit di RAM Server untuk Hemat Egress Supabase
+	
+	// CACHE SET KE 24 JAM (86400 Detik)
+	CACHE_TTL_ANIME   = int64(86400) 
 )
 
 func getEnvOrDefault(key, defaultValue string) string {
@@ -181,7 +182,7 @@ func startCronWorker() {
 func securityMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
-		if path == "/" || path == "/health" || strings.HasPrefix(path, "/api/proxy-stream") || strings.HasPrefix(path, "/proxy-stream") {
+		if path == "/" || path == "/health" || path == "/api/clear-cache" || strings.HasPrefix(path, "/api/proxy-stream") || strings.HasPrefix(path, "/proxy-stream") {
 			c.Next()
 			return
 		}
@@ -271,6 +272,14 @@ func main() {
 	r.GET("/api/user-data", userDataHandler)
 	r.POST("/api/user-update", userUpdateHandler)
 
+	// ENDPOINT MANUAL PURGE CACHE (BUAT JIKA HABIS UPDATE SUPABASE)
+	r.GET("/api/clear-cache", func(c *gin.Context) {
+		localCache.Lock()
+		localCache.AnimeList = make(map[string]CacheItem)
+		localCache.Unlock()
+		c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Cache RAM 24 jam berhasil dibersihkan!"})
+	})
+
 	log.Printf("Server running on port %s", port)
 	r.Run(":" + port)
 }
@@ -351,7 +360,7 @@ func animeListHandler(c *gin.Context) {
 	if item, found := localCache.AnimeList[cacheKey]; found {
 		if now-item.Timestamp < CACHE_TTL_ANIME {
 			localCache.RUnlock()
-			c.Header("Cache-Control", "public, s-maxage=1800, stale-while-revalidate=600")
+			c.Header("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=3600")
 			c.JSON(http.StatusOK, item.Data)
 			return
 		}
@@ -361,7 +370,6 @@ func animeListHandler(c *gin.Context) {
 	offset := (page - 1) * perPage
 	limit := perPage
 
-	// Hanya select kolom spesifik, tanpa menyedot kolom sinopsis yang besar
 	query := fmt.Sprintf("select=id,title,url,status,genre,img_url&order=id.asc&offset=%d&limit=%d", offset, limit)
 	if searchQuery != "" {
 		query += fmt.Sprintf("&title=ilike.*%s*", url.QueryEscape(searchQuery))
@@ -416,7 +424,7 @@ func animeListHandler(c *gin.Context) {
 	}
 	localCache.Unlock()
 
-	c.Header("Cache-Control", "public, s-maxage=1800, stale-while-revalidate=600")
+	c.Header("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=3600")
 	c.JSON(http.StatusOK, payload)
 }
 
@@ -497,7 +505,7 @@ func animeDetailHandler(c *gin.Context) {
 		})
 	}
 
-	c.Header("Cache-Control", "public, s-maxage=1800, stale-while-revalidate=600")
+	c.Header("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=3600")
 	c.JSON(http.StatusOK, gin.H{
 		"title":    animeItem["title"],
 		"url":      animeItem["url"],
@@ -593,7 +601,7 @@ func rankingHandler(c *gin.Context) {
 	totalItems := int(math.Max(float64(len(allMedia)-3), 1))
 	lastPage := int(math.Ceil(float64(totalItems) / 12.0))
 
-	c.Header("Cache-Control", "public, s-maxage=1800, stale-while-revalidate=600")
+	c.Header("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=3600")
 	c.JSON(http.StatusOK, gin.H{
 		"top3":      top3,
 		"list":      pageMedia,
