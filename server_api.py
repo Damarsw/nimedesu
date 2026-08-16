@@ -3,6 +3,7 @@ import time
 import hmac
 import hashlib
 import base64
+import threading
 import requests
 from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
@@ -46,14 +47,87 @@ SRV_KEY_LABEL = "keterangan"
 SRV_KEY_SERVER_NAME = "server"
 
 # ---------------------------------------------------------------------------
-# CACHING MEMORI
+# BATCH CACHING MEMORI (STORE HINGGA 100+ ANIME DARI API BATCH)
 # ---------------------------------------------------------------------------
-RANKING_CACHE = {}
+BATCH_RANKING_STORE = {
+    "bypopularity": [],
+    "upcoming": [],
+    "favorite": [],
+    "last_updated": 0
+}
+
 ANIME_LIST_CACHE = {}
 SCORE_CACHE = {}
 
-CACHE_TTL_RANKING = 7200  # 2 Jam untuk Peringkat
-CACHE_TTL_ANIME = 300     # 5 Menit untuk Daftar Anime
+CACHE_TTL_ANIME = 300     # 5 Menit untuk Daftar Anime Lokal
+
+# ---------------------------------------------------------------------------
+# BACKGROUND SCHEDULER: MAKSIMALKAN API DENGAN BATCH REQUEST (100 ANIME/CALL)
+# ---------------------------------------------------------------------------
+def fetch_anilist_ranking_batch(category):
+    """Memanggil API AniList sekali jalan untuk menyedot 100 anime sekaligus."""
+    sort_query = "POPULARITY_DESC"
+    status_query = ""
+
+    if category == "upcoming":
+        status_query = ", status: NOT_YET_RELEASED"
+        sort_query = "POPULARITY_DESC"
+    elif category == "favorite":
+        sort_query = "SCORE_DESC"
+
+    # Query GraphQL menyedot 100 anime sekaligus (Batas Maksimal Batch per Page AniList)
+    query_str = f"""
+    query {{
+        Page(page: 1, perPage: 100) {{
+            media(type: ANIME, sort: {sort_query}{status_query}) {{
+                id title {{ romaji english userPreferred }}
+                coverImage {{ extraLarge large }}
+                averageScore popularity
+            }}
+        }}
+    }}
+    """
+    try:
+        resp = requests.post(
+            "https://graphql.anilist.co",
+            json={"query": query_str},
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            timeout=10
+        )
+        if resp.status_code == 200:
+            json_data = resp.json()
+            return json_data.get("data", {}).get("Page", {}).get("media", [])
+    except Exception as e:
+        print(f"[Batch Ingestion Error - {category}]: {e}")
+    return []
+
+def background_ranking_cron():
+    """Fungsi latar belakang yang berjalan tiap menit untuk memperbarui store."""
+    while True:
+        try:
+            print("[Cron Worker] Memulai sinkronisasi batch ranking...")
+            pop_data = fetch_anilist_ranking_batch("bypopularity")
+            upc_data = fetch_anilist_ranking_batch("upcoming")
+            fav_data = fetch_anilist_ranking_batch("favorite")
+
+            if pop_data:
+                BATCH_RANKING_STORE["bypopularity"] = pop_data
+            if upc_data:
+                BATCH_RANKING_STORE["upcoming"] = upc_data
+            if fav_data:
+                BATCH_RANKING_STORE["favorite"] = fav_data
+
+            BATCH_RANKING_STORE["last_updated"] = time.time()
+            print("[Cron Worker] Sinkronisasi batch ranking sukses!")
+        except Exception as e:
+            print(f"[Cron Worker Error]: {e}")
+
+        # Jalankan sinkronisasi batch setiap 5 menit (300 detik) untuk menjaga ketersediaan kuota
+        time.sleep(300)
+
+# Jalankan Background Cron Thread saat server startup
+cron_thread = threading.Thread(target=background_ranking_cron, daemon=True)
+cron_thread.start()
 
 # ---------------------------------------------------------------------------
 # SECURITY MIDDLEWARE
@@ -104,7 +178,12 @@ def security_validation():
 @app.route("/")
 @app.route("/health")
 def home():
-    return jsonify({"status": "online", "service": "NimeDesu API", "timestamp": int(time.time())}), 200
+    return jsonify({
+        "status": "online", 
+        "service": "NimeDesu API", 
+        "batch_store_items": len(BATCH_RANKING_STORE["bypopularity"]),
+        "timestamp": int(time.time())
+    }), 200
 
 
 @app.route("/api/proxy-stream", methods=["GET"])
@@ -295,7 +374,7 @@ def api_anilist_score():
     except Exception:
         pass
 
-    # 2. Backup: Jikan API
+    # 2. Backup Jikan
     try:
         j_resp = requests.get(f"https://api.jikan.moe/v4/anime?q={requests.utils.quote(title)}&limit=1", timeout=3)
         if j_resp.status_code == 200:
@@ -307,114 +386,52 @@ def api_anilist_score():
     except Exception:
         pass
 
-    # 3. Backup: Kitsu API
-    try:
-        k_resp = requests.get(f"https://kitsu.io/api/edge/anime?filter[text]={requests.utils.quote(title)}&page[limit]=1", timeout=3)
-        if k_resp.status_code == 200:
-            k_data = k_resp.json().get("data", [])
-            if k_data:
-                avg_rating = k_data[0].get("attributes", {}).get("averageRating")
-                if avg_rating:
-                    score_formatted = f"{(float(avg_rating) / 10):.1f}"
-                    SCORE_CACHE[cache_key] = score_formatted
-                    return jsonify({"score": score_formatted}), 200
-    except Exception:
-        pass
-
     return jsonify({"score": "N/A"}), 200
 
 
 # ---------------------------------------------------------------------------
-# ENDPOINT PERINGKAT (DENGAN PODIUM UTUH DI SEMUA HALAMAN)
+# ENDPOINT PERINGKAT (MENGAMBIL INSTAN DARI IN-MEMORY BATCH STORE)
 # ---------------------------------------------------------------------------
 @app.route("/api/ranking", methods=["GET"])
 def api_ranking():
     category = request.args.get("type", "bypopularity").strip()
     page = int(request.args.get("page", 1))
 
-    cache_key = f"{category}_{page}"
-    current_time = time.time()
+    # Cek ketersediaan data di Batch Store
+    all_category_media = BATCH_RANKING_STORE.get(category, [])
 
-    if cache_key in RANKING_CACHE:
-        cached_entry = RANKING_CACHE[cache_key]
-        if current_time - cached_entry["timestamp"] < CACHE_TTL_RANKING:
-            resp = jsonify(cached_entry["data"])
-            resp.headers["Cache-Control"] = "public, s-maxage=3600, stale-while-revalidate=7200"
-            return resp
+    # Jika store belum terisi (saat cold start server), panggil batch darurat
+    if not all_category_media:
+        all_category_media = fetch_anilist_ranking_batch(category)
+        if all_category_media:
+            BATCH_RANKING_STORE[category] = all_category_media
 
-    sort_query = "POPULARITY_DESC"
-    status_query = ""
+    top3 = all_category_media[:3] if len(all_category_media) >= 3 else []
 
-    if category == "upcoming":
-        status_query = ", status: NOT_YET_RELEASED"
-        sort_query = "POPULARITY_DESC"
-    elif category == "favorite":
-        sort_query = "SCORE_DESC"
-
-    # Penyesuaian Query Halaman:
-    # Page 1: Ambil 15 item, buang 3 item teratas -> tersisa 12 item (#4 s/d #15)
-    # Page 2 dst: Ambil 12 item per halaman
+    # Memotong (slice) data instan berdasarkan halaman tanpa nembak API lagi
+    # Page 1: Ambil 12 item (#4 - #15)
+    # Page 2: Ambil 12 item (#16 - #27)
     if page == 1:
-        fetch_page = 1
-        fetch_per_page = 15
+        start_idx = 3
+        end_idx = 15
     else:
-        fetch_page = page
-        fetch_per_page = 12
+        start_idx = (page - 1) * 12 + 3
+        end_idx = start_idx + 12
 
-    query_str = f"""
-    query {{
-        top3: Page(page: 1, perPage: 3) {{
-            media(type: ANIME, sort: {sort_query}{status_query}) {{
-                id title {{ romaji english userPreferred }}
-                coverImage {{ extraLarge large }}
-                averageScore popularity
-            }}
-        }}
-        listData: Page(page: {fetch_page}, perPage: {fetch_per_page}) {{
-            pageInfo {{ total currentPage lastPage hasNextPage }}
-            media(type: ANIME, sort: {sort_query}{status_query}) {{
-                id title {{ romaji english userPreferred }}
-                coverImage {{ extraLarge large }}
-                averageScore popularity
-            }}
-        }}
-    }}
-    """
+    page_media = all_category_media[start_idx:end_idx]
+    total_items = max(len(all_category_media) - 3, 1)
+    last_page = -(-total_items // 12)
 
-    try:
-        resp = requests.post(
-            "https://graphql.anilist.co",
-            json={"query": query_str},
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
-            timeout=4
-        )
-        
-        if resp.status_code == 200:
-            json_data = resp.json()
-            if "data" in json_data and json_data["data"]:
-                top3 = json_data.get("data", {}).get("top3", {}).get("media", [])
-                list_obj = json_data.get("data", {}).get("listData", {})
-                raw_list_media = list_obj.get("media", [])
-                page_info = list_obj.get("pageInfo", {})
+    payload = {
+        "top3": top3,
+        "list": page_media,
+        "last_page": last_page,
+        "source": "batch_memory_store"
+    }
 
-                if page == 1:
-                    list_media = raw_list_media[3:]  # Potong 3 teratas agar Page 1 berisi #4 - #15
-                else:
-                    list_media = raw_list_media
-
-                payload = {
-                    "top3": top3,  # SELALU MENGIRIM TOP 3 PODIUM DI HALAMAN MANAPUN
-                    "list": list_media,
-                    "last_page": page_info.get("lastPage", 1),
-                    "source": "anilist"
-                }
-
-                RANKING_CACHE[cache_key] = {"timestamp": current_time, "data": payload}
-                return jsonify(payload), 200
-    except Exception:
-        pass
-
-    return jsonify({"top3": [], "list": [], "last_page": 1, "error": "All anime APIs unavailable"}), 200
+    resp = jsonify(payload)
+    resp.headers["Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=600"
+    return resp, 200
 
 
 @app.route("/api/user-sync", methods=["POST"])
