@@ -5,6 +5,7 @@ let activeEpisodes = [];
 let activeEpisodeIndex = 0;
 let globalAnimeTitle = "Anime";
 let currentAnimeThumbnail = "";
+let currentAnimeGenres = []; // Array simpan genre anime aktif
 let searchDebounceTimer = null;
 
 function generateSecurityToken() {
@@ -161,10 +162,8 @@ async function checkAniListAuthStatus() {
             localStorage.setItem('anilist_user', JSON.stringify(user));
             if (headerAuthContainer) {
                 headerAuthContainer.innerHTML = `
-                    <div class="flex items-center gap-2 bg-white dark:bg-zinc-800/90 p-1 pr-3 rounded-full border border-neon-yellow shadow-xs">
-                        <img src="${user.avatar.medium}" class="w-6 h-6 rounded-full object-cover">
-                        <span class="text-xs font-bold text-black dark:text-neon-yellow max-w-[80px] truncate">${user.name}</span>
-                        <button onclick="logoutAniList()" class="ml-1 text-[11px] text-black dark:text-zinc-400 hover:text-red-500 transition" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
+                    <div class="flex items-center bg-white dark:bg-zinc-800/90 p-0.5 rounded-full border border-neon-yellow shadow-xs">
+                        <img src="${user.avatar.medium}" class="w-7 h-7 rounded-full object-cover">
                     </div>
                 `;
             }
@@ -283,7 +282,7 @@ function liveSearchAnime() {
                     <div onclick="window.location.href='stream.html?url=${encodeURIComponent(animeUrl)}&eps=0'" class="flex items-center gap-3 p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer transition">
                         <img src="${thumb}" class="w-10 h-14 object-cover rounded-lg shrink-0">
                         <div class="overflow-hidden">
-                            <h4 class="text-xs font-semibold text-zinc-900 dark:text-white truncate">${title}</h4>
+                            <h4 class="text-xs font-semibold text-black dark:text-white truncate">${title}</h4>
                             <span class="text-[10px] text-zinc-500 dark:text-zinc-400 truncate block">${genres}</span>
                         </div>
                     </div>
@@ -324,6 +323,14 @@ async function initStream() {
         const data = await response.json();
 
         currentAnimeThumbnail = data.img_url || data.image_url || data.thumbnail || "";
+
+        if (data.genre) {
+            if (Array.isArray(data.genre)) {
+                currentAnimeGenres = data.genre;
+            } else if (typeof data.genre === 'string') {
+                currentAnimeGenres = data.genre.split(',').map(g => g.trim()).filter(Boolean);
+            }
+        }
 
         if (!currentAnimeThumbnail && data.title) {
             try {
@@ -369,11 +376,8 @@ async function initStream() {
             document.getElementById('episodeNavContainer').classList.remove('hidden');
             renderDynamicEpisodes();
 
-            try {
-                renderMixedGenreRecommendations();
-            } catch (recError) {
-                document.getElementById('recommendationSlider').innerHTML = '<p class="text-xs text-zinc-500">Gagal memuat rekomendasi.</p>';
-            }
+            // Panggil rekomendasi acak berbasis genre
+            renderMixedGenreRecommendations();
         } else {
             document.getElementById('streamTitle').innerText = "Data Episode Tidak Tersedia.";
         }
@@ -394,47 +398,76 @@ function scrollSlider(direction) {
     slider.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
 }
 
+/* REKOMENDASI ACAK PER GENRE (MAKSIMAL 12 ANIME) */
 async function renderMixedGenreRecommendations() {
     const recSlider = document.getElementById('recommendationSlider');
+    if (!recSlider) return;
+
     try {
         const sec = generateSecurityToken();
-        const res = await fetch(`${RENDER_API_URL}/anime?per_page=12`, {
-            headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
-            }
-        });
-        const result = await res.json();
-        const items = result.data || [];
+        let recommendedAnimeList = [];
+        const currentUrlParam = new URLSearchParams(window.location.search).get('url');
 
-        if (items.length === 0) {
-            recSlider.innerHTML = '<p class="text-xs text-zinc-500">Tidak ada rekomendasi anime.</p>';
+        let targetGenres = currentAnimeGenres.slice(0, 3);
+        if (targetGenres.length === 0) {
+            targetGenres = ['Action', 'Drama'];
+        }
+
+        const itemsPerGenre = Math.floor(12 / targetGenres.length);
+
+        for (const genre of targetGenres) {
+            const res = await fetch(`${RENDER_API_URL}/anime?genre=${encodeURIComponent(genre)}&per_page=15`, {
+                headers: {
+                    "X-Client-Token": sec.token,
+                    "X-Client-Time": sec.time
+                }
+            });
+            const result = await res.json();
+            let items = result.data || [];
+
+            items = items.filter(a => a.url !== currentUrlParam);
+            items.sort(() => 0.5 - Math.random());
+
+            const picked = items.slice(0, itemsPerGenre);
+            recommendedAnimeList = recommendedAnimeList.concat(picked);
+        }
+
+        const uniqueMap = new Map();
+        recommendedAnimeList.forEach(item => uniqueMap.set(item.id || item.url, item));
+        recommendedAnimeList = Array.from(uniqueMap.values());
+
+        recommendedAnimeList.sort(() => 0.5 - Math.random());
+        recommendedAnimeList = recommendedAnimeList.slice(0, 12);
+
+        if (recommendedAnimeList.length === 0) {
+            recSlider.innerHTML = '<p class="text-xs text-zinc-500">Tidak ada rekomendasi anime serupa.</p>';
             return;
         }
 
-        recSlider.innerHTML = items.map(rec => {
+        recSlider.innerHTML = recommendedAnimeList.map(rec => {
             const title = rec.title || "Tanpa Judul";
             const thumb = rec.image_url || rec.img_url || rec.thumbnail || "https://placehold.co/300x400?text=No+Image";
             const recUrl = rec.url ? rec.url.trim() : "";
             const status = rec.status || "Ongoing";
 
             return `
-                <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?url=${encodeURIComponent(recUrl)}&eps=0'">
+                <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow/60 dark:border-neon-darkBorder hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?url=${encodeURIComponent(recUrl)}&eps=0'">
                     <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
                         <img src="${thumb}" alt="${title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
                         <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
                             <div class="w-10 h-10 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
-                                <i class="fa-solid fa-play text-xs"></i>
+                                <i class="fa-solid fa-play text-xs ml-0.5"></i>
                             </div>
                         </div>
                         <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${status}</span>
                     </div>
                     <div class="p-2.5">
-                        <h4 class="font-semibold text-xs line-clamp-2 text-zinc-900 dark:text-white">${title}</h4>
+                        <h4 class="font-semibold text-xs line-clamp-2 text-black dark:text-white">${title}</h4>
                     </div>
                 </div>
             `;
         }).join('');
+
     } catch (e) {
         recSlider.innerHTML = '<p class="text-xs text-zinc-500">Gagal memuat rekomendasi.</p>';
     }
@@ -462,7 +495,7 @@ function renderDynamicEpisodes() {
     document.getElementById('nextEpBtn').style.opacity = activeEpisodeIndex >= activeEpisodes.length - 1 ? '0.5' : '1';
 
     container.innerHTML = activeEpisodes.map((ep, index) => {
-        const activeClass = index === activeEpisodeIndex ? 'bg-neon-yellow text-white font-bold shadow-glow-yellow' : 'bg-neon-lightBg dark:bg-neon-darkBg text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow';
+        const activeClass = index === activeEpisodeIndex ? 'bg-neon-yellow text-black font-bold shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border border-neon-yellow/60 dark:border-neon-darkBorder hover:border-neon-yellow';
         let epLabel = ep.episode_title ? ep.episode_title.replace(/Sub.*$/, '').trim() : `Eps ${index + 1}`;
         if (!epLabel || epLabel.toLowerCase() === globalAnimeTitle.toLowerCase()) return '';
 
@@ -512,9 +545,9 @@ function renderDynamicServers(servers) {
         const resolution = "MP4";
 
         htmlContent += `
-            <button onclick="selectServer(this, '${resolution}', '${serverName}', '${videoUrl}')" class="server-btn w-full text-left px-3 py-2 rounded text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder">
-                <span><i class="fa-solid fa-play text-neon-yellow mr-2"></i> ${serverName}</span>
-                <span class="text-[9px] px-1.5 py-0.5 rounded bg-neon-yellow text-black font-bold">HD</span>
+            <button onclick="selectServer(this, '${resolution}', '${serverName}', '${videoUrl}')" class="server-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-black dark:text-white border border-neon-yellow/60 dark:border-neon-darkBorder">
+                <span><i class="fa-solid fa-play text-black dark:text-neon-yellow mr-2"></i> ${serverName}</span>
+                <span class="text-[9px] px-2 py-0.5 rounded-full bg-neon-yellow text-black font-bold">HD</span>
             </button>
         `;
 
@@ -554,10 +587,10 @@ function toggleEpisodeBox() {
 function selectServer(element, resolution, serverNum, videoUrl) {
     document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
     document.querySelectorAll('.server-btn').forEach(btn => {
-        btn.className = "server-btn w-full text-left px-3 py-2 rounded text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-zinc-900 dark:text-white border border-neon-lightBorder dark:border-neon-darkBorder";
+        btn.className = "server-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-black dark:text-white border border-neon-yellow/60 dark:border-neon-darkBorder";
     });
     if(element) {
-        element.className = "server-btn w-full text-left px-3 py-2 rounded text-xs bg-neon-yellow text-white font-bold shadow-glow-yellow transition flex justify-between items-center";
+        element.className = "server-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs bg-neon-yellow text-black font-bold shadow-glow-yellow transition flex justify-between items-center";
     }
     document.getElementById('mainServerContainer').classList.add('hidden');
     document.getElementById('mainServerArrow').style.transform = 'rotate(-90deg)';
@@ -584,13 +617,15 @@ function selectServer(element, resolution, serverNum, videoUrl) {
 
 function toggleTheme() {
     const html = document.documentElement;
-    const icon = document.getElementById('themeIcon');
-    if (html.classList.contains('dark')) {
+    const isDark = html.classList.contains('dark');
+    const floatingIcon = document.getElementById('floatingThemeIcon');
+
+    if (isDark) {
         html.classList.remove('dark');
-        icon.classList.replace('fa-moon', 'fa-sun');
+        if (floatingIcon) floatingIcon.classList.replace('fa-sun', 'fa-moon');
     } else {
         html.classList.add('dark');
-        icon.classList.replace('fa-sun', 'fa-moon');
+        if (floatingIcon) floatingIcon.classList.replace('fa-moon', 'fa-sun');
     }
 }
 
