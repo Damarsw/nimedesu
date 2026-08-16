@@ -1410,6 +1410,7 @@ async function fetchRankingFromBackend(type, page, loadingEl, podiumEl, gridEl, 
         const listData = json.list || [];
         const lastPage = json.last_page || 1;
 
+        // SELALU TAMPILKAN PODIUM DI SEMUA HALAMAN (PAGE 1, 2, 3, DST)
         if (top3Data.length >= 3) {
             renderPodiumData(top3Data);
             podiumEl.classList.remove('hidden');
