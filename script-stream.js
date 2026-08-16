@@ -4,12 +4,8 @@ const RENDER_API_URL = "/api-backend";
 let activeEpisodes = [];
 let activeEpisodeIndex = 0;
 let globalAnimeTitle = "Anime";
-let allAnimeList = [];
 let currentAnimeThumbnail = "";
-
-const KEY_X = "LayerX_Secret2026";
-const KEY_Y = "LayerY_Secret2026";
-const KEY_Z = "LayerZ_Secret2026";
+let searchDebounceTimer = null;
 
 function generateSecurityToken() {
     const timestamp = Math.floor(Date.now() / 1000);
@@ -216,7 +212,7 @@ async function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIn
 }
 
 /* =========================================================
-   SEARCH BAR TOGGLE & OUTSIDE CLICK
+   SEARCH BAR TOGGLE & LIVE SEARCH
    ========================================================= */
 function toggleSearchInput(event) {
     if(event) event.stopPropagation();
@@ -228,11 +224,9 @@ function toggleSearchInput(event) {
         container.classList.remove('hidden');
         field.focus();
         
-        // Posisikan kursor di bagian akhir teks
         const len = field.value.length;
         field.setSelectionRange(len, len);
 
-        if(allAnimeList.length === 0) fetchAllAnimeForSearch();
         if(field.value.trim() !== '') liveSearchAnime();
     } else {
         container.classList.add('hidden');
@@ -240,7 +234,6 @@ function toggleSearchInput(event) {
     }
 }
 
-// Tutup search bar saat klik di luar area tanpa mereset teks input
 document.addEventListener('click', function(e) {
     const container = document.getElementById('searchContainer');
     const searchBoxWrapper = document.getElementById('searchBoxWrapper');
@@ -259,83 +252,57 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Caching SessionStorage (Mengambil 1x per sesi browser)
-async function fetchAllAnimeForSearch() {
-    const cached = sessionStorage.getItem('nimedesu_search_cache');
-    if (cached) {
-        try {
-            allAnimeList = JSON.parse(cached);
+function liveSearchAnime() {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(async () => {
+        const query = document.getElementById('searchField').value.trim();
+        const suggestionsBox = document.getElementById('searchSuggestions');
+
+        if (!query) {
+            suggestionsBox.classList.add('hidden');
+            suggestionsBox.innerHTML = '';
             return;
-        } catch (e) {}
-    }
+        }
 
-    try {
-        const perPage = 1000;
-        let page = 1;
-        let all = [];
-        let totalPages = 1;
-
-        do {
+        try {
             const sec = generateSecurityToken();
-            const res = await fetch(`${RENDER_API_URL}/anime?page=${page}&per_page=${perPage}`, {
+            const res = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(query)}&per_page=6`, {
                 headers: {
                     "X-Client-Token": sec.token,
                     "X-Client-Time": sec.time
                 }
             });
             const result = await res.json();
-            const pageData = Array.isArray(result) ? result : (result.data || []);
-            all = all.concat(pageData);
+            const matched = result.data || [];
 
-            totalPages = result.total_pages || 1;
-            page++;
-        } while (page <= totalPages);
+            if (matched.length === 0) {
+                suggestionsBox.innerHTML = `<p class="text-xs text-center text-zinc-500 py-3">Anime tidak ditemukan</p>`;
+                suggestionsBox.classList.remove('hidden');
+                return;
+            }
 
-        allAnimeList = all;
-        try {
-            sessionStorage.setItem('nimedesu_search_cache', JSON.stringify(all));
-        } catch (e) {}
-    } catch (e) {
-        allAnimeList = [];
-    }
-}
+            suggestionsBox.innerHTML = matched.map(anime => {
+                const title = anime.title || "Tanpa Judul";
+                const thumb = anime.image_url || anime.thumbnail || "https://placehold.co/100x150?text=No+Image";
+                const animeUrl = anime.url ? anime.url.trim() : "";
+                const rawGenre = anime.genre || "";
+                const genres = rawGenre ? rawGenre.split(',').map(g => g.trim()).join(', ') : '-';
 
-function liveSearchAnime() {
-    const query = document.getElementById('searchField').value.trim().toLowerCase();
-    const suggestionsBox = document.getElementById('searchSuggestions');
-
-    if (!query) {
-        suggestionsBox.classList.add('hidden');
-        suggestionsBox.innerHTML = '';
-        return;
-    }
-
-    const matched = (Array.isArray(allAnimeList) ? allAnimeList : []).filter(a => (a.title || a.Judul || "").toLowerCase().includes(query)).slice(0, 6);
-
-    if (matched.length === 0) {
-        suggestionsBox.innerHTML = `<p class="text-xs text-center text-zinc-500 py-3">Anime tidak ditemukan</p>`;
-        suggestionsBox.classList.remove('hidden');
-        return;
-    }
-
-    suggestionsBox.innerHTML = matched.map(anime => {
-        const title = anime.title || anime.Judul || "Tanpa Judul";
-        const thumb = anime.image_url || anime.thumbnail || "https://placehold.co/100x150?text=No+Image";
-        const animeUrl = anime.url ? anime.url.trim() : "";
-        const rawGenre = anime.genre || anime.Genre || "";
-        const genres = rawGenre ? rawGenre.split(',').map(g => g.trim()).join(', ') : '-';
-        
-        return `
-            <div onclick="window.location.href='stream.html?url=${encodeURIComponent(animeUrl)}&eps=0'" class="flex items-center gap-3 p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer transition">
-                <img src="${thumb}" class="w-10 h-14 object-cover rounded-lg shrink-0">
-                <div class="overflow-hidden">
-                    <h4 class="text-xs font-semibold text-zinc-900 dark:text-white truncate">${title}</h4>
-                    <span class="text-[10px] text-zinc-500 dark:text-zinc-400 truncate block">${genres}</span>
-                </div>
-            </div>
-        `;
-    }).join('');
-    suggestionsBox.classList.remove('hidden');
+                return `
+                    <div onclick="window.location.href='stream.html?url=${encodeURIComponent(animeUrl)}&eps=0'" class="flex items-center gap-3 p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer transition">
+                        <img src="${thumb}" class="w-10 h-14 object-cover rounded-lg shrink-0">
+                        <div class="overflow-hidden">
+                            <h4 class="text-xs font-semibold text-zinc-900 dark:text-white truncate">${title}</h4>
+                            <span class="text-[10px] text-zinc-500 dark:text-zinc-400 truncate block">${genres}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            suggestionsBox.classList.remove('hidden');
+        } catch (e) {
+            console.error(e);
+        }
+    }, 300);
 }
 
 function executeSearch() {
@@ -356,10 +323,6 @@ async function initStream() {
     }
 
     try {
-        if(allAnimeList.length === 0) {
-            await fetchAllAnimeForSearch();
-        }
-
         const sec = generateSecurityToken();
         const response = await fetch(`${RENDER_API_URL}/anime-detail?url=${encodeURIComponent(animeUrl)}`, {
             headers: {
@@ -389,17 +352,12 @@ async function initStream() {
 
             activeEpisodeIndex = (targetEps >= 0 && targetEps < activeEpisodes.length) ? targetEps : 0;
 
-            globalAnimeTitle = data.title || data.Judul;
+            globalAnimeTitle = data.title;
             if (!globalAnimeTitle) {
                 const segments = animeUrl.split('/').filter(Boolean);
                 globalAnimeTitle = segments[segments.length - 1].replace(/-/g, ' ');
             }
 
-            const currentAnimeInfo = allAnimeList.find(a => (a.url && a.url.trim() === animeUrl));
-            if (currentAnimeInfo) {
-                currentAnimeThumbnail = currentAnimeInfo.image_url || currentAnimeInfo.thumbnail || "";
-            }
-            
             document.getElementById('episodeNavContainer').classList.remove('hidden');
             renderDynamicEpisodes();
 
@@ -428,56 +386,50 @@ function scrollSlider(direction) {
     slider.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
 }
 
-function renderMixedGenreRecommendations() {
+async function renderMixedGenreRecommendations() {
     const recSlider = document.getElementById('recommendationSlider');
-    if (!allAnimeList || allAnimeList.length === 0) {
-        recSlider.innerHTML = '<p class="text-xs text-zinc-500">Daftar anime belum dimuat.</p>';
-        return;
-    }
-
-    const targetGenres = ['horror', 'supernatural', 'mecha'];
-    let selectedRecommendations = [];
-
-    targetGenres.forEach(genre => {
-        const filtered = allAnimeList.filter(a => {
-            const itemGenre = a.genre || a.Genre || "";
-            return itemGenre.toLowerCase().includes(genre);
+    try {
+        const sec = generateSecurityToken();
+        const res = await fetch(`${RENDER_API_URL}/anime?per_page=12`, {
+            headers: {
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            }
         });
+        const result = await res.json();
+        const items = result.data || [];
 
-        const shuffled = filtered.sort(() => 0.5 - Math.random());
-        selectedRecommendations = selectedRecommendations.concat(shuffled.slice(0, 4));
-    });
+        if (items.length === 0) {
+            recSlider.innerHTML = '<p class="text-xs text-zinc-500">Tidak ada rekomendasi anime.</p>';
+            return;
+        }
 
-    selectedRecommendations.sort(() => 0.5 - Math.random());
+        recSlider.innerHTML = items.map(rec => {
+            const title = rec.title || "Tanpa Judul";
+            const thumb = rec.image_url || rec.thumbnail || "https://placehold.co/300x400?text=No+Image";
+            const recUrl = rec.url ? rec.url.trim() : "";
+            const status = rec.status || "Ongoing";
 
-    if (selectedRecommendations.length === 0) {
-        recSlider.innerHTML = '<p class="text-xs text-zinc-500">Tidak ada rekomendasi anime dengan genre tersebut.</p>';
-        return;
-    }
-
-    recSlider.innerHTML = selectedRecommendations.map(rec => {
-        const title = rec.title || rec.Judul || "Tanpa Judul";
-        const thumb = rec.image_url || rec.thumbnail || "https://placehold.co/300x400?text=No+Image";
-        const recUrl = rec.url ? rec.url.trim() : "";
-        const status = rec.status || rec.Status || "Ongoing";
-
-        return `
-            <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?url=${encodeURIComponent(recUrl)}&eps=0'">
-                <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
-                    <img src="${thumb}" alt="${title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
-                    <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
-                        <div class="w-10 h-10 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
-                            <i class="fa-solid fa-play text-xs"></i>
+            return `
+                <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-lightBorder dark:border-neon-darkBorder hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?url=${encodeURIComponent(recUrl)}&eps=0'">
+                    <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
+                        <img src="${thumb}" alt="${title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
+                        <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
+                            <div class="w-10 h-10 rounded-full bg-neon-yellow text-black flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition duration-300">
+                                <i class="fa-solid fa-play text-xs"></i>
+                            </div>
                         </div>
+                        <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${status}</span>
                     </div>
-                    <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-white dark:text-neon-yellow text-[10px] font-semibold px-2 py-0.5 rounded-full z-10">${status}</span>
+                    <div class="p-2.5">
+                        <h4 class="font-semibold text-xs line-clamp-2 text-zinc-900 dark:text-white">${title}</h4>
+                    </div>
                 </div>
-                <div class="p-2.5">
-                    <h4 class="font-semibold text-xs line-clamp-2 text-zinc-900 dark:text-white">${title}</h4>
-                </div>
-            </div>
-        `;
-    }).join('');
+            `;
+        }).join('');
+    } catch (e) {
+        recSlider.innerHTML = '<p class="text-xs text-zinc-500">Gagal memuat rekomendasi.</p>';
+    }
 }
 
 function renderDynamicEpisodes() {
