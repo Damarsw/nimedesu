@@ -435,7 +435,8 @@ func animeDetailHandler(c *gin.Context) {
 		return
 	}
 
-	resp, err := supabaseRequest("GET", fmt.Sprintf("anime?url=ilike.*%s*&select=*", url.QueryEscape(animeURL)), nil, nil)
+	// 1. Coba pencarian Exact Match (eq) menggunakan Query Escape
+	resp, err := supabaseRequest("GET", fmt.Sprintf("anime?url=eq.%s&select=*", url.QueryEscape(animeURL)), nil, nil)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"episodes": []interface{}{}})
 		return
@@ -445,6 +446,28 @@ func animeDetailHandler(c *gin.Context) {
 	var animeList []map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&animeList)
 
+	// 2. Fallback: Jika eq gagal karena encoded slashes, cari dengan raw URL
+	if len(animeList) == 0 {
+		fbResp, fbErr := supabaseRequest("GET", fmt.Sprintf("anime?url=eq.%s&select=*", animeURL), nil, nil)
+		if fbErr == nil {
+			defer fbResp.Body.Close()
+			json.NewDecoder(fbResp.Body).Decode(&animeList)
+		}
+	}
+
+	// Jika masih kosong, coba split slug paling akhir dari URL
+	if len(animeList) == 0 {
+		segments := strings.Split(strings.TrimRight(animeURL, "/"), "/")
+		if len(segments) > 0 {
+			lastSlug := segments[len(segments)-1]
+			slugResp, slugErr := supabaseRequest("GET", fmt.Sprintf("anime?url=ilike.*%s*&select=*", lastSlug), nil, nil)
+			if slugErr == nil {
+				defer slugResp.Body.Close()
+				json.NewDecoder(slugResp.Body).Decode(&animeList)
+			}
+		}
+	}
+
 	if len(animeList) == 0 {
 		c.JSON(http.StatusOK, gin.H{"episodes": []interface{}{}})
 		return
@@ -453,6 +476,7 @@ func animeDetailHandler(c *gin.Context) {
 	animeItem := animeList[0]
 	animeID := animeItem["id"]
 
+	// Ambil episode berdasarkan anime_id
 	epResp, err := supabaseRequest("GET", fmt.Sprintf("episode?anime_id=eq.%v&order=id.asc&select=*", animeID), nil, nil)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"episodes": []interface{}{}})
@@ -510,11 +534,10 @@ func animeDetailHandler(c *gin.Context) {
 		"title":    animeItem["title"],
 		"url":      animeItem["url"],
 		"img_url":  animeItem["img_url"],
-		"genre":    animeItem["genre"], // KIRIM GENRE ANIME KE FRONTEND
+		"genre":    animeItem["genre"],
 		"episodes": episodesList,
 	})
 }
-
 func anilistScoreHandler(c *gin.Context) {
 	title := strings.TrimSpace(c.Query("title"))
 	if title == "" {
