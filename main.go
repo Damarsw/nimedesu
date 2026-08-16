@@ -91,6 +91,20 @@ func supabaseRequest(method, endpoint string, body []byte, headers map[string]st
 	return client.Do(req)
 }
 
+// logSupabaseError membaca & mencatat body response kalau statusnya bukan 2xx,
+// lalu me-restore body-nya biar tetap bisa di-decode seperti biasa oleh pemanggil.
+// Dipakai supaya error dari PostgREST (misal RLS, filter salah, dsb) nggak lagi
+// "hilang diam-diam" jadi keliatan kosong doang di frontend.
+func logSupabaseError(context string, resp *http.Response) {
+	if resp == nil || resp.StatusCode < 300 {
+		return
+	}
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	log.Printf("[Supabase Error] %s -> status=%d body=%s", context, resp.StatusCode, string(bodyBytes))
+}
+
 // ---------------------------------------------------------------------------
 // BACKGROUND WORKER (AniList Batch Ingestion)
 // ---------------------------------------------------------------------------
@@ -385,10 +399,13 @@ func animeListHandler(c *gin.Context) {
 		"Prefer": "count=exact",
 	})
 	if err != nil {
+		log.Printf("[animeListHandler] supabase request error: %v", err)
 		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0, "page": page, "total_pages": 1})
 		return
 	}
 	defer resp.Body.Close()
+
+	logSupabaseError(fmt.Sprintf("animeListHandler query=%s", query), resp)
 
 	var data []map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&data)
@@ -417,12 +434,17 @@ func animeListHandler(c *gin.Context) {
 		"total_pages": totalPages,
 	}
 
-	localCache.Lock()
-	localCache.AnimeList[cacheKey] = CacheItem{
-		Timestamp: now,
-		Data:      payload,
+	// Jangan cache hasil kosong. Kalau di-cache, anime yang baru di-insert ke
+	// Supabase setelah query kosong ini pernah dijalankan bakal "hilang" dari
+	// pencarian sampai 24 jam (CACHE_TTL_ANIME) meskipun datanya sudah ada di DB.
+	if len(data) > 0 {
+		localCache.Lock()
+		localCache.AnimeList[cacheKey] = CacheItem{
+			Timestamp: now,
+			Data:      payload,
+		}
+		localCache.Unlock()
 	}
-	localCache.Unlock()
 
 	c.Header("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=3600")
 	c.JSON(http.StatusOK, payload)
@@ -443,8 +465,11 @@ func animeDetailHandler(c *gin.Context) {
 	if animeIDParam != "" {
 		idResp, err := supabaseRequest("GET", fmt.Sprintf("anime?id=eq.%s&select=*", url.QueryEscape(animeIDParam)), nil, nil)
 		if err == nil {
+			logSupabaseError("animeDetailHandler id lookup id="+animeIDParam, idResp)
 			json.NewDecoder(idResp.Body).Decode(&animeList)
 			idResp.Body.Close()
+		} else {
+			log.Printf("[animeDetailHandler] id lookup error: %v", err)
 		}
 	}
 
@@ -464,8 +489,11 @@ func animeDetailHandler(c *gin.Context) {
 
 		resp, err := supabaseRequest("GET", fmt.Sprintf("anime?url=ilike.*%s*&select=*", url.QueryEscape(targetSlug)), nil, nil)
 		if err == nil {
+			logSupabaseError("animeDetailHandler slug lookup slug="+targetSlug, resp)
 			json.NewDecoder(resp.Body).Decode(&animeList)
 			resp.Body.Close()
+		} else {
+			log.Printf("[animeDetailHandler] slug lookup error: %v", err)
 		}
 	}
 
