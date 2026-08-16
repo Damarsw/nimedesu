@@ -41,15 +41,29 @@ function generateSecurityToken() {
 }
 
 /* =========================================================
-   SISTEM SKOR CERDAS DENGAN LOCAL CACHING & BACKEND PROXY
+   SISTEM SKOR CERDAS DENGAN LOCAL CACHING (EXPIRE 7 HARI)
    ========================================================= */
 function getCachedScore(title, defaultScore) {
     if (defaultScore && defaultScore !== '-' && defaultScore !== 'N/A') {
         return defaultScore;
     }
     if (!title) return 'N/A';
+    
     const cleanTitle = title.replace(/([a-zA-Z0-9])x([a-zA-Z0-9])/gi, '$1 x $2').toLowerCase().trim();
-    return scoreLocalCache[cleanTitle] || 'N/A';
+    const cachedData = scoreLocalCache[cleanTitle];
+
+    if (cachedData) {
+        if (typeof cachedData === 'string') return cachedData;
+
+        // Validasi expired 7 Hari (604.800.000 ms)
+        const now = Date.now();
+        const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+        
+        if (now - cachedData.timestamp < SEVEN_DAYS_MS) {
+            return cachedData.score;
+        }
+    }
+    return 'N/A';
 }
 
 async function fetchAniListScoreForCard(animeTitle, elementId, defaultScore) {
@@ -63,9 +77,10 @@ async function fetchAniListScoreForCard(animeTitle, elementId, defaultScore) {
     let cleanTitle = animeTitle.replace(/([a-zA-Z0-9])x([a-zA-Z0-9])/gi, '$1 x $2').trim();
     const cacheKey = cleanTitle.toLowerCase();
 
-    if (scoreLocalCache[cacheKey]) {
+    const cachedScore = getCachedScore(cleanTitle, defaultScore);
+    if (cachedScore !== 'N/A') {
         const targetEl = document.getElementById(elementId);
-        if (targetEl) targetEl.innerHTML = `★ ${scoreLocalCache[cacheKey]}`;
+        if (targetEl) targetEl.innerHTML = `★ ${cachedScore}`;
         return;
     }
 
@@ -82,7 +97,11 @@ async function fetchAniListScoreForCard(animeTitle, elementId, defaultScore) {
         const targetEl = document.getElementById(elementId);
 
         if (score && score !== 'N/A') {
-            scoreLocalCache[cacheKey] = score;
+            scoreLocalCache[cacheKey] = {
+                score: score,
+                timestamp: Date.now() // Simpan timestamp waktu sekarang
+            };
+
             try {
                 localStorage.setItem('nimedesu_scores_cache', JSON.stringify(scoreLocalCache));
             } catch (e) {}
@@ -848,7 +867,7 @@ function goToPage(pageNumber) {
 }
 
 /* =========================================================
-   SEARCH BAR TOGGLE (MENYEMBUL DARI BAWAH HEADER)
+   SEARCH BAR OVERLAY TOGGLE & MODAL BEHAVIOR
    ========================================================= */
 function toggleSearchInput(event) {
     if(event) event.stopPropagation();
@@ -971,6 +990,7 @@ function selectLiveSearchItem(anime) {
     viewDetails(anime.id);
 }
 
+// RESET STYLE TOMBOL NAVIGASI (IKON HITAM DI TEMA TERANG)
 function resetTabActiveStyles() {
     document.querySelectorAll('.nav-tab-btn').forEach(b => {
         b.classList.remove('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
@@ -978,7 +998,6 @@ function resetTabActiveStyles() {
 
         const icon = b.querySelector('i');
         if (icon && icon.id !== 'genreArrow') {
-            // Di tema terang selalu hitam, di tema gelap kembali ke kuning neon
             icon.className = icon.className.replace(/text-\S+/g, '');
             icon.classList.add('text-black', 'dark:text-neon-yellow');
         }
@@ -1041,7 +1060,7 @@ function changeTab(type, element) {
 
         const icon = element.querySelector('i');
         if (icon) {
-            icon.classList.remove('text-neon-yellow');
+            icon.className = icon.className.replace(/text-\S+/g, '');
             icon.classList.add('text-black');
         }
     }
@@ -1107,7 +1126,6 @@ function searchAnime() {
         searchField.blur();
     }
 
-    // Jika pengguna sedang berada di tampilan Peringkat/Informasi
     if (currentView === 'information') {
         activeInfoSearchQuery = query;
         const targetType = currentInfoType || 'bypopularity';
@@ -1130,6 +1148,7 @@ function searchAnime() {
     loadAnimeDatabase(1).then(() => {
         scrollToSearchResults();
     });
+    scrollToSearchResults();
 }
 
 function viewDetails(id) {
@@ -1188,13 +1207,11 @@ function toggleTheme() {
    SISTEM PERINGKAT & INFORMASI
    ========================================================= */
 function setInfoTabActive(type) {
-    // Reset semua tombol ke kondisi non-aktif
     document.querySelectorAll('.info-tab-btn').forEach(b => {
         b.className = 'info-tab-btn px-4 py-2 rounded-full bg-neon-lightCard dark:bg-neon-darkCard text-xs font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs';
         
         const icon = b.querySelector('i');
         if (icon) {
-            // Tema terang: Hitam | Tema gelap: Kuning Neon
             icon.className = icon.className.replace(/text-\S+/g, '');
             icon.classList.add('text-black', 'dark:text-neon-yellow');
         }
@@ -1204,14 +1221,12 @@ function setInfoTabActive(type) {
     if (type === 'upcoming') activeBtnId = 'infoBtnUpcoming';
     if (type === 'favorite') activeBtnId = 'infoBtnFavorite';
     
-    // Set tombol yang diklik ke kondisi aktif
     const activeBtn = document.getElementById(activeBtnId);
     if (activeBtn) {
         activeBtn.className = 'info-tab-btn px-4 py-2 rounded-full bg-neon-yellow text-black text-xs font-bold shadow-glow-yellow transition';
         
         const activeIcon = activeBtn.querySelector('i');
         if (activeIcon) {
-            // Saat aktif (background kuning), baik tema terang maupun gelap ikonnya HITAM
             activeIcon.className = activeIcon.className.replace(/text-\S+/g, '');
             activeIcon.classList.add('text-black');
         }
@@ -1385,7 +1400,7 @@ async function fetchRankingFromBackend(type, page, loadingEl, podiumEl, gridEl, 
             podiumEl.classList.remove('hidden');
         }
 
-        const startRankOffset = page === 1 ? 4 : (15 + ((page - 2) * 12) + 1);
+        const startRankOffset = page === 1 ? 4 : ((page - 1) * 12 + 4);
         gridEl.innerHTML = listData.map((anime, idx) => renderRankListItem(anime, startRankOffset + idx)).join('');
 
         renderInfoPagination(type, page, lastPage, paginationEl);
@@ -1470,10 +1485,15 @@ function renderRankListItem(anime, rankNumber) {
 }
 
 function renderInfoPagination(type, page, totalPageCount, paginationEl) {
+    if (!paginationEl || totalPageCount <= 1) {
+        if (paginationEl) paginationEl.innerHTML = '';
+        return;
+    }
     let pagHTML = '';
     const baseBtn = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow transition shadow-xs';
     const disBtn = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border-zinc-200 dark:border-zinc-800 cursor-not-allowed';
-    
+    const escapedQuery = query.replace(/'/g, "\\'");
+
     pagHTML += `<button class="${page > 1 ? baseBtn : disBtn}" ${page <= 1 ? 'disabled' : ''} onclick="openInformation('${type}', ${page - 1})">&lsaquo;</button>`;
     
     const isMobile = window.innerWidth < 640;
