@@ -978,7 +978,8 @@ function resetTabActiveStyles() {
 
         const icon = b.querySelector('i');
         if (icon && icon.id !== 'genreArrow') {
-            icon.classList.remove('text-neon-yellow');
+            // Di tema terang selalu hitam, di tema gelap kembali ke kuning neon
+            icon.className = icon.className.replace(/text-\S+/g, '');
             icon.classList.add('text-black', 'dark:text-neon-yellow');
         }
     });
@@ -1187,11 +1188,14 @@ function toggleTheme() {
    SISTEM PERINGKAT & INFORMASI
    ========================================================= */
 function setInfoTabActive(type) {
+    // Reset semua tombol ke kondisi non-aktif
     document.querySelectorAll('.info-tab-btn').forEach(b => {
         b.className = 'info-tab-btn px-4 py-2 rounded-full bg-neon-lightCard dark:bg-neon-darkCard text-xs font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs';
+        
         const icon = b.querySelector('i');
         if (icon) {
-            icon.classList.remove('text-black');
+            // Tema terang: Hitam | Tema gelap: Kuning Neon
+            icon.className = icon.className.replace(/text-\S+/g, '');
             icon.classList.add('text-black', 'dark:text-neon-yellow');
         }
     });
@@ -1200,12 +1204,15 @@ function setInfoTabActive(type) {
     if (type === 'upcoming') activeBtnId = 'infoBtnUpcoming';
     if (type === 'favorite') activeBtnId = 'infoBtnFavorite';
     
+    // Set tombol yang diklik ke kondisi aktif
     const activeBtn = document.getElementById(activeBtnId);
     if (activeBtn) {
         activeBtn.className = 'info-tab-btn px-4 py-2 rounded-full bg-neon-yellow text-black text-xs font-bold shadow-glow-yellow transition';
+        
         const activeIcon = activeBtn.querySelector('i');
         if (activeIcon) {
-            activeIcon.classList.remove('dark:text-neon-yellow');
+            // Saat aktif (background kuning), baik tema terang maupun gelap ikonnya HITAM
+            activeIcon.className = activeIcon.className.replace(/text-\S+/g, '');
             activeIcon.classList.add('text-black');
         }
     }
