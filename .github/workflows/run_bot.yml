@@ -28,4 +28,4 @@ jobs:
 
     - name: Run Bot Script
       run: |
-        python total.py
+        python ongoing.py
