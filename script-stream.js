@@ -594,6 +594,36 @@ function toggleEpisodeBox() {
     }
 }
 
+/* HELPER UNTUK MENGUBAH URL EMBED SECARA OTOMATIS BERDASARKAN PROVIDER SERVER */
+function formatEmbedUrl(url) {
+    if (!url) return "about:blank";
+
+    let finalUrl = url;
+    try {
+        let decoded = atob(url);
+        if (decoded && decoded.startsWith('http')) {
+            finalUrl = decoded;
+        }
+    } catch (e) {
+        finalUrl = url;
+    }
+
+    // 1. Handling Google Drive
+    if (finalUrl.includes('drive.google.com')) {
+        return finalUrl
+            .replace('/view?usp=drivesdk', '/preview')
+            .replace('/view', '/preview');
+    }
+
+    // 2. Handling Mega.nz
+    if (finalUrl.includes('mega.nz')) {
+        return finalUrl.replace('/file/', '/embed/');
+    }
+
+    // 3. Server Lain (Blogger, Bitchute, Streamtape, Doodstream, dll.)
+    return finalUrl;
+}
+
 function selectServer(element, resolution, serverNum, videoUrl) {
     document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
     document.querySelectorAll('.server-btn').forEach(btn => {
@@ -612,17 +642,7 @@ function selectServer(element, resolution, serverNum, videoUrl) {
         return;
     }
 
-    let finalUrl = videoUrl;
-    try {
-        let decoded = atob(videoUrl);
-        if (decoded && decoded.startsWith('http')) {
-            finalUrl = decoded;
-        }
-    } catch (e) {
-        finalUrl = videoUrl;
-    }
-
-    iframe.src = finalUrl;
+    iframe.src = formatEmbedUrl(videoUrl);
 }
 
 function toggleTheme() {
