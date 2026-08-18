@@ -2,19 +2,15 @@ FROM golang:1.22-alpine AS builder
 
 WORKDIR /app
 
-# Hanya salin go.mod saja agar tidak error malformed/missing go.sum
-COPY go.mod ./
+# Salin go.mod dan go.sum
+COPY go.mod go.sum ./
 
-# Download dependensi tanpa bergantung pada go.sum manual
 RUN go mod download
 
-# Salin seluruh isi source code project
 COPY . .
 
-# Build binary aplikasi
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o main .
 
-# Stage 2: Container final yang ringan
 FROM alpine:latest
 
 RUN apk --no-cache add ca-certificates tzdata
