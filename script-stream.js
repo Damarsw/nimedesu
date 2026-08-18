@@ -1,6 +1,6 @@
 document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
-const RENDER_API_URL = "https://nimedesu.onrender.com/api";
+const RENDER_API_URL = "/api-backend";
 let activeEpisodes = [];
 let activeEpisodeIndex = 0;
 let globalAnimeTitle = "Anime";
