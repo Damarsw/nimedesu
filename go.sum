@@ -1,3 +1,0 @@
-git add go.sum go.mod
-git commit -m "Fix missing go.sum for deployment"
-git push origin main
