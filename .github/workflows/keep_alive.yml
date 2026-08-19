@@ -1,0 +1,17 @@
+name: Keep Render Alive
+
+on:
+  schedule:
+    # Jalan tiap 10 menit sekali (Render sleep setelah 15 menit idle)
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Supaya bisa di-trigger manual kalau mau tes
+
+jobs:
+  ping-render:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ping Backend Render Service
+        run: |
+          # Ganti URL di bawah dengan URL Backend Render kamu
+          curl -s https://nimedesu.onrender.com/health || exit 0
