@@ -306,7 +306,8 @@ function executeSearch() {
 
 async function initStream() {
     const urlParams = new URLSearchParams(window.location.search);
-    const animeId = urlParams.get('id');
+    // Mengambil id baik dari parameter 'id' maupun 'anime_id'
+    const animeId = urlParams.get('id') || urlParams.get('anime_id');
     const animeUrl = urlParams.get('url');
     const targetEps = parseInt(urlParams.get('eps')) || 0; 
 
