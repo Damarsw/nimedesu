@@ -123,13 +123,13 @@ async function fetchAniListScoreForCard(animeTitle, elementId, defaultScore) {
 function isAnimeBookmarked(anime) {
     if (!userBookmarksCache || userBookmarksCache.length === 0 || !anime) return false;
     
-    const targetId = String(anime.id || "");
+    const targetId = String(anime.id || anime.anime_id || "");
     const titleUser = (anime.title?.userPreferred || anime.title?.romaji || anime.title?.english || anime.title || "").toLowerCase().trim();
     const titleRomaji = (anime.title?.romaji || "").toLowerCase().trim();
     const titleEnglish = (anime.title?.english || "").toLowerCase().trim();
 
     return userBookmarksCache.some(b => {
-        const bId = String(b.id || "");
+        const bId = String(b.id || b.anime_id || "");
         const bTitle = (b.title || "").toLowerCase().trim();
 
         if (targetId && bId && targetId === bId) return true;
@@ -259,6 +259,7 @@ async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
 
         const bookmarkItem = {
             id: animeObj.id,
+            anime_id: animeObj.id,
             title: animeObj.title?.userPreferred || animeObj.title?.romaji || animeObj.title?.english || animeObj.title || "Anime",
             url: animeObj.url || "",
             thumbnail: animeObj.coverImage?.extraLarge || animeObj.coverImage?.large || animeObj.thumbnail || "https://placehold.co/400x600?text=No+Image",
@@ -270,7 +271,7 @@ async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
         };
 
         const existsIndex = bookmarks.findIndex(b => {
-            if (String(b.id) === String(bookmarkItem.id)) return true;
+            if (String(b.id || b.anime_id) === String(bookmarkItem.id)) return true;
             if (b.title?.toLowerCase() === bookmarkItem.title?.toLowerCase()) return true;
             return false;
         });
@@ -350,7 +351,7 @@ async function loadBookmarkTab(page = 1) {
     }
 
     currentData = bookmarks.map((b, idx) => ({
-        id: b.id || (idx + 1),
+        id: b.id || b.anime_id || (idx + 1),
         title: b.title || "Tanpa Judul",
         url: b.url || "",
         status: b.status || "Ongoing",
@@ -543,7 +544,7 @@ async function checkAniListAuthStatus() {
 }
 
 /* =========================================================
-   RIWAYAT TONTONAN (AUTO-REPAIR GAMBAR KOSONG)
+   RIWAYAT TONTONAN (MENGGUNAKAN ANIME_ID)
    ========================================================= */
 async function renderHistory() {
     const historySection = document.getElementById('historySection');
@@ -571,11 +572,12 @@ async function renderHistory() {
                 const uniqueImgId = `histImg_${idx}_${Date.now()}`;
                 const isNoImage = !item.thumbnail || item.thumbnail.includes('placehold.co') || item.thumbnail === '';
 
-                if (isNoImage && item.url) {
+                if (isNoImage && (item.anime_id || item.id)) {
                     setTimeout(async () => {
                         try {
                             const sec = generateSecurityToken();
-                            const res = await fetch(`${RENDER_API_URL}/anime-detail?url=${encodeURIComponent(item.url)}`, {
+                            const targetId = item.anime_id || item.id;
+                            const res = await fetch(`${RENDER_API_URL}/anime-detail?id=${encodeURIComponent(targetId)}`, {
                                 headers: {
                                     "X-Client-Token": sec.token,
                                     "X-Client-Time": sec.time
@@ -592,9 +594,10 @@ async function renderHistory() {
                 }
 
                 const displayImg = isNoImage ? "https://placehold.co/400x600?text=Memuat..." : item.thumbnail;
+                const targetAnimeId = item.anime_id || item.id;
 
                 return `
-                    <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?url=${encodeURIComponent(item.url)}&eps=${item.lastEpisodeIndex || 0}'">
+                    <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow dark:border-neon-yellow/60 hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?anime_id=${encodeURIComponent(targetAnimeId)}&eps=${item.lastEpisodeIndex || 0}'">
                         <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
                             <img id="${uniqueImgId}" src="${displayImg}" alt="${item.title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
                             <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
@@ -1206,9 +1209,13 @@ function viewDetails(id) {
     }
 }
 
+/* =========================================================
+   FUNGSI STREAMING TERHUBUNG DENGAN ANIME_ID
+   ========================================================= */
 function openStreamingTab() {
-    if (!activeAnime || !activeAnime.url) return;
-    window.open(`stream.html?url=${encodeURIComponent(activeAnime.url)}&eps=0`, '_blank');
+    if (!activeAnime || !activeAnime.id) return;
+    // Mengarahkan ke stream.html dengan parameter anime_id
+    window.open(`stream.html?anime_id=${encodeURIComponent(activeAnime.id)}&eps=0`, '_blank');
 }
 
 function toggleTheme() {
@@ -1497,7 +1504,7 @@ function renderRankListItem(anime, rankNumber) {
                     </div>
                 </div>
             </div>
-            <button onclick="toggleBookmarkAnime(${JSON.stringify({ id: anime.id, title: title, thumbnail: img, score: score, popularity: pop }).replace(/"/g, '&quot;')}, this)" title="Simpan Bookmark" class="p-2 text-zinc-400 hover:text-neon-yellow transition shrink-0">
+            <button onclick="toggleBookmarkAnime(${JSON.stringify({ id: anime.id, anime_id: anime.id, title: title, thumbnail: img, score: score, popularity: pop }).replace(/"/g, '&quot;')}, this)" title="Simpan Bookmark" class="p-2 text-zinc-400 hover:text-neon-yellow transition shrink-0">
                 <i class="${isBookmarked ? 'fa-solid fa-bookmark text-neon-yellow' : 'fa-regular fa-bookmark'} text-sm"></i>
             </button>
         </div>
