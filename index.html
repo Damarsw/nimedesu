@@ -9,30 +9,30 @@
     <link rel="icon" href="https://i.ibb.co.com/Ld2r8ZLS/logo.png" type="image/png" />
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        neon: {
-                            lightBg: '#F8F9FA',        
-                            lightCard: '#FFFFFF',      
-                            lightBorder: '#F6BE00',    
-                            darkBg: '#0f0e0a',         
-                            darkCard: '#1a1912',       
-                            darkBorder: '#33311f',     
-                            yellow: '#F6BE00',         /* Warna Kuning Header Cerah */
-                            yellowHover: '#d4a000'     
-                        }
-                    },
-                    boxShadow: {
-                        'glow-yellow': '0 0 15px rgba(246, 190, 0, 0.4), inset 0 0 5px rgba(246, 190, 0, 0.2)'
+<script>
+    tailwind.config = {
+        darkMode: 'class',
+        theme: {
+            extend: {
+                colors: {
+                    neon: {
+                        lightBg: '#F8F9FA',        
+                        lightCard: '#FFFFFF',      
+                        lightBorder: '#F6BE00',    
+                        darkBg: '#0f0e0a',         
+                        darkCard: '#1a1912',       
+                        darkBorder: '#33311f',     
+                        yellow: '#F6BE00',         /* Warna Kuning Header Cerah */
+                        yellowHover: '#d4a000'     
                     }
+                },
+                boxShadow: {
+                    'glow-yellow': '0 0 15px rgba(246, 190, 0, 0.4), inset 0 0 5px rgba(246, 190, 0, 0.2)'
                 }
             }
         }
-    </script>
+    }
+</script>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -152,10 +152,12 @@
             </div>
 
             <div class="flex items-center space-x-2">
+                <!-- Tombol Search (Kiri) -->
                 <button id="btnSearchToggle" onclick="toggleSearchInput(event)" class="p-2.5 rounded-full bg-transparent hover:bg-black/10 dark:hover:bg-yellow-500/25 transition text-black dark:text-neon-yellow" title="Cari Anime">
                     <i class="fa-solid fa-magnifying-glass text-sm"></i>
                 </button>
 
+                <!-- Tombol Login / User Icon (Kanan) -->
                 <div id="headerAuthContainer">
                     <button onclick="loginAniList()" class="p-2.5 rounded-full bg-transparent hover:bg-black/10 dark:hover:bg-yellow-500/25 transition text-black dark:text-neon-yellow" title="Login AniList">
                         <i class="fa-solid fa-user text-sm"></i>
@@ -164,7 +166,7 @@
             </div>
         </div>
 
-        <!-- SEARCH BAR TOGGLE -->
+        <!-- SEARCH BAR TOGGLE (NONGTOL / MENYEMBUL LANGSUNG DARI BAWAH HEADER) -->
         <div id="searchContainer" class="hidden w-full bg-white/95 dark:bg-[#1a1912]/95 border-b-2 border-neon-yellow shadow-xl py-3 px-4 sm:px-8 transition-all duration-300 relative z-50">
             <div id="searchBoxWrapper" class="relative max-w-2xl mx-auto flex flex-col">
                 <div class="flex items-center bg-zinc-100 dark:bg-zinc-900 rounded-2xl border border-neon-yellow/60 overflow-hidden px-2 py-1 shadow-inner">
@@ -176,6 +178,7 @@
                         <i class="fa-solid fa-xmark text-base"></i>
                     </button>
                 </div>
+                <!-- Live Search Suggestions Dropdown di Bawah Input Search Header -->
                 <div id="searchSuggestions" class="hidden w-full bg-white dark:bg-[#1a1912] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-h-72 overflow-y-auto mt-2 p-2 z-50"></div>
             </div>
         </div>
@@ -232,6 +235,7 @@
 
         <!-- HOME VIEW -->
         <div id="homeView">
+            <!-- UCAPAN SELAMAT DATANG USER (GREETING BANNER) -->
             <div id="userWelcomeBanner" class="hidden mb-6 p-4 rounded-2xl bg-neon-lightCard dark:bg-neon-darkCard border border-neon-yellow/50 shadow-sm flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <div id="userWelcomeAvatarContainer"></div>
@@ -255,23 +259,16 @@
                 <div id="historyGrid" class="flex gap-4 overflow-x-auto no-scrollbar scroll-smooth pb-2 pt-1"></div>
             </div>
 
-            <!-- TAB NAVIGASI BERANDA DENGAN TOMBOL BOOKMARK & FAVORITE BERSAMPINGAN -->
+            <!-- TAB NAVIGASI BERANDA DENGAN TOGGLE CONTAINER -->
             <div class="relative mb-6">
+                <!-- Baris Tombol Utama (Scrollable Horisontal di HP) -->
                 <div class="flex items-center gap-2 overflow-x-auto no-scrollbar flex-nowrap pb-1 pr-8 scroll-smooth" id="navTabScrollContainer">
-                    <!-- TOMBOL BOOKMARK (PLANNING ANILIST) -->
+                    <!-- TOMBOL BOOKMARK -->
                     <button id="btnBookmarkTab"
                         class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs flex items-center gap-2 hover:border-neon-yellow shrink-0"
                         onclick="changeTab('bookmark', this)"
-                        title="Daftar Bookmark (Planning)">
+                        title="Daftar Bookmark">
                         <i class="fa-solid fa-bookmark text-black dark:text-neon-yellow text-sm"></i>
-                    </button>
-
-                    <!-- TOMBOL FAVORITE (FAVORITE ANILIST) -->
-                    <button id="btnFavoriteTab"
-                        class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs flex items-center gap-2 hover:border-neon-yellow shrink-0"
-                        onclick="changeTab('favorite_tab', this)"
-                        title="Daftar Favorit">
-                        <i class="fa-solid fa-heart text-red-500 text-sm"></i>
                     </button>
 
                     <button id="btnSemua" class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs shrink-0" onclick="changeTab('all', this)">Semua</button>
@@ -282,12 +279,13 @@
                     </button>
                 </div>
 
+                <!-- Petunjuk Panah Scroll Kanan di HP -->
                 <div class="pointer-events-none absolute right-0 top-0 bottom-1 w-12 bg-gradient-to-l from-neon-lightBg dark:from-neon-darkBg to-transparent flex items-center justify-end pr-0.5 sm:hidden">
                     <i class="fa-solid fa-chevron-right text-neon-yellow text-xs animate-pulse drop-shadow-md"></i>
                 </div>
             </div>
 
-            <!-- CONTAINER LIST GENRE SANGAT LENGKAP -->
+            <!-- CONTAINER LIST GENRE (GRID TABEL SIMETRIS RAPI) -->
             <div id="genreContainer" class="hidden mb-6 p-4 bg-neon-lightCard dark:bg-neon-darkCard rounded-2xl border border-neon-yellow dark:border-neon-darkBorder shadow-md">
                 <div class="flex items-center justify-between mb-3 pb-2 border-b border-zinc-200 dark:border-zinc-800">
                     <span class="text-xs font-bold text-black dark:text-neon-yellow uppercase tracking-wider flex items-center gap-1.5">
@@ -604,7 +602,7 @@
         <p class="mt-1">Butuh bantuan atau kirim masukan? <a href="mailto:damdesu@proton.me" class="text-black dark:text-neon-yellow underline font-medium">Hubungi saya</a></p>
     </footer>
 
-    <!-- Floating Theme Switcher Button -->
+    <!-- Floating Theme Switcher Button (Kanan Bawah Kontras) -->
     <button onclick="toggleTheme()" 
             class="fixed bottom-10 right-6 z-50 w-12 h-12 rounded-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-neon-yellow border-2 border-neon-yellow shadow-lg shadow-black/40 flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-300" 
             title="Ganti Tema">
