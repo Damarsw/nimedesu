@@ -284,6 +284,8 @@ async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
             thumbnail: animeObj.coverImage?.extraLarge || animeObj.thumbnail || "https://placehold.co/400x600?text=No+Image",
             status: animeObj.status || "Ongoing",
             skor: animeObj.skor || animeObj.score || "-",
+            genres: animeObj.genres || [],
+            synopsis: animeObj.synopsis || "Sinopsis belum tersedia.",
             addedAt: new Date().toISOString()
         };
 
@@ -333,6 +335,8 @@ async function toggleFavoriteAnime(animeObjOrId, buttonEl) {
             thumbnail: animeObj.coverImage?.extraLarge || animeObj.thumbnail || "https://placehold.co/400x600?text=No+Image",
             status: animeObj.status || "Ongoing",
             skor: animeObj.skor || animeObj.score || "-",
+            genres: animeObj.genres || [],
+            synopsis: animeObj.synopsis || "Sinopsis belum tersedia.",
             addedAt: new Date().toISOString()
         };
 
