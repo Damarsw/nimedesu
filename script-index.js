@@ -1,5 +1,16 @@
 document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
+/* Callback untuk menampilkan konten web setelah Turnstile terverifikasi */
+function onTurnstileSuccess(token) {
+    const header = document.getElementById('mainHeader');
+    const main = document.getElementById('mainContent');
+    const footer = document.getElementById('mainFooter');
+
+    if (header) header.classList.remove('hidden');
+    if (main) main.classList.remove('hidden');
+    if (footer) footer.classList.remove('hidden');
+}
+
 let currentData = [];
 let currentPage = 1;
 let totalPages = 1;
