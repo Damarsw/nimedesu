@@ -17,6 +17,7 @@ function onTurnstileSuccess(token) {
     const turnstileContainer = document.getElementById('turnstileContainer');
     if (turnstileContainer) {
         turnstileContainer.style.display = 'none';
+    }
 }
     
 function generateSecurityToken() {
