@@ -25,16 +25,6 @@ try {
     scoreLocalCache = {};
 }
 
-function onTurnstileSuccess(token) {
-    const overlay = document.getElementById('turnstileOverlay');
-    if (overlay) 
-        overlay.classList.add('opacity-0', 'pointer-events-none');
-        setTimeout(() => {
-            overlay.classList.add('hidden');
-        }, 500);
-    }
-}
-
 const RENDER_API_URL = "/api-backend";
 
 function getTurnstileToken() {
