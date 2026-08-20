@@ -9,6 +9,10 @@ let currentAnimeGenres = [];
 let currentAnimeId = null;
 let searchDebounceTimer = null;
 
+function getTurnstileToken() {
+    return document.querySelector('[name="cf-turnstile-response"]')?.value || "";
+}
+
 function generateSecurityToken() {
     const timestamp = Math.floor(Date.now() / 1000);
     const rawPayload = `${timestamp}_NimeDesuSecretKey2026`;
@@ -35,7 +39,8 @@ async function syncUserWithSupabase(user) {
             headers: {
                 "Content-Type": "application/json",
                 "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
+                "X-Client-Time": sec.time,
+                "X-Turnstile-Token": getTurnstileToken()
             },
             body: JSON.stringify({
                 anilist_id: identifier,
@@ -92,7 +97,8 @@ async function saveSupabaseUserData(user, payload) {
             headers: {
                 "Content-Type": "application/json",
                 "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
+                "X-Client-Time": sec.time,
+                "X-Turnstile-Token": getTurnstileToken()
             },
             body: JSON.stringify({
                 anilist_id: identifier,
@@ -306,7 +312,6 @@ function executeSearch() {
 
 async function initStream() {
     const urlParams = new URLSearchParams(window.location.search);
-    // Mengambil id baik dari parameter 'id' maupun 'anime_id'
     const animeId = urlParams.get('id') || urlParams.get('anime_id');
     const animeUrl = urlParams.get('url');
     const targetEps = parseInt(urlParams.get('eps')) || 0; 
@@ -595,7 +600,6 @@ function toggleEpisodeBox() {
     }
 }
 
-/* HELPER UNTUK MENGUBAH URL EMBED SECARA OTOMATIS BERDASARKAN PROVIDER SERVER */
 function formatEmbedUrl(url) {
     if (!url) return "about:blank";
 
@@ -609,19 +613,16 @@ function formatEmbedUrl(url) {
         finalUrl = url;
     }
 
-    // 1. Handling Google Drive
     if (finalUrl.includes('drive.google.com')) {
         return finalUrl
             .replace('/view?usp=drivesdk', '/preview')
             .replace('/view', '/preview');
     }
 
-    // 2. Handling Mega.nz
     if (finalUrl.includes('mega.nz')) {
         return finalUrl.replace('/file/', '/embed/');
     }
 
-    // 3. Server Lain (Blogger, Bitchute, Streamtape, Doodstream, dll.)
     return finalUrl;
 }
 
