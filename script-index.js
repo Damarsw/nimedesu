@@ -27,13 +27,29 @@ try {
 
 const RENDER_API_URL = "/api-backend";
 
-function generateSecurityToken() {
+// Turnstile Token Manager
+let turnstileToken = "";
+
+window.onTurnstileSuccess = function(token) {
+    turnstileToken = token;
+};
+
+function getAuthHeaders(extraHeaders = {}) {
     const timestamp = Math.floor(Date.now() / 1000);
     const rawPayload = `${timestamp}_NimeDesuSecretKey2026`;
     const token = CryptoJS.SHA256(rawPayload).toString(CryptoJS.enc.Hex);
+
+    let activeTurnstile = turnstileToken;
+    if (window.turnstile && typeof window.turnstile.getResponse === 'function') {
+        const resp = window.turnstile.getResponse();
+        if (resp) activeTurnstile = resp;
+    }
+
     return {
-        token: token,
-        time: timestamp.toString()
+        "X-Client-Token": token,
+        "X-Client-Time": timestamp.toString(),
+        "X-Turnstile-Token": activeTurnstile,
+        ...extraHeaders
     };
 }
 
@@ -43,10 +59,7 @@ function getNextSundayMidnightTimestamp() {
     
     const dayOfWeek = now.getDay();
     let daysUntilSunday = (7 - dayOfWeek) % 7;
-    
-    if (daysUntilSunday === 0) {
-        daysUntilSunday = 7;
-    }
+    if (daysUntilSunday === 0) daysUntilSunday = 7;
     
     result.setDate(now.getDate() + daysUntilSunday);
     result.setHours(0, 0, 0, 0);
@@ -54,9 +67,7 @@ function getNextSundayMidnightTimestamp() {
 }
 
 function getCachedScore(title, defaultScore) {
-    if (defaultScore && defaultScore !== '-' && defaultScore !== 'N/A') {
-        return defaultScore;
-    }
+    if (defaultScore && defaultScore !== '-' && defaultScore !== 'N/A') return defaultScore;
     if (!title) return 'N/A';
     
     const cleanTitle = title.replace(/([a-zA-Z0-9])x([a-zA-Z0-9])/gi, '$1 x $2').toLowerCase().trim();
@@ -64,11 +75,7 @@ function getCachedScore(title, defaultScore) {
 
     if (cachedData) {
         if (typeof cachedData === 'string') return cachedData;
-
-        const now = Date.now();
-        if (cachedData.expiresAt && now < cachedData.expiresAt) {
-            return cachedData.score;
-        }
+        if (cachedData.expiresAt && Date.now() < cachedData.expiresAt) return cachedData.score;
     }
     return 'N/A';
 }
@@ -92,12 +99,8 @@ async function fetchAniListScoreForCard(animeTitle, elementId, defaultScore) {
     }
 
     try {
-        const sec = generateSecurityToken();
         const response = await fetch(`${RENDER_API_URL}/anilist-score?title=${encodeURIComponent(cleanTitle)}`, {
-            headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
-            }
+            headers: getAuthHeaders()
         });
         const result = await response.json();
         const score = result?.score;
@@ -108,14 +111,8 @@ async function fetchAniListScoreForCard(animeTitle, elementId, defaultScore) {
                 score: score,
                 expiresAt: getNextSundayMidnightTimestamp()
             };
-
-            try {
-                localStorage.setItem('nimedesu_scores_cache', JSON.stringify(scoreLocalCache));
-            } catch (e) {}
-
-            if (targetEl) {
-                targetEl.innerHTML = `★ ${score}`;
-            }
+            try { localStorage.setItem('nimedesu_scores_cache', JSON.stringify(scoreLocalCache)); } catch (e) {}
+            if (targetEl) targetEl.innerHTML = `★ ${score}`;
         }
     } catch (err) {}
 }
@@ -131,12 +128,9 @@ function isAnimeBookmarked(anime) {
     return userBookmarksCache.some(b => {
         const bId = String(b.id || b.anime_id || "");
         const bTitle = (b.title || "").toLowerCase().trim();
-
         if (targetId && bId && targetId === bId) return true;
         if (bTitle) {
-            if (bTitle === titleUser) return true;
-            if (titleRomaji && bTitle === titleRomaji) return true;
-            if (titleEnglish && bTitle === titleEnglish) return true;
+            if (bTitle === titleUser || (titleRomaji && bTitle === titleRomaji) || (titleEnglish && bTitle === titleEnglish)) return true;
         }
         return false;
     });
@@ -152,14 +146,9 @@ async function syncUserWithSupabase(user) {
     const identifier = getUserIdentifier(user);
 
     try {
-        const sec = generateSecurityToken();
         const res = await fetch(`${RENDER_API_URL}/user-sync`, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
-            },
+            headers: getAuthHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({
                 anilist_id: identifier,
                 user_info: {
@@ -188,12 +177,8 @@ async function getSupabaseUserData(user) {
     const identifier = getUserIdentifier(user);
 
     try {
-        const sec = generateSecurityToken();
         const res = await fetch(`${RENDER_API_URL}/user-data?anilist_id=${encodeURIComponent(identifier)}`, {
-            headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
-            }
+            headers: getAuthHeaders()
         });
         const result = await res.json();
         const cookies = result.cookies || {};
@@ -214,14 +199,9 @@ async function saveSupabaseUserData(user, payload) {
     const identifier = getUserIdentifier(user);
 
     try {
-        const sec = generateSecurityToken();
         const res = await fetch(`${RENDER_API_URL}/user-update`, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
-            },
+            headers: getAuthHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({
                 anilist_id: identifier,
                 cookies: payload
@@ -244,13 +224,7 @@ async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
         return;
     }
 
-    let animeObj = null;
-    if (typeof animeObjOrId === 'object' && animeObjOrId !== null) {
-        animeObj = animeObjOrId;
-    } else {
-        animeObj = currentData.find(a => String(a.id) === String(animeObjOrId));
-    }
-
+    let animeObj = typeof animeObjOrId === 'object' && animeObjOrId !== null ? animeObjOrId : currentData.find(a => String(a.id) === String(animeObjOrId));
     if (!animeObj) return;
 
     try {
@@ -270,11 +244,7 @@ async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
             addedAt: new Date().toISOString()
         };
 
-        const existsIndex = bookmarks.findIndex(b => {
-            if (String(b.id || b.anime_id) === String(bookmarkItem.id)) return true;
-            if (b.title?.toLowerCase() === bookmarkItem.title?.toLowerCase()) return true;
-            return false;
-        });
+        const existsIndex = bookmarks.findIndex(b => String(b.id || b.anime_id) === String(bookmarkItem.id) || b.title?.toLowerCase() === bookmarkItem.title?.toLowerCase());
 
         if (existsIndex > -1) {
             bookmarks.splice(existsIndex, 1);
@@ -295,18 +265,11 @@ async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
         userData.bookmarks = bookmarks;
         await saveSupabaseUserData(user, userData);
 
-        if (isBookmarkViewActive) {
-            loadBookmarkTab(currentPage);
-        }
+        if (isBookmarkViewActive) loadBookmarkTab(currentPage);
 
     } catch (err) {
         console.error("Gagal toggle bookmark:", err);
-        alert("Terjadi kesalahan saat memproses bookmark.");
     }
-}
-
-function addAniListBookmark(animeOrMediaId, buttonEl) {
-    toggleBookmarkAnime(animeOrMediaId, buttonEl);
 }
 
 async function loadBookmarkTab(page = 1) {
@@ -369,8 +332,7 @@ async function loadBookmarkTab(page = 1) {
 
     totalPages = Math.max(1, Math.ceil(currentData.length / itemsPerPage));
     const startIdx = (page - 1) * itemsPerPage;
-    const endIdx = startIdx + itemsPerPage;
-    const pageItems = currentData.slice(startIdx, endIdx);
+    const pageItems = currentData.slice(startIdx, startIdx + itemsPerPage);
 
     renderBookmarkGrid(pageItems);
 }
@@ -421,14 +383,6 @@ function renderBookmarkGrid(items) {
     let startPage = Math.max(1, currentPage - maxVisibleRange);
     let endPage = Math.min(totalPages, currentPage + maxVisibleRange);
 
-    if (isMobile) {
-        if (currentPage === 1) {
-            endPage = Math.min(totalPages, 3);
-        } else if (currentPage === totalPages) {
-            startPage = Math.max(1, totalPages - 2);
-        }
-    }
-
     for (let i = startPage; i <= endPage; i++) {
         const activeClass = i === currentPage ? 'bg-neon-yellow text-black font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder shadow-xs';
         paginationHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${activeClass} transition" onclick="loadBookmarkTab(${i})">${i}</button>`;
@@ -462,10 +416,6 @@ function handleAniListOAuthCallback() {
 }
 
 function loginAniList() {
-    if (!ANILIST_CLIENT_ID || ANILIST_CLIENT_ID === "YOUR_ANILIST_CLIENT_ID") {
-        alert("Client ID AniList belum diatur.");
-        return;
-    }
     const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${ANILIST_CLIENT_ID}&response_type=token`;
     window.location.href = authUrl;
 }
@@ -528,10 +478,6 @@ async function checkAniListAuthStatus() {
                 if (userWelcomeAvatarContainer) {
                     userWelcomeAvatarContainer.innerHTML = `<img src="${user.avatar.medium}" class="w-10 h-10 rounded-full border border-neon-yellow object-cover shadow-sm">`;
                 }
-                
-                const bannerLogoutBtn = userWelcomeBanner.querySelector('button');
-                if (bannerLogoutBtn) bannerLogoutBtn.style.display = 'none';
-
                 userWelcomeBanner.classList.remove('hidden');
             }
 
@@ -543,13 +489,9 @@ async function checkAniListAuthStatus() {
     }
 }
 
-/* =========================================================
-   RIWAYAT TONTONAN (MENGGUNAKAN ANIME_ID)
-   ========================================================= */
 async function renderHistory() {
     const historySection = document.getElementById('historySection');
     const historyGrid = document.getElementById('historyGrid');
-
     const user = getLoggedInUser();
 
     if (!user) {
@@ -575,13 +517,9 @@ async function renderHistory() {
                 if (isNoImage && (item.anime_id || item.id)) {
                     setTimeout(async () => {
                         try {
-                            const sec = generateSecurityToken();
                             const targetId = item.anime_id || item.id;
                             const res = await fetch(`${RENDER_API_URL}/anime-detail?id=${encodeURIComponent(targetId)}`, {
-                                headers: {
-                                    "X-Client-Token": sec.token,
-                                    "X-Client-Time": sec.time
-                                }
+                                headers: getAuthHeaders()
                             });
                             const data = await res.json();
                             const realImg = data.img_url || data.image_url || data.thumbnail;
@@ -623,9 +561,7 @@ async function renderHistory() {
 
 async function clearHistory() {
     const user = getLoggedInUser();
-    if (!user) return;
-
-    if (!confirm("Apakah Anda yakin ingin menghapus seluruh riwayat tontonan di database?")) return;
+    if (!user || !confirm("Apakah Anda yakin ingin menghapus seluruh riwayat tontonan di database?")) return;
 
     try {
         const userData = await getSupabaseUserData(user);
@@ -646,26 +582,16 @@ function scrollToSearchResults() {
     if (target) {
         const navbarOffset = 70;
         const targetPosition = target.getBoundingClientRect().top + window.pageYOffset - navbarOffset;
-
-        window.scrollTo({
-            top: targetPosition,
-            behavior: 'smooth'
-        });
+        window.scrollTo({ top: targetPosition, behavior: 'smooth' });
     }
 }
 
 async function openDetailFromAniListTitle(title) {
     if (!title) return;
     try {
-        const sec = generateSecurityToken();
         let searchQuery = title.replace(/([a-zA-Z0-9])x([a-zA-Z0-9])/gi, '$1 x $2').trim();
-        const fetchUrl = `${RENDER_API_URL}/anime?q=${encodeURIComponent(searchQuery)}&per_page=10`;
-        
-        const res = await fetch(fetchUrl, {
-            headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
-            }
+        const res = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(searchQuery)}&per_page=10`, {
+            headers: getAuthHeaders()
         });
         const result = await res.json();
         const matchedList = result.data || [];
@@ -675,16 +601,7 @@ async function openDetailFromAniListTitle(title) {
             const normalize = (str) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
             const cleanTarget = normalize(title);
 
-            matchedItem = matchedList.find(item => normalize(item.title) === cleanTarget);
-            if (!matchedItem) {
-                matchedItem = matchedList.find(item => {
-                    const itemTitleClean = normalize(item.title);
-                    if (cleanTarget === "naruto" && itemTitleClean.includes("boruto")) return false;
-                    return true;
-                });
-            }
-            if (!matchedItem) matchedItem = matchedList[0];
-
+            matchedItem = matchedList.find(item => normalize(item.title) === cleanTarget) || matchedList[0];
             const cachedScore = getCachedScore(matchedItem.title, matchedItem.score);
 
             const animeObj = {
@@ -704,70 +621,42 @@ async function openDetailFromAniListTitle(title) {
                 studio: matchedItem.studio || "-"
             };
 
-            const exists = currentData.some(a => a.id == animeObj.id);
-            if (!exists) currentData.push(animeObj);
-
+            if (!currentData.some(a => a.id == animeObj.id)) currentData.push(animeObj);
             viewDetails(animeObj.id);
         } else {
             alert(`Anime "${title}" belum tersedia di database NimeDesu.`);
         }
     } catch (err) {
-        console.error("Gagal mencocokkan judul:", err);
         alert("Gagal menghubungkan ke server.");
     }
 }
 
 function switchView(viewName, shouldScrollToTop = true) {
     currentView = viewName;
-    const views = ['homeView', 'detailView', 'dmcaView', 'informationView'];
-    views.forEach(id => {
+    ['homeView', 'detailView', 'dmcaView', 'informationView'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.add('hidden');
     });
 
-    if (viewName === 'home') {
-        const home = document.getElementById('homeView');
-        if (home) home.classList.remove('hidden');
-        renderHistory();
-    } else if (viewName === 'detail') {
-        const detail = document.getElementById('detailView');
-        if (detail) detail.classList.remove('hidden');
-    } else if (viewName === 'dmca') {
-        const dmca = document.getElementById('dmcaView');
-        if (dmca) dmca.classList.remove('hidden');
-    } else if (viewName === 'information') {
-        const information = document.getElementById('informationView');
-        if (information) information.classList.remove('hidden');
-    }
-    
-    if (shouldScrollToTop) {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    const targetEl = document.getElementById(`${viewName}View`);
+    if (targetEl) targetEl.classList.remove('hidden');
+    if (viewName === 'home') renderHistory();
+    if (shouldScrollToTop) window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function toggleSidebar() {
     const sidebar = document.getElementById('sidebarMenu');
     const overlay = document.getElementById('sidebarOverlay');
-    if (sidebar.classList.contains('-translate-x-full')) {
-        sidebar.classList.remove('-translate-x-full');
-        overlay.classList.remove('hidden');
-    } else {
-        sidebar.classList.add('-translate-x-full');
-        overlay.classList.add('hidden');
-    }
+    sidebar.classList.toggle('-translate-x-full');
+    overlay.classList.toggle('hidden');
 }
 
 function toggleInformationSubmenu(e) {
-    if(e) e.stopPropagation();
+    if (e) e.stopPropagation();
     const submenu = document.getElementById('informationSubmenu');
     const icon = document.getElementById('informationMenuIcon');
-    if (submenu.classList.contains('hidden')) {
-        submenu.classList.remove('hidden');
-        icon.classList.add('rotate-180');
-    } else {
-        submenu.classList.add('hidden');
-        icon.classList.remove('rotate-180');
-    }
+    submenu.classList.toggle('hidden');
+    icon.classList.toggle('rotate-180');
 }
 
 async function loadAnimeDatabase(page = 1) {
@@ -775,18 +664,11 @@ async function loadAnimeDatabase(page = 1) {
         isBookmarkViewActive = false;
         currentPage = page;
         let fetchUrl = `${RENDER_API_URL}/anime?page=${page}&per_page=${itemsPerPage}`;
-        
         if (activeSearchQuery) fetchUrl += `&q=${encodeURIComponent(activeSearchQuery)}`;
         if (activeStatusFilter) fetchUrl += `&status=${encodeURIComponent(activeStatusFilter)}`;
         if (activeGenreFilter) fetchUrl += `&genre=${encodeURIComponent(activeGenreFilter)}`;
 
-        const sec = generateSecurityToken();
-        const response = await fetch(fetchUrl, {
-            headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
-            }
-        });
+        const response = await fetch(fetchUrl, { headers: getAuthHeaders() });
         const result = await response.json();
 
         currentData = (result.data || []).map((item, index) => ({
@@ -810,7 +692,6 @@ async function loadAnimeDatabase(page = 1) {
         displayAnimeWithPagination();
 
     } catch (error) {
-        console.error("Gagal memuat API server:", error);
         document.getElementById('animeDisplayGrid').innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat data anime dari database.</p>`;
     }
 }
@@ -868,14 +749,6 @@ function displayAnimeWithPagination() {
     let startPage = Math.max(1, currentPage - maxVisibleRange);
     let endPage = Math.min(totalPages, currentPage + maxVisibleRange);
 
-    if (isMobile) {
-        if (currentPage === 1) {
-            endPage = Math.min(totalPages, 3);
-        } else if (currentPage === totalPages) {
-            startPage = Math.max(1, totalPages - 2);
-        }
-    }
-
     for (let i = startPage; i <= endPage; i++) {
         const activeClass = i === currentPage ? 'bg-neon-yellow text-black font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder shadow-xs';
         paginationHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${activeClass} transition" onclick="goToPage(${i})">${i}</button>`;
@@ -897,7 +770,7 @@ function goToPage(pageNumber) {
 }
 
 function toggleSearchInput(event) {
-    if(event) event.stopPropagation();
+    if (event) event.stopPropagation();
     const container = document.getElementById('searchContainer');
     const field = document.getElementById('searchField');
     const suggestions = document.getElementById('searchSuggestions');
@@ -907,13 +780,7 @@ function toggleSearchInput(event) {
     if (container.classList.contains('hidden')) {
         container.classList.remove('hidden');
         field.focus();
-        
-        const len = field.value.length;
-        field.setSelectionRange(len, len);
-
-        if (field.value.trim() !== '') {
-            liveSearchAnime();
-        }
+        if (field.value.trim() !== '') liveSearchAnime();
     } else {
         container.classList.add('hidden');
         if (suggestions) suggestions.classList.add('hidden');
@@ -926,10 +793,7 @@ document.addEventListener('click', function(e) {
     const btnToggle = document.getElementById('btnSearchToggle');
 
     if (container && !container.classList.contains('hidden')) {
-        const isClickInside = (searchBoxWrapper && searchBoxWrapper.contains(e.target)) ||
-                              (btnToggle && btnToggle.contains(e.target));
-        
-        if (!isClickInside) {
+        if (!searchBoxWrapper?.contains(e.target) && !btnToggle?.contains(e.target)) {
             container.classList.add('hidden');
             const searchSuggestions = document.getElementById('searchSuggestions');
             if (searchSuggestions) searchSuggestions.classList.add('hidden');
@@ -950,12 +814,8 @@ function liveSearchAnime() {
         }
 
         try {
-            const sec = generateSecurityToken();
             const res = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(query)}&per_page=6`, {
-                headers: {
-                    "X-Client-Token": sec.token,
-                    "X-Client-Time": sec.time
-                }
+                headers: getAuthHeaders()
             });
             const result = await res.json();
             const matched = result.data || [];
@@ -998,22 +858,17 @@ function liveSearchAnime() {
                 `;
             }).join('');
             suggestionsBox.classList.remove('hidden');
-        } catch (e) { console.error(e); }
+        } catch (e) {}
     }, 300);
 }
 
 function selectLiveSearchItem(anime) {
-    const searchContainer = document.getElementById('searchContainer');
-    const searchSuggestions = document.getElementById('searchSuggestions');
+    document.getElementById('searchContainer')?.classList.add('hidden');
+    document.getElementById('searchSuggestions')?.classList.add('hidden');
     const searchField = document.getElementById('searchField');
-
-    if (searchContainer) searchContainer.classList.add('hidden');
-    if (searchSuggestions) searchSuggestions.classList.add('hidden');
     if (searchField) searchField.value = '';
 
-    const exists = currentData.some(a => a.id == anime.id);
-    if (!exists) currentData.push(anime);
-
+    if (!currentData.some(a => a.id == anime.id)) currentData.push(anime);
     viewDetails(anime.id);
 }
 
@@ -1021,12 +876,6 @@ function resetTabActiveStyles() {
     document.querySelectorAll('.nav-tab-btn').forEach(b => {
         b.classList.remove('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
         b.classList.add('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
-
-        const icon = b.querySelector('i');
-        if (icon && icon.id !== 'genreArrow') {
-            icon.className = icon.className.replace(/text-\S+/g, '');
-            icon.classList.add('text-black', 'dark:text-neon-yellow');
-        }
     });
 }
 
@@ -1041,33 +890,14 @@ function toggleGenreContainer(e) {
     if (container.classList.contains('hidden')) {
         container.classList.remove('hidden');
         if (arrow) arrow.style.transform = 'rotate(180deg)';
-
         resetTabActiveStyles();
         if (genreBtn) {
             genreBtn.classList.remove('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
             genreBtn.classList.add('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
-            
-            const icon = genreBtn.querySelector('i');
-            if (icon && icon.id !== 'genreArrow') icon.classList.remove('text-neon-yellow');
         }
-
-        setTimeout(() => {
-            const navbarOffset = 80;
-            const targetPosition = container.getBoundingClientRect().top + window.pageYOffset - navbarOffset;
-            window.scrollTo({
-                top: targetPosition,
-                behavior: 'smooth'
-            });
-        }, 50);
-
     } else {
         container.classList.add('hidden');
         if (arrow) arrow.style.transform = 'rotate(0deg)';
-
-        if (!activeGenreFilter && genreBtn) {
-            genreBtn.classList.remove('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
-            genreBtn.classList.add('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
-        }
     }
 }
 
@@ -1075,20 +905,13 @@ function changeTab(type, element) {
     switchView('home');
     resetTabActiveStyles();
 
-    const genreContainer = document.getElementById('genreContainer');
+    document.getElementById('genreContainer')?.classList.add('hidden');
     const arrow = document.getElementById('genreArrow');
-    if (genreContainer) genreContainer.classList.add('hidden');
     if (arrow) arrow.style.transform = 'rotate(0deg)';
 
     if (element) {
         element.classList.remove('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
         element.classList.add('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
-
-        const icon = element.querySelector('i');
-        if (icon) {
-            icon.className = icon.className.replace(/text-\S+/g, '');
-            icon.classList.add('text-black');
-        }
     }
 
     activeSearchQuery = "";
@@ -1107,7 +930,7 @@ function changeTab(type, element) {
     } else if (type === 'ongoing') {
         activeStatusFilter = "Ongoing";
         document.getElementById('sectionHeader').innerText = "Anime Ongoing Terbaru";
-    } else if (type === 'finished' || type === 'completed') {
+    } else if (type === 'finished') {
         activeStatusFilter = "Finished";
         document.getElementById('sectionHeader').innerText = "Anime Finished";
     }
@@ -1116,36 +939,27 @@ function changeTab(type, element) {
 
 function filterGenre(genre) {
     switchView('home');
-    const genreContainer = document.getElementById('genreContainer');
+    document.getElementById('genreContainer')?.classList.add('hidden');
     const arrow = document.getElementById('genreArrow');
-    if (genreContainer) genreContainer.classList.add('hidden');
     if (arrow) arrow.style.transform = 'rotate(0deg)';
     
     resetTabActiveStyles();
-    const genreBtn = document.getElementById('btnGenre');
-    if (genreBtn) {
-        genreBtn.classList.remove('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
-        genreBtn.classList.add('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
-    }
+    document.getElementById('btnGenre')?.classList.add('bg-neon-yellow', 'text-black', 'font-bold');
 
     activeSearchQuery = "";
     activeStatusFilter = "";
     activeGenreFilter = genre;
     document.getElementById('sectionHeader').innerText = `Genre: ${genre}`;
     loadAnimeDatabase(1);
-
     scrollToSearchResults();
 }
 
 function searchAnime() {
     const searchField = document.getElementById('searchField');
-    const searchContainer = document.getElementById('searchContainer');
-    const suggestionsBox = document.getElementById('searchSuggestions');
-    
     const query = searchField ? searchField.value.trim() : "";
 
-    if (searchContainer) searchContainer.classList.add('hidden');
-    if (suggestionsBox) suggestionsBox.classList.add('hidden');
+    document.getElementById('searchContainer')?.classList.add('hidden');
+    document.getElementById('searchSuggestions')?.classList.add('hidden');
 
     if (searchField) {
         searchField.value = '';
@@ -1154,36 +968,25 @@ function searchAnime() {
 
     if (currentView === 'information') {
         activeInfoSearchQuery = query;
-        const targetType = currentInfoType || 'bypopularity';
-        if (!query) {
-            openInformation(targetType, 1);
-            return;
-        }
-        searchInformationRanking(query, targetType, 1);
+        searchInformationRanking(query, currentInfoType || 'bypopularity', 1);
         return;
     }
 
     activeSearchQuery = query;
     activeGenreFilter = "";
     const sectionHeader = document.getElementById('sectionHeader');
-    if (sectionHeader) {
-        sectionHeader.innerText = query ? `Hasil Pencarian: "${query}"` : "Semua Daftar Anime";
-    }
+    if (sectionHeader) sectionHeader.innerText = query ? `Hasil Pencarian: "${query}"` : "Semua Daftar Anime";
     
     switchView('home', false);
-    loadAnimeDatabase(1).then(() => {
-        scrollToSearchResults();
-    });
-    scrollToSearchResults();
+    loadAnimeDatabase(1).then(() => scrollToSearchResults());
 }
 
 function viewDetails(id) {
     const anime = currentData.find(a => a.id == id);
-    if(!anime) return;
+    if (!anime) return;
     activeAnime = anime;
 
     switchView('detail');
-
     const cachedScore = getCachedScore(anime.title, anime.skor);
 
     document.getElementById('detTitle').innerText = anime.title;
@@ -1209,19 +1012,14 @@ function viewDetails(id) {
     }
 }
 
-/* =========================================================
-   FUNGSI STREAMING TERHUBUNG DENGAN ANIME_ID
-   ========================================================= */
 function openStreamingTab() {
     if (!activeAnime || !activeAnime.id) return;
-    // Mengarahkan ke stream.html dengan parameter anime_id
     window.open(`stream.html?anime_id=${encodeURIComponent(activeAnime.id)}&eps=0`, '_blank');
 }
 
 function toggleTheme() {
     const html = document.documentElement;
     const isDark = html.classList.contains('dark');
-    
     const floatingIcon = document.getElementById('floatingThemeIcon');
 
     if (isDark) {
@@ -1236,12 +1034,6 @@ function toggleTheme() {
 function setInfoTabActive(type) {
     document.querySelectorAll('.info-tab-btn').forEach(b => {
         b.className = 'info-tab-btn px-4 py-2 rounded-full bg-neon-lightCard dark:bg-neon-darkCard text-xs font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs';
-        
-        const icon = b.querySelector('i');
-        if (icon) {
-            icon.className = icon.className.replace(/text-\S+/g, '');
-            icon.classList.add('text-black', 'dark:text-neon-yellow');
-        }
     });
     
     let activeBtnId = 'infoBtnPopularity';
@@ -1251,12 +1043,6 @@ function setInfoTabActive(type) {
     const activeBtn = document.getElementById(activeBtnId);
     if (activeBtn) {
         activeBtn.className = 'info-tab-btn px-4 py-2 rounded-full bg-neon-yellow text-black text-xs font-bold shadow-glow-yellow transition';
-        
-        const activeIcon = activeBtn.querySelector('i');
-        if (activeIcon) {
-            activeIcon.className = activeIcon.className.replace(/text-\S+/g, '');
-            activeIcon.classList.add('text-black');
-        }
     }
 }
 
@@ -1303,20 +1089,6 @@ async function searchInformationRanking(query, type = (currentInfoType || 'bypop
     switchView('information');
     setInfoTabActive(type);
 
-    const headerEl = document.getElementById('informationHeader');
-    const descEl = document.getElementById('informationDescription');
-    
-    if (type === 'upcoming') {
-        if (headerEl) headerEl.innerText = `Hasil Pencarian Upcoming: "${query}"`;
-        if (descEl) descEl.innerText = `Menampilkan anime mendatang untuk pencarian "${query}".`;
-    } else if (type === 'favorite') {
-        if (headerEl) headerEl.innerText = `Hasil Pencarian Highest Rated: "${query}"`;
-        if (descEl) descEl.innerText = `Menampilkan peringkat evaluasi tertinggi untuk pencarian "${query}".`;
-    } else {
-        if (headerEl) headerEl.innerText = `Hasil Pencarian Top Trending: "${query}"`;
-        if (descEl) descEl.innerText = `Menampilkan peringkat popularitas anime untuk pencarian "${query}".`;
-    }
-
     const loadingEl = document.getElementById('informationLoading');
     const podiumEl = document.getElementById('podiumSection');
     const gridEl = document.getElementById('informationGrid');
@@ -1327,15 +1099,9 @@ async function searchInformationRanking(query, type = (currentInfoType || 'bypop
     if (gridEl) gridEl.innerHTML = '';
     if (paginationEl) paginationEl.innerHTML = '';
 
-    const perPage = 12;
-
     try {
-        const sec = generateSecurityToken();
-        const res = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(query)}&page=${page}&per_page=${perPage}`, {
-            headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
-            }
+        const res = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(query)}&page=${page}&per_page=12`, {
+            headers: getAuthHeaders()
         });
         const json = await res.json();
         const items = json.data || [];
@@ -1344,58 +1110,16 @@ async function searchInformationRanking(query, type = (currentInfoType || 'bypop
         if (loadingEl) loadingEl.classList.add('hidden');
 
         if (items.length === 0) {
-            if (gridEl) gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Anime "${query}" tidak ditemukan.</p>`;
+            gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Anime "${query}" tidak ditemukan.</p>`;
             return;
         }
 
-        if (gridEl) {
-            gridEl.innerHTML = items.map(anime => {
-                const realRank = anime.score ? `★ ${anime.score}` : '-';
-                return renderRankListItem(anime, realRank);
-            }).join('');
-        }
+        gridEl.innerHTML = items.map(anime => renderRankListItem(anime, anime.score ? `★ ${anime.score}` : '-')).join('');
         renderSearchInfoPagination(query, type, page, lastPage, paginationEl);
     } catch (fallbackErr) {
         if (loadingEl) loadingEl.classList.add('hidden');
-        if (gridEl) gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat hasil pencarian peringkat.</p>`;
+        gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat hasil pencarian peringkat.</p>`;
     }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function renderSearchInfoPagination(query, type, page, totalPageCount, paginationEl) {
-    if (!paginationEl || totalPageCount <= 1) {
-        if (paginationEl) paginationEl.innerHTML = '';
-        return;
-    }
-    let pagHTML = '';
-    const baseBtn = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow transition shadow-xs';
-    const disBtn = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border-zinc-200 dark:border-zinc-800 cursor-not-allowed';
-    const escapedQuery = query.replace(/'/g, "\\'");
-
-    pagHTML += `<button class="${page > 1 ? baseBtn : disBtn}" ${page <= 1 ? 'disabled' : ''} onclick="openInformation('${type}', ${page - 1})">&lsaquo;</button>`;
-    
-    const isMobile = window.innerWidth < 640;
-    const maxVisibleRange = isMobile ? 1 : 2;
-
-    let sPage = Math.max(1, page - maxVisibleRange);
-    let ePage = Math.min(totalPageCount, page + maxVisibleRange);
-
-    if (isMobile) {
-        if (page === 1) {
-            ePage = Math.min(totalPageCount, 3);
-        } else if (page === totalPageCount) {
-            sPage = Math.max(1, totalPageCount - 2);
-        }
-    }
-    
-    for (let i = sPage; i <= ePage; i++) {
-        let actClass = i === page ? 'bg-neon-yellow text-black font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder shadow-xs';
-        pagHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${actClass} transition" onclick="searchInformationRanking('${escapedQuery}', '${type}', ${i})">${i}</button>`;
-    }
-    
-    pagHTML += `<button class="${page < totalPageCount ? baseBtn : disBtn}" ${page >= totalPageCount ? 'disabled' : ''} onclick="openInformation('${type}', ${page + 1})">&rsaquo;</button>`;
-    
-    paginationEl.innerHTML = pagHTML;
 }
 
 function formatNumberShort(num) {
@@ -1407,15 +1131,10 @@ function formatNumberShort(num) {
 
 async function fetchRankingFromBackend(type, page, loadingEl, podiumEl, gridEl, paginationEl) {
     try {
-        const sec = generateSecurityToken();
         const res = await fetch(`${RENDER_API_URL}/ranking?type=${encodeURIComponent(type)}&page=${page}`, {
-            headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
-            }
+            headers: getAuthHeaders()
         });
         const json = await res.json();
-        
         loadingEl.classList.add('hidden');
 
         const top3Data = json.top3 || [];
@@ -1429,11 +1148,9 @@ async function fetchRankingFromBackend(type, page, loadingEl, podiumEl, gridEl, 
 
         const startRankOffset = page === 1 ? 4 : ((page - 1) * 12 + 4);
         gridEl.innerHTML = listData.map((anime, idx) => renderRankListItem(anime, startRankOffset + idx)).join('');
-
         renderInfoPagination(type, page, lastPage, paginationEl);
 
     } catch (err) {
-        console.error("Gagal memuat ranking:", err);
         loadingEl.classList.add('hidden');
         gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Gagal memuat data peringkat.</p>`;
     }
@@ -1443,6 +1160,7 @@ function renderPodiumData(top3) {
     top3.forEach((r, index) => {
         const rankIdx = index + 1;
         const title = r.title?.userPreferred || r.title?.romaji || r.title?.english || 'Tanpa Judul';
+        
         const imgEl = document.getElementById(`podium${rankIdx}Img`);
         const titleEl = document.getElementById(`podium${rankIdx}Title`);
         const scoreEl = document.getElementById(`podium${rankIdx}Score`);
@@ -1461,9 +1179,7 @@ function renderPodiumData(top3) {
         const isBookmarked = isAnimeBookmarked(r);
         if (btn) {
             const icon = btn.querySelector('i');
-            if (icon) {
-                icon.className = isBookmarked ? 'fa-solid fa-bookmark text-xs text-neon-yellow' : 'fa-regular fa-bookmark text-xs text-zinc-300';
-            }
+            if (icon) icon.className = isBookmarked ? 'fa-solid fa-bookmark text-xs text-neon-yellow' : 'fa-regular fa-bookmark text-xs text-zinc-300';
             btn.onclick = function(e) {
                 e.stopPropagation();
                 toggleBookmarkAnime(r, this);
@@ -1480,15 +1196,7 @@ function renderRankListItem(anime, rankNumber) {
     const escapedTitle = title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
     const isBookmarked = isAnimeBookmarked(anime);
-
-    let rankDisplay = "";
-    if (typeof rankNumber === 'number') {
-        rankDisplay = `#${rankNumber}`;
-    } else if (typeof rankNumber === 'string') {
-        rankDisplay = rankNumber.startsWith('#') ? rankNumber : (rankNumber === '-' || rankNumber === 'N/A' ? '#-' : `#${rankNumber}`);
-    } else {
-        rankDisplay = '#-';
-    }
+    let rankDisplay = typeof rankNumber === 'number' ? `#${rankNumber}` : (String(rankNumber).startsWith('#') ? rankNumber : `#${rankNumber}`);
 
     return `
         <div class="bg-neon-lightCard dark:bg-neon-darkCard border border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow rounded-xl p-3 flex items-center gap-3.5 transition shadow-xs">
@@ -1512,10 +1220,7 @@ function renderRankListItem(anime, rankNumber) {
 }
 
 function renderInfoPagination(type, page, totalPageCount, paginationEl) {
-    if (!paginationEl || totalPageCount <= 1) {
-        if (paginationEl) paginationEl.innerHTML = '';
-        return;
-    }
+    if (!paginationEl || totalPageCount <= 1) return;
     let pagHTML = '';
     const baseBtn = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder hover:border-neon-yellow transition shadow-xs';
     const disBtn = 'px-3 py-1.5 rounded-lg text-xs font-semibold border bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border-zinc-200 dark:border-zinc-800 cursor-not-allowed';
@@ -1523,26 +1228,15 @@ function renderInfoPagination(type, page, totalPageCount, paginationEl) {
     pagHTML += `<button class="${page > 1 ? baseBtn : disBtn}" ${page <= 1 ? 'disabled' : ''} onclick="openInformation('${type}', ${page - 1})">&lsaquo;</button>`;
     
     const isMobile = window.innerWidth < 640;
-    const maxVisibleRange = isMobile ? 1 : 2;
+    let sPage = Math.max(1, page - (isMobile ? 1 : 2));
+    let ePage = Math.min(totalPageCount, page + (isMobile ? 1 : 2));
 
-    let sPage = Math.max(1, page - maxVisibleRange);
-    let ePage = Math.min(totalPageCount, page + maxVisibleRange);
-
-    if (isMobile) {
-        if (page === 1) {
-            ePage = Math.min(totalPageCount, 3);
-        } else if (page === totalPageCount) {
-            sPage = Math.max(1, totalPageCount - 2);
-        }
-    }
-    
     for (let i = sPage; i <= ePage; i++) {
         let actClass = i === page ? 'bg-neon-yellow text-black font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder shadow-xs';
         pagHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${actClass} transition" onclick="openInformation('${type}', ${i})">${i}</button>`;
     }
     
     pagHTML += `<button class="${page < totalPageCount ? baseBtn : disBtn}" ${page >= totalPageCount ? 'disabled' : ''} onclick="openInformation('${type}', ${page + 1})">&rsaquo;</button>`;
-    
     paginationEl.innerHTML = pagHTML;
 }
 
@@ -1551,29 +1245,20 @@ window.onload = async function() {
     await checkAniListAuthStatus();
 
     const defaultBtn = document.getElementById('btnSemua');
-    if(defaultBtn) {
-        defaultBtn.classList.remove('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
+    if (defaultBtn) {
+        defaultBtn.classList.remove('bg-neon-lightCard', 'dark:bg-neon-darkCard');
         defaultBtn.classList.add('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
     }
     
-    activeSearchQuery = "";
-    activeGenreFilter = "";
-    activeStatusFilter = "";
-
     const urlParams = new URLSearchParams(window.location.search);
     const queryParam = urlParams.get('q');
     if (queryParam) {
         activeSearchQuery = queryParam;
         const sectionHeader = document.getElementById('sectionHeader');
-        if (sectionHeader) {
-            sectionHeader.innerText = `Hasil Pencarian: "${queryParam}"`;
-        }
+        if (sectionHeader) sectionHeader.innerText = `Hasil Pencarian: "${queryParam}"`;
     }
 
     renderHistory();
     await loadAnimeDatabase(1);
-
-    if (queryParam) {
-        scrollToSearchResults();
-    }
+    if (queryParam) scrollToSearchResults();
 };
