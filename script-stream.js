@@ -9,29 +9,13 @@ let currentAnimeGenres = [];
 let currentAnimeId = null;
 let searchDebounceTimer = null;
 
-// Turnstile Token Manager
-let turnstileToken = "";
-
-window.onTurnstileSuccess = function(token) {
-    turnstileToken = token;
-};
-
-function getAuthHeaders(extraHeaders = {}) {
+function generateSecurityToken() {
     const timestamp = Math.floor(Date.now() / 1000);
     const rawPayload = `${timestamp}_NimeDesuSecretKey2026`;
     const token = CryptoJS.SHA256(rawPayload).toString(CryptoJS.enc.Hex);
-
-    let activeTurnstile = turnstileToken;
-    if (window.turnstile && typeof window.turnstile.getResponse === 'function') {
-        const resp = window.turnstile.getResponse();
-        if (resp) activeTurnstile = resp;
-    }
-
     return {
-        "X-Client-Token": token,
-        "X-Client-Time": timestamp.toString(),
-        "X-Turnstile-Token": activeTurnstile,
-        ...extraHeaders
+        token: token,
+        time: timestamp.toString()
     };
 }
 
@@ -45,9 +29,14 @@ async function syncUserWithSupabase(user) {
     const identifier = getUserIdentifier(user);
 
     try {
+        const sec = generateSecurityToken();
         const res = await fetch(`${RENDER_API_URL}/user-sync`, {
             method: "POST",
-            headers: getAuthHeaders({ "Content-Type": "application/json" }),
+            headers: {
+                "Content-Type": "application/json",
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            },
             body: JSON.stringify({
                 anilist_id: identifier,
                 user_info: {
@@ -62,6 +51,7 @@ async function syncUserWithSupabase(user) {
         const result = await res.json();
         return result.cookies || null;
     } catch (err) {
+        console.error("Gagal sync user di stream:", err);
         return null;
     }
 }
@@ -71,8 +61,12 @@ async function getSupabaseUserData(user) {
     const identifier = getUserIdentifier(user);
 
     try {
+        const sec = generateSecurityToken();
         const res = await fetch(`${RENDER_API_URL}/user-data?anilist_id=${encodeURIComponent(identifier)}`, {
-            headers: getAuthHeaders()
+            headers: {
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            }
         });
         const result = await res.json();
         const cookies = result.cookies || {};
@@ -82,6 +76,7 @@ async function getSupabaseUserData(user) {
             user_info: cookies.user_info || {}
         };
     } catch (err) {
+        console.error("Gagal membaca user data:", err);
         return { history: [], bookmarks: [] };
     }
 }
@@ -91,9 +86,14 @@ async function saveSupabaseUserData(user, payload) {
     const identifier = getUserIdentifier(user);
 
     try {
+        const sec = generateSecurityToken();
         const res = await fetch(`${RENDER_API_URL}/user-update`, {
             method: "POST",
-            headers: getAuthHeaders({ "Content-Type": "application/json" }),
+            headers: {
+                "Content-Type": "application/json",
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            },
             body: JSON.stringify({
                 anilist_id: identifier,
                 cookies: payload
@@ -102,6 +102,7 @@ async function saveSupabaseUserData(user, payload) {
         const result = await res.json();
         return result.status === "success";
     } catch (err) {
+        console.error("Gagal update user data:", err);
         return false;
     }
 }
@@ -169,11 +170,14 @@ async function checkAniListAuthStatus() {
             }
             await syncUserWithSupabase(user);
         }
-    } catch (err) {}
+    } catch (err) {
+        console.error("Auth check failed:", err);
+    }
 }
 
 async function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIndex, thumbnailImg) {
     const user = getLoggedInUser();
+
     if (!user) return;
 
     try {
@@ -196,11 +200,13 @@ async function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIn
 
         userData.history = history;
         await saveSupabaseUserData(user, userData);
-    } catch (e) {}
+    } catch (e) {
+        console.error("Gagal menyimpan riwayat:", e);
+    }
 }
 
 function toggleSearchInput(event) {
-    if (event) event.stopPropagation();
+    if(event) event.stopPropagation();
     const container = document.getElementById('searchContainer');
     const field = document.getElementById('searchField');
     const suggestions = document.getElementById('searchSuggestions');
@@ -208,7 +214,11 @@ function toggleSearchInput(event) {
     if (container.classList.contains('hidden')) {
         container.classList.remove('hidden');
         field.focus();
-        if (field.value.trim() !== '') liveSearchAnime();
+        
+        const len = field.value.length;
+        field.setSelectionRange(len, len);
+
+        if(field.value.trim() !== '') liveSearchAnime();
     } else {
         container.classList.add('hidden');
         if (suggestions) suggestions.classList.add('hidden');
@@ -218,13 +228,17 @@ function toggleSearchInput(event) {
 document.addEventListener('click', function(e) {
     const container = document.getElementById('searchContainer');
     const searchBoxWrapper = document.getElementById('searchBoxWrapper');
+    const searchSuggestions = document.getElementById('searchSuggestions');
     const btnToggle = document.getElementById('btnSearchToggle');
 
     if (container && !container.classList.contains('hidden')) {
-        if (!searchBoxWrapper?.contains(e.target) && !btnToggle?.contains(e.target)) {
+        const isClickInside = (searchBoxWrapper && searchBoxWrapper.contains(e.target)) ||
+                              (searchSuggestions && searchSuggestions.contains(e.target)) ||
+                              (btnToggle && btnToggle.contains(e.target));
+        
+        if (!isClickInside) {
             container.classList.add('hidden');
-            const suggestions = document.getElementById('searchSuggestions');
-            if (suggestions) suggestions.classList.add('hidden');
+            if (searchSuggestions) searchSuggestions.classList.add('hidden');
         }
     }
 });
@@ -242,8 +256,12 @@ function liveSearchAnime() {
         }
 
         try {
+            const sec = generateSecurityToken();
             const res = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(query)}&per_page=6`, {
-                headers: getAuthHeaders()
+                headers: {
+                    "X-Client-Token": sec.token,
+                    "X-Client-Time": sec.time
+                }
             });
             const result = await res.json();
             const matched = result.data || [];
@@ -273,17 +291,22 @@ function liveSearchAnime() {
                 `;
             }).join('');
             suggestionsBox.classList.remove('hidden');
-        } catch (e) {}
+        } catch (e) {
+            console.error(e);
+        }
     }, 300);
 }
 
 function executeSearch() {
     const query = document.getElementById('searchField').value.trim();
-    if (query) window.location.href = `index.html?q=${encodeURIComponent(query)}`;
+    if (query) {
+        window.location.href = `index.html?q=${encodeURIComponent(query)}`;
+    }
 }
 
 async function initStream() {
     const urlParams = new URLSearchParams(window.location.search);
+    // Mengambil id baik dari parameter 'id' maupun 'anime_id'
     const animeId = urlParams.get('id') || urlParams.get('anime_id');
     const animeUrl = urlParams.get('url');
     const targetEps = parseInt(urlParams.get('eps')) || 0; 
@@ -294,23 +317,40 @@ async function initStream() {
     }
 
     try {
+        const sec = generateSecurityToken();
         let apiEndpoint = `${RENDER_API_URL}/anime-detail?`;
-        apiEndpoint += animeId ? `id=${encodeURIComponent(animeId)}` : `url=${encodeURIComponent(animeUrl)}`;
+        if (animeId) {
+            apiEndpoint += `id=${encodeURIComponent(animeId)}`;
+        } else {
+            apiEndpoint += `url=${encodeURIComponent(animeUrl)}`;
+        }
 
-        const response = await fetch(apiEndpoint, { headers: getAuthHeaders() });
+        const response = await fetch(apiEndpoint, {
+            headers: {
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            }
+        });
         const data = await response.json();
 
         currentAnimeId = data.id || animeId;
         currentAnimeThumbnail = data.img_url || data.image_url || data.thumbnail || "";
 
         if (data.genre) {
-            currentAnimeGenres = Array.isArray(data.genre) ? data.genre : data.genre.split(',').map(g => g.trim()).filter(Boolean);
+            if (Array.isArray(data.genre)) {
+                currentAnimeGenres = data.genre;
+            } else if (typeof data.genre === 'string') {
+                currentAnimeGenres = data.genre.split(',').map(g => g.trim()).filter(Boolean);
+            }
         }
 
         if (!currentAnimeThumbnail && data.title) {
             try {
                 const searchRes = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(data.title)}&per_page=1`, {
-                    headers: getAuthHeaders()
+                    headers: {
+                        "X-Client-Token": sec.token,
+                        "X-Client-Time": sec.time
+                    }
                 });
                 const searchData = await searchRes.json();
                 if (searchData.data && searchData.data.length > 0) {
@@ -325,19 +365,29 @@ async function initStream() {
             activeEpisodes.sort((a, b) => {
                 const titleA = (a.episode_title || "").toLowerCase();
                 const titleB = (b.episode_title || "").toLowerCase();
+                
                 const isOvaSpecialA = titleA.includes('ova') || titleA.includes('special') || titleA.includes('sp');
                 const isOvaSpecialB = titleB.includes('ova') || titleB.includes('special') || titleB.includes('sp');
                 
                 if (isOvaSpecialA && !isOvaSpecialB) return 1;
                 if (!isOvaSpecialA && isOvaSpecialB) return -1;
-                return extractEpisodeNumber(a.episode_title) - extractEpisodeNumber(b.episode_title);
+
+                const numA = extractEpisodeNumber(a.episode_title);
+                const numB = extractEpisodeNumber(b.episode_title);
+                return numA - numB;
             });
 
             activeEpisodeIndex = (targetEps >= 0 && targetEps < activeEpisodes.length) ? targetEps : 0;
+
             globalAnimeTitle = data.title;
+            if (!globalAnimeTitle && animeUrl) {
+                const segments = animeUrl.split('/').filter(Boolean);
+                globalAnimeTitle = segments[segments.length - 1].replace(/-/g, ' ');
+            }
 
             document.getElementById('episodeNavContainer').classList.remove('hidden');
             renderDynamicEpisodes();
+
             renderMixedGenreRecommendations();
         } else {
             document.getElementById('streamTitle').innerText = "Data Episode Tidak Tersedia.";
@@ -355,35 +405,49 @@ function extractEpisodeNumber(title) {
 
 function scrollSlider(direction) {
     const slider = document.getElementById('recommendationSlider');
-    slider.scrollBy({ left: direction * 220, behavior: 'smooth' });
+    const scrollAmount = 220; 
+    slider.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
 }
 
+/* REKOMENDASI ACAK PER GENRE (MAKSIMAL 12 ANIME) */
 async function renderMixedGenreRecommendations() {
     const recSlider = document.getElementById('recommendationSlider');
     if (!recSlider) return;
 
     try {
+        const sec = generateSecurityToken();
         let recommendedAnimeList = [];
+
         let targetGenres = currentAnimeGenres.slice(0, 3);
-        if (targetGenres.length === 0) targetGenres = ['Action', 'Drama'];
+        if (targetGenres.length === 0) {
+            targetGenres = ['Action', 'Drama'];
+        }
 
         const itemsPerGenre = Math.floor(12 / targetGenres.length);
 
         for (const genre of targetGenres) {
             const res = await fetch(`${RENDER_API_URL}/anime?genre=${encodeURIComponent(genre)}&per_page=15`, {
-                headers: getAuthHeaders()
+                headers: {
+                    "X-Client-Token": sec.token,
+                    "X-Client-Time": sec.time
+                }
             });
             const result = await res.json();
             let items = result.data || [];
 
             items = items.filter(a => String(a.id) !== String(currentAnimeId));
             items.sort(() => 0.5 - Math.random());
-            recommendedAnimeList = recommendedAnimeList.concat(items.slice(0, itemsPerGenre));
+
+            const picked = items.slice(0, itemsPerGenre);
+            recommendedAnimeList = recommendedAnimeList.concat(picked);
         }
 
         const uniqueMap = new Map();
         recommendedAnimeList.forEach(item => uniqueMap.set(item.id || item.url, item));
-        recommendedAnimeList = Array.from(uniqueMap.values()).sort(() => 0.5 - Math.random()).slice(0, 12);
+        recommendedAnimeList = Array.from(uniqueMap.values());
+
+        recommendedAnimeList.sort(() => 0.5 - Math.random());
+        recommendedAnimeList = recommendedAnimeList.slice(0, 12);
 
         if (recommendedAnimeList.length === 0) {
             recSlider.innerHTML = '<p class="text-xs text-zinc-500">Tidak ada rekomendasi anime serupa.</p>';
@@ -424,13 +488,13 @@ function renderDynamicEpisodes() {
     const container = document.getElementById('episodeBoxContainer');
     const label = document.getElementById('episodeBoxLabel');
 
-    if (!activeEpisodes || activeEpisodes.length === 0) {
+    if(!activeEpisodes || activeEpisodes.length === 0) {
         container.innerHTML = '<p class="text-xs text-zinc-500">Tidak ada episode tersedia.</p>';
-        if (label) label.innerText = "Daftar Episode (0)";
+        if(label) label.innerText = "Daftar Episode (0)";
         return;
     }
 
-    if (label) label.innerText = `Daftar Episode (${activeEpisodes.length})`;
+    if(label) label.innerText = `Daftar Episode (${activeEpisodes.length})`;
 
     const currentEp = activeEpisodes[activeEpisodeIndex];
     const rawEpTitleForHeader = currentEp && currentEp.episode_title ? currentEp.episode_title.replace(/Sub.*$/, '').trim() : `Episode ${activeEpisodeIndex + 1}`;
@@ -449,14 +513,15 @@ function renderDynamicEpisodes() {
         return `<button onclick='selectEpisode(${index})' class="episode-btn ${activeClass} px-3 py-1.5 rounded-lg text-xs font-semibold transition">${epLabel}</button>`;
     }).join('');
 
-    if (activeEpisodes[activeEpisodeIndex] && activeEpisodes[activeEpisodeIndex].video_servers) {
+    if(activeEpisodes[activeEpisodeIndex] && activeEpisodes[activeEpisodeIndex].video_servers) {
         renderDynamicServers(activeEpisodes[activeEpisodeIndex].video_servers);
     }
 
     if (currentEp) {
         const epLabelClean = currentEp.episode_title ? currentEp.episode_title.replace(/Sub.*$/, '').trim() : `Eps ${activeEpisodeIndex + 1}`;
         const urlParams = new URLSearchParams(window.location.search);
-        saveStreamToHistory(globalAnimeTitle, urlParams.get('url'), epLabelClean, activeEpisodeIndex, currentAnimeThumbnail);
+        const animeUrl = urlParams.get('url');
+        saveStreamToHistory(globalAnimeTitle, animeUrl, epLabelClean, activeEpisodeIndex, currentAnimeThumbnail);
     }
 }
 
@@ -468,7 +533,9 @@ function selectEpisode(index) {
 
 function changeEpisodeRelative(direction) {
     const newIndex = activeEpisodeIndex + direction;
-    if (newIndex >= 0 && newIndex < activeEpisodes.length) selectEpisode(newIndex);
+    if (newIndex >= 0 && newIndex < activeEpisodes.length) {
+        selectEpisode(newIndex);
+    }
 }
 
 function renderDynamicServers(servers) {
@@ -486,7 +553,7 @@ function renderDynamicServers(servers) {
     servers.forEach((srv, index) => {
         const videoUrl = srv.url || srv.video_url || "";
         const serverName = `Server ${index + 1}`;
-        const resolution = "HD";
+        const resolution = "MP4";
 
         htmlContent += `
             <button onclick="selectServer(this, '${resolution}', '${serverName}', '${videoUrl}')" class="server-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-black dark:text-white border border-neon-yellow/60 dark:border-neon-darkBorder">
@@ -495,7 +562,7 @@ function renderDynamicServers(servers) {
             </button>
         `;
 
-        if (isFirst) {
+        if(isFirst) {
             setTimeout(() => selectServer(null, resolution, serverName, videoUrl), 100);
             isFirst = false;
         }
@@ -507,33 +574,54 @@ function renderDynamicServers(servers) {
 function toggleMainServerBox() {
     const container = document.getElementById('mainServerContainer');
     const arrow = document.getElementById('mainServerArrow');
-    container.classList.toggle('hidden');
-    arrow.style.transform = container.classList.contains('hidden') ? 'rotate(-90deg)' : 'rotate(0deg)';
+    if(container.classList.contains('hidden')) {
+        container.classList.remove('hidden');
+        arrow.style.transform = 'rotate(0deg)';
+    } else {
+        container.classList.add('hidden');
+        arrow.style.transform = 'rotate(-90deg)';
+    }
 }
 
 function toggleEpisodeBox() {
     const container = document.getElementById('episodeBoxContainer');
     const arrow = document.getElementById('episodeBoxArrow');
-    container.classList.toggle('hidden');
-    arrow.style.transform = container.classList.contains('hidden') ? 'rotate(-90deg)' : 'rotate(0deg)';
+    if(container.classList.contains('hidden')) {
+        container.classList.remove('hidden');
+        arrow.style.transform = 'rotate(0deg)';
+    } else {
+        container.classList.add('hidden');
+        arrow.style.transform = 'rotate(-90deg)';
+    }
 }
 
+/* HELPER UNTUK MENGUBAH URL EMBED SECARA OTOMATIS BERDASARKAN PROVIDER SERVER */
 function formatEmbedUrl(url) {
     if (!url) return "about:blank";
+
     let finalUrl = url;
     try {
         let decoded = atob(url);
-        if (decoded && decoded.startsWith('http')) finalUrl = decoded;
+        if (decoded && decoded.startsWith('http')) {
+            finalUrl = decoded;
+        }
     } catch (e) {
         finalUrl = url;
     }
 
+    // 1. Handling Google Drive
     if (finalUrl.includes('drive.google.com')) {
-        return finalUrl.replace('/view?usp=drivesdk', '/preview').replace('/view', '/preview');
+        return finalUrl
+            .replace('/view?usp=drivesdk', '/preview')
+            .replace('/view', '/preview');
     }
+
+    // 2. Handling Mega.nz
     if (finalUrl.includes('mega.nz')) {
         return finalUrl.replace('/file/', '/embed/');
     }
+
+    // 3. Server Lain (Blogger, Bitchute, Streamtape, Doodstream, dll.)
     return finalUrl;
 }
 
@@ -542,14 +630,20 @@ function selectServer(element, resolution, serverNum, videoUrl) {
     document.querySelectorAll('.server-btn').forEach(btn => {
         btn.className = "server-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-black dark:text-white border border-neon-yellow/60 dark:border-neon-darkBorder";
     });
-    if (element) {
+    if(element) {
         element.className = "server-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs bg-neon-yellow text-black font-bold shadow-glow-yellow transition flex justify-between items-center";
     }
     document.getElementById('mainServerContainer').classList.add('hidden');
     document.getElementById('mainServerArrow').style.transform = 'rotate(-90deg)';
 
     const iframe = document.getElementById('videoIframe');
-    iframe.src = (!videoUrl || videoUrl === 'undefined' || videoUrl === 'null') ? "about:blank" : formatEmbedUrl(videoUrl);
+    
+    if (!videoUrl || videoUrl === 'undefined' || videoUrl === 'null') {
+        iframe.src = "about:blank";
+        return;
+    }
+
+    iframe.src = formatEmbedUrl(videoUrl);
 }
 
 function toggleTheme() {
