@@ -116,7 +116,7 @@ func rateLimitMiddleware() gin.HandlerFunc {
 	}
 }
 
-// Updated Security Middleware
+// Security Middleware
 func securityMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
