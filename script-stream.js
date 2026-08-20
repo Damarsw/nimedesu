@@ -13,6 +13,12 @@ function getTurnstileToken() {
     return document.querySelector('[name="cf-turnstile-response"]')?.value || "";
 }
 
+function onTurnstileSuccess(token) {
+    const turnstileContainer = document.getElementById('turnstileContainer');
+    if (turnstileContainer) {
+        turnstileContainer.style.display = 'none';
+}
+    
 function generateSecurityToken() {
     const timestamp = Math.floor(Date.now() / 1000);
     const rawPayload = `${timestamp}_NimeDesuSecretKey2026`;
