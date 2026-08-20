@@ -21,54 +21,59 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"golang.org/x/time/rate"
 )
 
 var (
 	supabaseURL     = os.Getenv("SUPABASE_URL")
 	supabaseKey     = os.Getenv("SUPABASE_KEY")
-	turnstileSecret = os.Getenv("TURNSTILE_SECRET_KEY") // Set di Environment Variable
+	turnstileSecret = os.Getenv("TURNSTILE_SECRET_KEY")
 	secretServerKey = getEnvOrDefault("SECRET_SERVER_KEY", "NimeDesuSecretKey2026")
 	port            = getEnvOrDefault("PORT", "10000")
 )
 
-// Rate Limiter Store per IP
-type clientLimiter struct {
-	limiter  *rate.Limiter
+// Structural Cache RAM & Limits
+type visitorRate struct {
+	count    int
 	lastSeen time.Time
 }
 
 var (
-	clients      = make(map[string]*clientLimiter)
-	clientsMutex sync.Mutex
+	visitors     = make(map[string]*visitorRate)
+	visitorMutex sync.Mutex
 )
 
-func getVisitorLimiter(ip string) *rate.Limiter {
-	clientsMutex.Lock()
-	defer clientsMutex.Unlock()
+// Rate Limiter Sederhana (Pure Go Standard Library)
+func isAllowed(ip string) bool {
+	visitorMutex.Lock()
+	defer visitorMutex.Unlock()
 
-	lim, exists := clients[ip]
-	if !exists {
-		// Batasi: Maksimal 5 request per detik, burst limit hingga 10 request
-		limiter := rate.NewLimiter(5, 10)
-		clients[ip] = &clientLimiter{limiter: limiter, lastSeen: time.Now()}
-		return limiter
+	v, exists := visitors[ip]
+	now := time.Now()
+
+	if !exists || now.Sub(v.lastSeen) > 1*time.Second {
+		visitors[ip] = &visitorRate{count: 1, lastSeen: now}
+		return true
 	}
-	lim.lastSeen = time.Now()
-	return lim.limiter
+
+	// Batasi maksimal 10 request per detik per IP
+	if v.count >= 10 {
+		return false
+	}
+
+	v.count++
+	return true
 }
 
-// Cleanup IP limiter yang sudah tidak aktif (tiap 10 menit)
-func cleanupLimiters() {
+func cleanupVisitors() {
 	for {
-		time.Sleep(10 * time.Minute)
-		clientsMutex.Lock()
-		for ip, client := range clients {
-			if time.Since(client.lastSeen) > 10*time.Minute {
-				delete(clients, ip)
+		time.Sleep(5 * time.Minute)
+		visitorMutex.Lock()
+		for ip, v := range visitors {
+			if time.Since(v.lastSeen) > 5*time.Minute {
+				delete(visitors, ip)
 			}
 		}
-		clientsMutex.Unlock()
+		visitorMutex.Unlock()
 	}
 }
 
@@ -101,9 +106,7 @@ func verifyTurnstileToken(token string) bool {
 func rateLimitMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
-		limiter := getVisitorLimiter(ip)
-
-		if !limiter.Allow() {
+		if !isAllowed(ip) {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"error": "Akses terlalu cepat! Silakan tunggu beberapa detik.",
 			})
@@ -123,7 +126,6 @@ func securityMiddleware() gin.HandlerFunc {
 		}
 
 		if strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/proxy-stream") {
-			// 1. Cek Cloudflare Turnstile jika token dikirim
 			turnstileToken := c.GetHeader("X-Turnstile-Token")
 			if turnstileToken != "" {
 				if !verifyTurnstileToken(turnstileToken) {
@@ -132,7 +134,6 @@ func securityMiddleware() gin.HandlerFunc {
 				}
 			}
 
-			// 2. Proteksi Header & Domain Origin
 			origin := c.GetHeader("Origin")
 			referer := c.GetHeader("Referer")
 			allowedDomain := "nimedesu.vercel.app"
@@ -160,7 +161,7 @@ func main() {
 		log.Fatal("SUPABASE_URL and SUPABASE_KEY must be set!")
 	}
 
-	go cleanupLimiters()
+	go cleanupVisitors()
 	startCronWorker()
 
 	gin.SetMode(gin.ReleaseMode)
