@@ -27,6 +27,10 @@ try {
 
 const RENDER_API_URL = "/api-backend";
 
+function getTurnstileToken() {
+    return document.querySelector('[name="cf-turnstile-response"]')?.value || "";
+}
+
 function generateSecurityToken() {
     const timestamp = Math.floor(Date.now() / 1000);
     const rawPayload = `${timestamp}_NimeDesuSecretKey2026`;
@@ -158,7 +162,8 @@ async function syncUserWithSupabase(user) {
             headers: {
                 "Content-Type": "application/json",
                 "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
+                "X-Client-Time": sec.time,
+                "X-Turnstile-Token": getTurnstileToken()
             },
             body: JSON.stringify({
                 anilist_id: identifier,
@@ -220,7 +225,8 @@ async function saveSupabaseUserData(user, payload) {
             headers: {
                 "Content-Type": "application/json",
                 "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
+                "X-Client-Time": sec.time,
+                "X-Turnstile-Token": getTurnstileToken()
             },
             body: JSON.stringify({
                 anilist_id: identifier,
@@ -1209,12 +1215,8 @@ function viewDetails(id) {
     }
 }
 
-/* =========================================================
-   FUNGSI STREAMING TERHUBUNG DENGAN ANIME_ID
-   ========================================================= */
 function openStreamingTab() {
     if (!activeAnime || !activeAnime.id) return;
-    // Mengarahkan ke stream.html dengan parameter anime_id
     window.open(`stream.html?anime_id=${encodeURIComponent(activeAnime.id)}&eps=0`, '_blank');
 }
 
