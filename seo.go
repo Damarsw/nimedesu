@@ -35,40 +35,43 @@ var CompetitorKeywords = []string{
 	
 }
 
-// Handler untuk merender Dynamic Sitemap.xml
 func sitemapHandler(c *gin.Context) {
 	now := time.Now().Format(time.RFC3339)
 
-	xmlContent := `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+	var keywordComments string
+	for _, kw := range CompetitorKeywords {
+		keywordComments += fmt.Sprintf("<!-- Alternatif %s -->\n", kw)
+	}
+
+	xmlContent := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+%s<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
         http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
 	<url>
-		<loc>` + BaseDomain + `/</loc>
-		<lastmod>` + now + `</lastmod>
+		<loc>%s/</loc>
+		<lastmod>%s</lastmod>
 		<changefreq>daily</changefreq>
 		<priority>1.0</priority>
 	</url>
 	<url>
-		<loc>` + BaseDomain + `/index.html</loc>
-		<lastmod>` + now + `</lastmod>
+		<loc>%s/index.html</loc>
+		<lastmod>%s</lastmod>
 		<changefreq>daily</changefreq>
 		<priority>0.9</priority>
 	</url>
 	<url>
-		<loc>` + BaseDomain + `/stream.html</loc>
-		<lastmod>` + now + `</lastmod>
+		<loc>%s/stream.html</loc>
+		<lastmod>%s</lastmod>
 		<changefreq>always</changefreq>
 		<priority>0.8</priority>
 	</url>
-</urlset>`
+</urlset>`, keywordComments, BaseDomain, now, BaseDomain, now, BaseDomain, now)
 
 	c.Header("Content-Type", "application/xml; charset=utf-8")
 	c.Header("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=3600")
 	c.String(http.StatusOK, xmlContent)
 }
-
 // Handler untuk merender Robots.txt
 func robotsHandler(c *gin.Context) {
 	robotsContent := fmt.Sprintf(`User-agent: *
