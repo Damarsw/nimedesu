@@ -1,7 +1,16 @@
 <!DOCTYPE html>
 <html lang="id" class="dark">
 <head>
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<div id="turnstileOverlay" class="fixed inset-0 z-[9999] bg-[#0f0e0a] flex flex-col items-center justify-center space-y-4 p-4 transition-opacity duration-500">
+    <div class="text-center space-y-2 mb-2">
+        <h2 class="text-xl font-bold text-[#F6BE00]">Verifikasi Keamanan</h2>
+        <p class="text-xs text-zinc-400">Harap selesaikan verifikasi Cloudflare sebelum mengakses NimeDesu.</p>
+    </div>
+    <div class="cf-turnstile" 
+         data-sitekey="0x4AAAAAAEWna6ttG5FYWu12" 
+         data-callback="onTurnstileSuccess">
+    </div>
+</div>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NimeDesu - Nonton Anime Sub Indo</title>
@@ -610,6 +619,5 @@
     </button>
 
     <script src="script-index.js"></script>
-    <div class="cf-turnstile" data-sitekey="0x4AAAAAAEWna6ttG5FYWu12"></div>
 </body>
 </html>
