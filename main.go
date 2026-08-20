@@ -29,7 +29,15 @@ var (
 	supabaseKey     = os.Getenv("SUPABASE_KEY")
 	secretServerKey = getEnvOrDefault("SECRET_SERVER_KEY", "NimeDesuSecretKey2026")
 	port            = getEnvOrDefault("PORT", "10000")
+	turnstileSecret = "0x4AAAAAAEWna_vJ8Kdd3zB-Y0fTxiXPDc"
 )
+
+type TurnstileResponse struct {
+	Success     bool     `json:"success"`
+	ErrorCodes  []string `json:"error-codes"`
+	ChallengeTS string   `json:"challenge_ts"`
+	Hostname    string   `json:"hostname"`
+}
 
 type BatchStore struct {
 	sync.RWMutex
@@ -51,14 +59,14 @@ type CacheItem struct {
 }
 
 var (
-	batchStore        = &BatchStore{}
-	localCache        = &LocalCache{AnimeList: make(map[string]CacheItem), ScoreMap: make(map[string]string)}
-	lastAPICallTime   time.Time
-	apiCallMutex      sync.Mutex
-	minCallInterval   = 750 * time.Millisecond
-	
+	batchStore      = &BatchStore{}
+	localCache      = &LocalCache{AnimeList: make(map[string]CacheItem), ScoreMap: make(map[string]string)}
+	lastAPICallTime time.Time
+	apiCallMutex    sync.Mutex
+	minCallInterval = 750 * time.Millisecond
+
 	// Cache 24 Jam di RAM Server
-	CACHE_TTL_ANIME   = int64(86400)
+	CACHE_TTL_ANIME = int64(86400)
 )
 
 func getEnvOrDefault(key, defaultValue string) string {
@@ -67,6 +75,36 @@ func getEnvOrDefault(key, defaultValue string) string {
 		return defaultValue
 	}
 	return val
+}
+
+// Helper Verifikasi Turnstile
+func verifyTurnstileToken(token string, remoteIP string) bool {
+	if token == "" {
+		return false
+	}
+	apiURL := "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+
+	formData := url.Values{}
+	formData.Set("secret", turnstileSecret)
+	formData.Set("response", token)
+	if remoteIP != "" {
+		formData.Set("remoteip", remoteIP)
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.PostForm(apiURL, formData)
+	if err != nil {
+		log.Printf("[Turnstile Error] Gagal verifikasi ke Cloudflare: %v", err)
+		return false
+	}
+	defer resp.Body.Close()
+
+	var turnstileRes TurnstileResponse
+	if err := json.NewDecoder(resp.Body).Decode(&turnstileRes); err != nil {
+		return false
+	}
+
+	return turnstileRes.Success
 }
 
 // ---------------------------------------------------------------------------
@@ -91,10 +129,6 @@ func supabaseRequest(method, endpoint string, body []byte, headers map[string]st
 	return client.Do(req)
 }
 
-// logSupabaseError membaca & mencatat body response kalau statusnya bukan 2xx,
-// lalu me-restore body-nya biar tetap bisa di-decode seperti biasa oleh pemanggil.
-// Dipakai supaya error dari PostgREST (misal RLS, filter salah, dsb) nggak lagi
-// "hilang diam-diam" jadi keliatan kosong doang di frontend.
 func logSupabaseError(context string, resp *http.Response) {
 	if resp == nil || resp.StatusCode < 300 {
 		return
@@ -265,7 +299,7 @@ func main() {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"https://nimedesu.vercel.app"},
 		AllowMethods:     []string{"GET", "POST", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "X-Client-Token", "X-Client-Time"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "X-Client-Token", "X-Client-Time", "X-Turnstile-Token"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
@@ -434,9 +468,6 @@ func animeListHandler(c *gin.Context) {
 		"total_pages": totalPages,
 	}
 
-	// Jangan cache hasil kosong. Kalau di-cache, anime yang baru di-insert ke
-	// Supabase setelah query kosong ini pernah dijalankan bakal "hilang" dari
-	// pencarian sampai 24 jam (CACHE_TTL_ANIME) meskipun datanya sudah ada di DB.
 	if len(data) > 0 {
 		localCache.Lock()
 		localCache.AnimeList[cacheKey] = CacheItem{
@@ -461,7 +492,6 @@ func animeDetailHandler(c *gin.Context) {
 
 	var animeList []map[string]interface{}
 
-	// 1. UTAMA: Cari berdasarkan ID Anime (Exact Match & Sangat Presisi)
 	if animeIDParam != "" {
 		idResp, err := supabaseRequest("GET", fmt.Sprintf("anime?id=eq.%s&select=*", url.QueryEscape(animeIDParam)), nil, nil)
 		if err == nil {
@@ -473,7 +503,6 @@ func animeDetailHandler(c *gin.Context) {
 		}
 	}
 
-	// 2. FALLBACK: Jika ID tidak dikirim/tidak ada, cari menggunakan Slug URL
 	if len(animeList) == 0 && rawURL != "" {
 		decodedURL, errUnescape := url.QueryUnescape(rawURL)
 		if errUnescape != nil {
@@ -505,7 +534,6 @@ func animeDetailHandler(c *gin.Context) {
 	animeItem := animeList[0]
 	animeID := animeItem["id"]
 
-	// 3. Ambil daftar episode berdasarkan anime_id
 	epResp, err := supabaseRequest("GET", fmt.Sprintf("episode?anime_id=eq.%v&order=id.asc&select=*", animeID), nil, nil)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"episodes": []interface{}{}})
@@ -667,6 +695,12 @@ func rankingHandler(c *gin.Context) {
 }
 
 func userSyncHandler(c *gin.Context) {
+	turnstileToken := c.GetHeader("X-Turnstile-Token")
+	if turnstileToken != "" && !verifyTurnstileToken(turnstileToken, c.ClientIP()) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Verifikasi Turnstile Gagal"})
+		return
+	}
+
 	var body map[string]interface{}
 	if err := c.BindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -724,6 +758,12 @@ func userDataHandler(c *gin.Context) {
 }
 
 func userUpdateHandler(c *gin.Context) {
+	turnstileToken := c.GetHeader("X-Turnstile-Token")
+	if turnstileToken != "" && !verifyTurnstileToken(turnstileToken, c.ClientIP()) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Verifikasi Turnstile Gagal"})
+		return
+	}
+
 	var body map[string]interface{}
 	if err := c.BindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
