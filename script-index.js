@@ -1036,8 +1036,7 @@ function selectLiveSearchItem(anime) {
 
 function resetTabActiveStyles() {
     document.querySelectorAll('.nav-tab-btn').forEach(b => {
-        b.classList.remove('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
-        b.classList.add('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
+        b.className = "nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs shrink-0 flex items-center gap-2 hover:border-neon-yellow";
 
         const icon = b.querySelector('i');
         if (icon && icon.id !== 'genreArrow') {
