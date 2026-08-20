@@ -226,12 +226,13 @@ func startCronWorker() {
 }
 
 // ---------------------------------------------------------------------------
-// MIDDLEWARE KEAMANAN
+// MIDDLEWARE KEAMANAN (Update di bagian bypass path)
 // ---------------------------------------------------------------------------
 func securityMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
-		if path == "/" || path == "/health" || path == "/api/clear-cache" || strings.HasPrefix(path, "/api/proxy-stream") || strings.HasPrefix(path, "/proxy-stream") {
+		
+		if path == "/" || path == "/health" || path == "/sitemap.xml" || path == "/robots.txt" || path == "/api/clear-cache" || strings.HasPrefix(path, "/api/proxy-stream") || strings.HasPrefix(path, "/proxy-stream") {
 			c.Next()
 			return
 		}
