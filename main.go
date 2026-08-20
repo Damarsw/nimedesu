@@ -322,6 +322,7 @@ func main() {
 	r.GET("/api/user-data", userDataHandler)
 	r.POST("/api/user-update", userUpdateHandler)
 
+	SetupSEORoutes(r)
 	r.GET("/api/clear-cache", func(c *gin.Context) {
 		localCache.Lock()
 		localCache.AnimeList = make(map[string]CacheItem)
