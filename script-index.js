@@ -1036,12 +1036,12 @@ function selectLiveSearchItem(anime) {
 
 function resetTabActiveStyles() {
     document.querySelectorAll('.nav-tab-btn').forEach(b => {
-        b.className = "nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs shrink-0 flex items-center gap-2 hover:border-neon-yellow";
-
+        b.classList.remove('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
+        b.classList.add('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
         const icon = b.querySelector('i');
         if (icon && icon.id !== 'genreArrow') {
-            icon.className = icon.className.replace(/text-\S+/g, '');
-            icon.classList.add('text-black', 'dark:text-neon-yellow');
+            icon.classList.remove('text-black');
+            icon.classList.add('dark:text-neon-yellow');
         }
     });
 }
@@ -1095,18 +1095,16 @@ function changeTab(type, element) {
     const arrow = document.getElementById('genreArrow');
     if (genreContainer) genreContainer.classList.add('hidden');
     if (arrow) arrow.style.transform = 'rotate(0deg)';
-
     if (element) {
         element.classList.remove('bg-neon-lightCard', 'dark:bg-neon-darkCard', 'text-black', 'dark:text-white');
         element.classList.add('bg-neon-yellow', 'text-black', 'font-bold', 'border-neon-yellow', 'shadow-glow-yellow');
-
+    
         const icon = element.querySelector('i');
         if (icon) {
-            icon.className = icon.className.replace(/text-\S+/g, '');
+            icon.classList.remove('text-neon-yellow', 'dark:text-neon-yellow');
             icon.classList.add('text-black');
         }
-    }
-
+}
     activeSearchQuery = "";
     activeGenreFilter = "";
 
