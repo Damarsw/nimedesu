@@ -13,13 +13,26 @@ import (
 
 const BaseDomain = "https://nimedesu.vercel.app"
 
-// Keyword kompetitor untuk di-asosiasikan oleh Googlebot saat merayapi sitemap
 var CompetitorKeywords = []string{
 	"otakudesu",
 	"samehadaku",
 	"nimegami",
 	"kuramanime",
 	"oploverz",
+	"xanime",
+	"kusonime",
+	"bilibili",
+	"crunchyroll",
+	"muse",
+	"myanimelist",
+	"anilist",
+	"animeindo",
+	"layarkaca21",
+	"indoxxi",
+	"lk21",
+	"rebahin",
+	"kitanonton",
+	
 }
 
 // Handler untuk merender Dynamic Sitemap.xml
@@ -70,7 +83,7 @@ Sitemap: %s/sitemap.xml
 
 type GoogleIndexingPayload struct {
 	URL  string `json:"url" binding:"required"`
-	Type string `json:"type"` // URL_UPDATED atau URL_DELETED
+	Type string `json:"type"`
 }
 
 // Handler Bot Notifier ke Google Indexing API
