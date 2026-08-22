@@ -1191,7 +1191,64 @@ function searchAnime() {
     scrollToSearchResults();
 }
 
-async function
+async function viewDetails(id) {
+    // 1. Pindah ke halaman detail & tampilkan indikator loading
+    switchView('detail');
+    document.getElementById('synopsisText').innerText = "Memuat sinopsis dari server...";
+
+    try {
+        // 2. Fetch data detail lengkap ke Backend
+        const sec = generateSecurityToken();
+        const res = await fetch(`${RENDER_API_URL}/anime-detail?id=${encodeURIComponent(id)}`, {
+            headers: {
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            }
+        });
+        
+        const anime = await res.json();
+        
+        if (!anime || !anime.id) {
+            document.getElementById('synopsisText').innerText = "Gagal memuat detail anime.";
+            return;
+        }
+
+        activeAnime = anime;
+        const cachedScore = getCachedScore(anime.title, anime.score);
+
+        // 3. Pasang data dari backend ke tampilan HTML
+        document.getElementById('detTitle').innerText = anime.title || '-';
+        document.getElementById('detThumbnail').src = anime.img_url || anime.image_url || 'https://placehold.co/400x600?text=No+Image';
+        document.getElementById('detStatusBadge').innerText = anime.status || 'Ongoing';
+        
+        // SINOPSIS DARI BACKEND DIRENDER DI SINI
+        document.getElementById('synopsisText').innerText = (anime.synopsis && anime.synopsis !== "<nil>") ? anime.synopsis : "Sinopsis belum tersedia.";
+
+        document.getElementById('detJapanese').innerText = anime.japanese || '-';
+        document.getElementById('detSkor').innerText = cachedScore;
+        document.getElementById('detStatus').innerText = anime.status || '-';
+        document.getElementById('detTotalEpisode').innerText = anime.total_episodes || '-';
+        document.getElementById('detDurasi').innerText = anime.duration || '-';
+        document.getElementById('detTanggalRilis').innerText = anime.release_date || '-';
+        document.getElementById('detStudio').innerText = anime.studio || '-';
+
+        // Render Genre Buttons
+        const genreLinksContainer = document.getElementById('detGenreLinks');
+        const genresList = anime.genre ? anime.genre.split(',').map(g => g.trim()) : [];
+        if (genresList.length > 0) {
+            genreLinksContainer.innerHTML = genresList.map(genre => `
+                <button onclick="filterGenre('${genre}')" class="bg-zinc-100 text-black dark:bg-neon-darkBg dark:text-neon-yellow border border-neon-yellow/40 hover:border-neon-yellow text-[10px] font-semibold px-2.5 py-0.5 rounded-full transition shadow-xs">${genre}</button>
+            `).join('');
+        } else {
+            genreLinksContainer.innerHTML = '<span class="text-xs text-zinc-500">-</span>';
+        }
+
+    } catch (err) {
+        console.error("Gagal mengambil detail anime:", err);
+        document.getElementById('synopsisText').innerText = "Terjadi kesalahan koneksi saat memuat sinopsis.";
+    }
+}
+
 function openStreamingTab() {
     if (!activeAnime || !activeAnime.id) return;
     window.open(`stream.html?anime_id=${encodeURIComponent(activeAnime.id)}&eps=0`, '_blank');
