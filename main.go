@@ -50,6 +50,7 @@ type LocalCache struct {
 	sync.RWMutex
 	AnimeList map[string]CacheItem
 	ScoreMap  map[string]string
+	DetailMap map[string]CacheItem
 }
 
 type CacheItem struct {
@@ -57,9 +58,25 @@ type CacheItem struct {
 	Data      interface{}
 }
 
+type ExternalAnimeMetadata struct {
+	Synopsis     string `json:"synopsis"`
+	Japanese     string `json:"japanese"`
+	Score        string `json:"score"`
+	Status       string `json:"status"`
+	TotalEp      string `json:"total_episodes"`
+	Duration     string `json:"duration"`
+	ReleaseDate  string `json:"release_date"`
+	Studio       string `json:"studio"`
+	CoverImg     string `json:"cover_img"`
+}
+
 var (
 	batchStore      = &BatchStore{}
-	localCache      = &LocalCache{AnimeList: make(map[string]CacheItem), ScoreMap: make(map[string]string)}
+	localCache      = &LocalCache{
+		AnimeList: make(map[string]CacheItem), 
+		ScoreMap:  make(map[string]string),
+		DetailMap: make(map[string]CacheItem),
+	}
 	lastAPICallTime time.Time
 	apiCallMutex    sync.Mutex
 	minCallInterval = 750 * time.Millisecond
@@ -121,6 +138,248 @@ func supabaseRequest(method, endpoint string, body []byte, headers map[string]st
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	return client.Do(req)
+}
+
+// Clean HTML tags dari sinopsis (misal dari AniList/Jikan)
+func stripHTMLTags(s string) string {
+	var builder strings.Builder
+	inTag := false
+	for _, r := range s {
+		if r == '<' {
+			inTag = true
+			continue
+		}
+		if r == '>' {
+			inTag = false
+			continue
+		}
+		if !inTag {
+			builder.WriteRune(r)
+		}
+	}
+	res := builder.String()
+	res = strings.ReplaceAll(res, "&quot;", "\"")
+	res = strings.ReplaceAll(res, "&#039;", "'")
+	res = strings.ReplaceAll(res, "&amp;", "&")
+	return strings.TrimSpace(res)
+}
+
+// ---------------------------------------------------------------------------
+// FETCH METADATA: AniList -> Jikan (MyAnimeList) Backup
+// ---------------------------------------------------------------------------
+func fetchMetadataFromAniList(title string) (*ExternalAnimeMetadata, error) {
+	graphqlQuery := `
+	query ($search: String) {
+	  Media (search: $search, type: ANIME) {
+	    title { romaji native english }
+	    description
+	    averageScore
+	    status
+	    episodes
+	    duration
+	    startDate { year month day }
+	    coverImage { extraLarge large }
+	    studios(isMain: true) {
+	      nodes { name }
+	    }
+	  }
+	}`
+
+	reqBody, _ := json.Marshal(map[string]interface{}{
+		"query": graphqlQuery,
+		"variables": map[string]string{"search": title},
+	})
+
+	req, _ := http.NewRequest("POST", "https://graphql.anilist.co", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 4 * time.Second}
+
+	resp, err := client.Do(req)
+	if err != nil || resp.StatusCode != 200 {
+		return nil, fmt.Errorf("anilist request failed")
+	}
+	defer resp.Body.Close()
+
+	var res struct {
+		Data struct {
+			Media struct {
+				Title struct {
+					Native  string `json:"native"`
+					Romaji  string `json:"romaji"`
+					English string `json:"english"`
+				} `json:"title"`
+				Description  string  `json:"description"`
+				AverageScore float64 `json:"averageScore"`
+				Status       string  `json:"status"`
+				Episodes     int     `json:"episodes"`
+				Duration     int     `json:"duration"`
+				StartDate    struct {
+					Year  int `json:"year"`
+					Month int `json:"month"`
+					Day   int `json:"day"`
+				} `json:"startDate"`
+				CoverImage struct {
+					ExtraLarge string `json:"extraLarge"`
+					Large      string `json:"large"`
+				} `json:"coverImage"`
+				Studios struct {
+					Nodes []struct {
+						Name string `json:"name"`
+					} `json:"nodes"`
+				} `json:"studios"`
+			} `json:"Media"`
+		} `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil || res.Data.Media.Description == "" {
+		return nil, fmt.Errorf("invalid anilist data")
+	}
+
+	m := res.Data.Media
+	scoreStr := "N/A"
+	if m.AverageScore > 0 {
+		scoreStr = fmt.Sprintf("%.1f", m.AverageScore/10.0)
+	}
+
+	totalEpStr := "N/A"
+	if m.Episodes > 0 {
+		totalEpStr = fmt.Sprintf("%d Episode", m.Episodes)
+	}
+
+	durStr := "N/A"
+	if m.Duration > 0 {
+		durStr = fmt.Sprintf("%d Menit", m.Duration)
+	}
+
+	dateStr := "N/A"
+	if m.StartDate.Year > 0 {
+		dateStr = fmt.Sprintf("%d-%02d-%02d", m.StartDate.Year, m.StartDate.Month, m.StartDate.Day)
+	}
+
+	studioStr := "N/A"
+	if len(m.Studios.Nodes) > 0 {
+		studioStr = m.Studios.Nodes[0].Name
+	}
+
+	img := m.CoverImage.ExtraLarge
+	if img == "" {
+		img = m.CoverImage.Large
+	}
+
+	return &ExternalAnimeMetadata{
+		Synopsis:    stripHTMLTags(m.Description),
+		Japanese:    m.Title.Native,
+		Score:       scoreStr,
+		Status:      m.Status,
+		TotalEp:     totalEpStr,
+		Duration:    durStr,
+		ReleaseDate: dateStr,
+		Studio:      studioStr,
+		CoverImg:    img,
+	}, nil
+}
+
+func fetchMetadataFromJikan(title string) (*ExternalAnimeMetadata, error) {
+	jikanURL := fmt.Sprintf("https://api.jikan.moe/v4/anime?q=%s&limit=1", url.QueryEscape(title))
+	req, _ := http.NewRequest("GET", jikanURL, nil)
+	client := &http.Client{Timeout: 4 * time.Second}
+
+	resp, err := client.Do(req)
+	if err != nil || resp.StatusCode != 200 {
+		return nil, fmt.Errorf("jikan request failed")
+	}
+	defer resp.Body.Close()
+
+	var res struct {
+		Data []struct {
+			TitleJapanese string  `json:"title_japanese"`
+			Synopsis      string  `json:"synopsis"`
+			Score         float64 `json:"score"`
+			Status        string  `json:"status"`
+			Episodes      int     `json:"episodes"`
+			Duration      string  `json:"duration"`
+			Aired         struct {
+				String string `json:"string"`
+			} `json:"aired"`
+			Studios []struct {
+				Name string `json:"name"`
+			} `json:"studios"`
+			Images struct {
+				JPG struct {
+					LargeImageURL string `json:"large_image_url"`
+				} `json:"jpg"`
+			} `json:"images"`
+		} `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil || len(res.Data) == 0 {
+		return nil, fmt.Errorf("invalid jikan data")
+	}
+
+	item := res.Data[0]
+	scoreStr := "N/A"
+	if item.Score > 0 {
+		scoreStr = fmt.Sprintf("%.1f", item.Score)
+	}
+
+	totalEpStr := "N/A"
+	if item.Episodes > 0 {
+		totalEpStr = fmt.Sprintf("%d Episode", item.Episodes)
+	}
+
+	studioStr := "N/A"
+	if len(item.Studios) > 0 {
+		studioStr = item.Studios[0].Name
+	}
+
+	return &ExternalAnimeMetadata{
+		Synopsis:    stripHTMLTags(item.Synopsis),
+		Japanese:    item.TitleJapanese,
+		Score:       scoreStr,
+		Status:      item.Status,
+		TotalEp:     totalEpStr,
+		Duration:    item.Duration,
+		ReleaseDate: item.Aired.String,
+		Studio:      studioStr,
+		CoverImg:    item.Images.JPG.LargeImageURL,
+	}, nil
+}
+
+func getOrFetchAnimeMetadata(title string) *ExternalAnimeMetadata {
+	cacheKey := strings.ToLower(title)
+	now := time.Now().Unix()
+
+	localCache.RLock()
+	if item, found := localCache.DetailMap[cacheKey]; found {
+		if now-item.Timestamp < CACHE_TTL_ANIME {
+			localCache.RUnlock()
+			if meta, ok := item.Data.(*ExternalAnimeMetadata); ok {
+				return meta
+			}
+		}
+	}
+	localCache.RUnlock()
+
+	// 1. Coba AniList GraphQL
+	meta, err := fetchMetadataFromAniList(title)
+	
+	// 2. Fallback ke Jikan API jika AniList gagal/error
+	if err != nil || meta == nil || meta.Synopsis == "" {
+		log.Printf("[Metadata Backup] AniList gagal untuk %s, mencoba Jikan...", title)
+		meta, err = fetchMetadataFromJikan(title)
+	}
+
+	if meta != nil && meta.Synopsis != "" {
+		localCache.Lock()
+		localCache.DetailMap[cacheKey] = CacheItem{
+			Timestamp: now,
+			Data:      meta,
+		}
+		localCache.Unlock()
+		return meta
+	}
+
+	return nil
 }
 
 func fetchAniListBatch(category string) []interface{} {
@@ -295,6 +554,8 @@ func main() {
 	r.GET("/api/clear-cache", func(c *gin.Context) {
 		localCache.Lock()
 		localCache.AnimeList = make(map[string]CacheItem)
+		localCache.ScoreMap = make(map[string]string)
+		localCache.DetailMap = make(map[string]CacheItem)
 		localCache.Unlock()
 		c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Cache RAM 24 jam berhasil dibersihkan!"})
 	})
@@ -449,7 +710,7 @@ func animeListHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, payload)
 }
 
-// OPTIMIZED: 1-Query Relational Join ke Supabase (Mengeliminasi Waterfall Latency)
+// OPTIMIZED DETAIL HANDLER (AniList -> Jikan Fallback -> Supabase Backup)
 func animeDetailHandler(c *gin.Context) {
 	animeIDParam := strings.TrimSpace(c.Query("id"))
 	rawURL := strings.TrimSpace(c.Query("url"))
@@ -488,8 +749,58 @@ func animeDetailHandler(c *gin.Context) {
 	}
 
 	animeItem := result[0]
-	rawEpisodes, _ := animeItem["episode"].([]interface{})
+	animeTitle := fmt.Sprintf("%v", animeItem["title"])
 
+	// Ambil metadata external (AniList / Backup Jikan)
+	extMeta := getOrFetchAnimeMetadata(animeTitle)
+
+	// Fallback nilai ke database lokal Supabase jika external API kosong
+	synopsisVal := fmt.Sprintf("%v", animeItem["sinopsis"])
+	if extMeta != nil && extMeta.Synopsis != "" {
+		synopsisVal = extMeta.Synopsis
+	}
+
+	japaneseVal := fmt.Sprintf("%v", animeItem["japanese"])
+	if extMeta != nil && extMeta.Japanese != "" {
+		japaneseVal = extMeta.Japanese
+	}
+
+	scoreVal := fmt.Sprintf("%v", animeItem["score"])
+	if extMeta != nil && extMeta.Score != "" {
+		scoreVal = extMeta.Score
+	}
+
+	statusVal := fmt.Sprintf("%v", animeItem["status"])
+	if extMeta != nil && extMeta.Status != "" {
+		statusVal = extMeta.Status
+	}
+
+	totalEpVal := fmt.Sprintf("%v", animeItem["total_episodes"])
+	if extMeta != nil && extMeta.TotalEp != "" {
+		totalEpVal = extMeta.TotalEp
+	}
+
+	durationVal := fmt.Sprintf("%v", animeItem["duration"])
+	if extMeta != nil && extMeta.Duration != "" {
+		durationVal = extMeta.Duration
+	}
+
+	releaseDateVal := fmt.Sprintf("%v", animeItem["release_date"])
+	if extMeta != nil && extMeta.ReleaseDate != "" {
+		releaseDateVal = extMeta.ReleaseDate
+	}
+
+	studioVal := fmt.Sprintf("%v", animeItem["studio"])
+	if extMeta != nil && extMeta.Studio != "" {
+		studioVal = extMeta.Studio
+	}
+
+	imgVal := fmt.Sprintf("%v", animeItem["img_url"])
+	if extMeta != nil && extMeta.CoverImg != "" {
+		imgVal = extMeta.CoverImg
+	}
+
+	rawEpisodes, _ := animeItem["episode"].([]interface{})
 	episodesList := make([]map[string]interface{}, 0, len(rawEpisodes))
 	for _, epObj := range rawEpisodes {
 		ep, ok := epObj.(map[string]interface{})
@@ -534,12 +845,21 @@ func animeDetailHandler(c *gin.Context) {
 
 	c.Header("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=3600")
 	c.JSON(http.StatusOK, gin.H{
-		"id":       animeItem["id"],
-		"title":    animeItem["title"],
-		"url":      animeItem["url"],
-		"img_url":  animeItem["img_url"],
-		"genre":    animeItem["genre"],
-		"episodes": episodesList,
+		"id":             animeItem["id"],
+		"title":          animeItem["title"],
+		"url":            animeItem["url"],
+		"img_url":        imgVal,
+		"image_url":      imgVal,
+		"genre":          animeItem["genre"],
+		"sinopsis":       animeItem["sinopsis"],
+		"japanese":       japaneseVal,
+		"score":          scoreVal,
+		"status":         statusVal,
+		"total_episodes": totalEpVal,
+		"duration":       durationVal,
+		"release_date":   releaseDateVal,
+		"studio":         studioVal,
+		"episodes":       episodesList,
 	})
 }
 
