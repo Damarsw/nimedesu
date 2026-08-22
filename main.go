@@ -756,7 +756,7 @@ func animeDetailHandler(c *gin.Context) {
 	extMeta := getOrFetchAnimeMetadata(animeTitle)
 
 	// Fallback nilai ke database lokal Supabase jika external API kosong
-	synopsisVal := fmt.Sprintf("%v", animeItem["sinopsis"])
+	synopsisVal := fmt.Sprintf("%v", animeItem["synopsis"])
 	if extMeta != nil && extMeta.Synopsis != "" {
 		synopsisVal = extMeta.Synopsis
 	}
@@ -852,7 +852,7 @@ func animeDetailHandler(c *gin.Context) {
 		"img_url":        imgVal,
 		"image_url":      imgVal,
 		"genre":          animeItem["genre"],
-		"sinopsis":       animeItem["sinopsis"],
+		"synopsis":       synopsisVal,
 		"japanese":       japaneseVal,
 		"score":          scoreVal,
 		"status":         statusVal,
