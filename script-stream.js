@@ -190,7 +190,6 @@ async function checkAniListAuthStatus() {
 
 async function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIndex, thumbnailImg) {
     const user = getLoggedInUser();
-
     if (!user) return;
 
     try {
@@ -356,21 +355,6 @@ async function initStream() {
             }
         }
 
-        if (!currentAnimeThumbnail && data.title) {
-            try {
-                const searchRes = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(data.title)}&per_page=1`, {
-                    headers: {
-                        "X-Client-Token": sec.token,
-                        "X-Client-Time": sec.time
-                    }
-                });
-                const searchData = await searchRes.json();
-                if (searchData.data && searchData.data.length > 0) {
-                    currentAnimeThumbnail = searchData.data[0].img_url || searchData.data[0].image_url || "";
-                }
-            } catch (e) {}
-        }
-
         if (data && data.episodes && data.episodes.length > 0) {
             activeEpisodes = data.episodes.filter(ep => ep && (ep.episode_title || ep.video_servers));
             
@@ -399,7 +383,6 @@ async function initStream() {
 
             document.getElementById('episodeNavContainer').classList.remove('hidden');
             renderDynamicEpisodes();
-
             renderMixedGenreRecommendations();
         } else {
             document.getElementById('streamTitle').innerText = "Data Episode Tidak Tersedia.";
@@ -421,45 +404,38 @@ function scrollSlider(direction) {
     slider.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
 }
 
-/* REKOMENDASI ACAK PER GENRE (MAKSIMAL 12 ANIME) */
+// OPTIMIZED: Paralleled Fetching menggunakan Promise.all()
 async function renderMixedGenreRecommendations() {
     const recSlider = document.getElementById('recommendationSlider');
     if (!recSlider) return;
 
     try {
         const sec = generateSecurityToken();
-        let recommendedAnimeList = [];
-
         let targetGenres = currentAnimeGenres.slice(0, 3);
-        if (targetGenres.length === 0) {
-            targetGenres = ['Action', 'Drama'];
-        }
+        if (targetGenres.length === 0) targetGenres = ['Action', 'Drama'];
 
-        const itemsPerGenre = Math.floor(12 / targetGenres.length);
-
-        for (const genre of targetGenres) {
-            const res = await fetch(`${RENDER_API_URL}/anime?genre=${encodeURIComponent(genre)}&per_page=15`, {
+        const fetchPromises = targetGenres.map(genre =>
+            fetch(`${RENDER_API_URL}/anime?genre=${encodeURIComponent(genre)}&per_page=10`, {
                 headers: {
                     "X-Client-Token": sec.token,
                     "X-Client-Time": sec.time
                 }
-            });
-            const result = await res.json();
-            let items = result.data || [];
+            }).then(res => res.json()).catch(() => ({ data: [] }))
+        );
 
-            items = items.filter(a => String(a.id) !== String(currentAnimeId));
-            items.sort(() => 0.5 - Math.random());
-
-            const picked = items.slice(0, itemsPerGenre);
-            recommendedAnimeList = recommendedAnimeList.concat(picked);
-        }
+        const results = await Promise.all(fetchPromises);
+        let recommendedAnimeList = results.flatMap(r => r.data || []);
 
         const uniqueMap = new Map();
-        recommendedAnimeList.forEach(item => uniqueMap.set(item.id || item.url, item));
-        recommendedAnimeList = Array.from(uniqueMap.values());
+        recommendedAnimeList.forEach(item => {
+            if (String(item.id) !== String(currentAnimeId)) {
+                uniqueMap.set(item.id || item.url, item);
+            }
+        });
 
-        recommendedAnimeList.sort(() => 0.5 - Math.random());
-        recommendedAnimeList = recommendedAnimeList.slice(0, 12);
+        recommendedAnimeList = Array.from(uniqueMap.values())
+            .sort(() => 0.5 - Math.random())
+            .slice(0, 12);
 
         if (recommendedAnimeList.length === 0) {
             recSlider.innerHTML = '<p class="text-xs text-zinc-500">Tidak ada rekomendasi anime serupa.</p>';
@@ -621,9 +597,7 @@ function formatEmbedUrl(url) {
     }
 
     if (finalUrl.includes('drive.google.com')) {
-        return finalUrl
-            .replace('/view?usp=drivesdk', '/preview')
-            .replace('/view', '/preview');
+        return finalUrl.replace('/view?usp=drivesdk', '/preview').replace('/view', '/preview');
     }
 
     if (finalUrl.includes('mega.nz')) {
@@ -633,6 +607,7 @@ function formatEmbedUrl(url) {
     return finalUrl;
 }
 
+// OPTIMIZED: Switch Video Frame tanpa memicu Thread Locking
 function selectServer(element, resolution, serverNum, videoUrl) {
     document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
     document.querySelectorAll('.server-btn').forEach(btn => {
@@ -651,7 +626,10 @@ function selectServer(element, resolution, serverNum, videoUrl) {
         return;
     }
 
-    iframe.src = formatEmbedUrl(videoUrl);
+    iframe.src = "about:blank";
+    requestAnimationFrame(() => {
+        iframe.src = formatEmbedUrl(videoUrl);
+    });
 }
 
 function toggleTheme() {
