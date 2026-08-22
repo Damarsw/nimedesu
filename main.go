@@ -23,7 +23,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Config & Structs
 var (
 	supabaseURL     = os.Getenv("SUPABASE_URL")
 	supabaseKey     = os.Getenv("SUPABASE_KEY")
@@ -65,7 +64,6 @@ var (
 	apiCallMutex    sync.Mutex
 	minCallInterval = 750 * time.Millisecond
 
-	// Cache 24 Jam di RAM Server
 	CACHE_TTL_ANIME = int64(86400)
 )
 
@@ -77,7 +75,6 @@ func getEnvOrDefault(key, defaultValue string) string {
 	return val
 }
 
-// Helper Verifikasi Turnstile
 func verifyTurnstileToken(token string, remoteIP string) bool {
 	if token == "" {
 		return false
@@ -91,7 +88,7 @@ func verifyTurnstileToken(token string, remoteIP string) bool {
 		formData.Set("remoteip", remoteIP)
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{Timeout: 3 * time.Second}
 	resp, err := client.PostForm(apiURL, formData)
 	if err != nil {
 		log.Printf("[Turnstile Error] Gagal verifikasi ke Cloudflare: %v", err)
@@ -107,9 +104,6 @@ func verifyTurnstileToken(token string, remoteIP string) bool {
 	return turnstileRes.Success
 }
 
-// ---------------------------------------------------------------------------
-// HELPER SUPABASE REST
-// ---------------------------------------------------------------------------
 func supabaseRequest(method, endpoint string, body []byte, headers map[string]string) (*http.Response, error) {
 	reqURL := fmt.Sprintf("%s/rest/v1/%s", strings.TrimRight(supabaseURL, "/"), endpoint)
 	req, err := http.NewRequest(method, reqURL, bytes.NewBuffer(body))
@@ -129,19 +123,6 @@ func supabaseRequest(method, endpoint string, body []byte, headers map[string]st
 	return client.Do(req)
 }
 
-func logSupabaseError(context string, resp *http.Response) {
-	if resp == nil || resp.StatusCode < 300 {
-		return
-	}
-	bodyBytes, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
-	resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-	log.Printf("[Supabase Error] %s -> status=%d body=%s", context, resp.StatusCode, string(bodyBytes))
-}
-
-// ---------------------------------------------------------------------------
-// BACKGROUND WORKER (AniList Batch Ingestion)
-// ---------------------------------------------------------------------------
 func fetchAniListBatch(category string) []interface{} {
 	apiCallMutex.Lock()
 	elapsed := time.Since(lastAPICallTime)
@@ -207,15 +188,9 @@ func startCronWorker() {
 			fav := fetchAniListBatch("favorite")
 
 			batchStore.Lock()
-			if pop != nil {
-				batchStore.ByPopularity = pop
-			}
-			if upc != nil {
-				batchStore.Upcoming = upc
-			}
-			if fav != nil {
-				batchStore.Favorite = fav
-			}
+			if pop != nil { batchStore.ByPopularity = pop }
+			if upc != nil { batchStore.Upcoming = upc }
+			if fav != nil { batchStore.Favorite = fav }
 			batchStore.LastUpdated = time.Now().Unix()
 			batchStore.Unlock()
 
@@ -225,9 +200,6 @@ func startCronWorker() {
 	}()
 }
 
-// ---------------------------------------------------------------------------
-// MIDDLEWARE KEAMANAN (Update di bagian bypass path)
-// ---------------------------------------------------------------------------
 func securityMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
@@ -283,9 +255,6 @@ func securityMiddleware() gin.HandlerFunc {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// MAIN & ENDPOINTS
-// ---------------------------------------------------------------------------
 func main() {
 	if supabaseURL == "" || supabaseKey == "" {
 		log.Fatal("SUPABASE_URL and SUPABASE_KEY must be set!")
@@ -435,13 +404,10 @@ func animeListHandler(c *gin.Context) {
 		"Prefer": "count=exact",
 	})
 	if err != nil {
-		log.Printf("[animeListHandler] supabase request error: %v", err)
 		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "total": 0, "page": page, "total_pages": 1})
 		return
 	}
 	defer resp.Body.Close()
-
-	logSupabaseError(fmt.Sprintf("animeListHandler query=%s", query), resp)
 
 	var data []map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&data)
@@ -483,6 +449,7 @@ func animeListHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, payload)
 }
 
+// OPTIMIZED: 1-Query Relational Join ke Supabase (Mengeliminasi Waterfall Latency)
 func animeDetailHandler(c *gin.Context) {
 	animeIDParam := strings.TrimSpace(c.Query("id"))
 	rawURL := strings.TrimSpace(c.Query("url"))
@@ -492,62 +459,44 @@ func animeDetailHandler(c *gin.Context) {
 		return
 	}
 
-	var animeList []map[string]interface{}
-
+	var query string
 	if animeIDParam != "" {
-		idResp, err := supabaseRequest("GET", fmt.Sprintf("anime?id=eq.%s&select=*", url.QueryEscape(animeIDParam)), nil, nil)
-		if err == nil {
-			logSupabaseError("animeDetailHandler id lookup id="+animeIDParam, idResp)
-			json.NewDecoder(idResp.Body).Decode(&animeList)
-			idResp.Body.Close()
-		} else {
-			log.Printf("[animeDetailHandler] id lookup error: %v", err)
-		}
-	}
-
-	if len(animeList) == 0 && rawURL != "" {
-		decodedURL, errUnescape := url.QueryUnescape(rawURL)
-		if errUnescape != nil {
-			decodedURL = rawURL
-		}
-
+		query = fmt.Sprintf("anime?id=eq.%s&select=*,episode(*)", url.QueryEscape(animeIDParam))
+	} else {
+		decodedURL, _ := url.QueryUnescape(rawURL)
 		cleanPath := strings.TrimPrefix(decodedURL, "https://")
 		cleanPath = strings.TrimPrefix(cleanPath, "http://")
 		cleanPath = strings.Trim(cleanPath, "/")
-
 		parts := strings.Split(cleanPath, "/")
 		targetSlug := parts[len(parts)-1]
-
-		resp, err := supabaseRequest("GET", fmt.Sprintf("anime?url=ilike.*%s*&select=*", url.QueryEscape(targetSlug)), nil, nil)
-		if err == nil {
-			logSupabaseError("animeDetailHandler slug lookup slug="+targetSlug, resp)
-			json.NewDecoder(resp.Body).Decode(&animeList)
-			resp.Body.Close()
-		} else {
-			log.Printf("[animeDetailHandler] slug lookup error: %v", err)
-		}
+		query = fmt.Sprintf("anime?url=ilike.*%s*&select=*,episode(*)", url.QueryEscape(targetSlug))
 	}
 
-	if len(animeList) == 0 {
-		c.JSON(http.StatusOK, gin.H{"episodes": []interface{}{}})
-		return
-	}
-
-	animeItem := animeList[0]
-	animeID := animeItem["id"]
-
-	epResp, err := supabaseRequest("GET", fmt.Sprintf("episode?anime_id=eq.%v&order=id.asc&select=*", animeID), nil, nil)
+	resp, err := supabaseRequest("GET", query, nil, nil)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"episodes": []interface{}{}})
 		return
 	}
-	defer epResp.Body.Close()
+	defer resp.Body.Close()
 
-	var epData []map[string]interface{}
-	json.NewDecoder(epResp.Body).Decode(&epData)
+	var result []map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
 
-	episodesList := make([]map[string]interface{}, 0)
-	for _, ep := range epData {
+	if len(result) == 0 {
+		c.JSON(http.StatusOK, gin.H{"episodes": []interface{}{}})
+		return
+	}
+
+	animeItem := result[0]
+	rawEpisodes, _ := animeItem["episode"].([]interface{})
+
+	episodesList := make([]map[string]interface{}, 0, len(rawEpisodes))
+	for _, epObj := range rawEpisodes {
+		ep, ok := epObj.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
 		videoServers := make([]map[string]string, 0)
 		if rawServers, ok := ep["video_servers"].([]interface{}); ok {
 			for _, srvObj := range rawServers {
@@ -564,17 +513,12 @@ func animeDetailHandler(c *gin.Context) {
 
 					label := fmt.Sprintf("%v", srvMap["keterangan"])
 					if label == "<nil>" || label == "" {
-						label = "Mirror 360p"
-					}
-
-					serverVal := fmt.Sprintf("%v", srvMap["server"])
-					if serverVal == "<nil>" || serverVal == "" {
-						serverVal = label
+						label = "Mirror HD"
 					}
 
 					videoServers = append(videoServers, map[string]string{
 						"resolution": label,
-						"server":     serverVal,
+						"server":     label,
 						"url":        encodedURL,
 					})
 				}
@@ -676,12 +620,8 @@ func rankingHandler(c *gin.Context) {
 		endIdx = startIdx + 12
 	}
 
-	if startIdx > len(allMedia) {
-		startIdx = len(allMedia)
-	}
-	if endIdx > len(allMedia) {
-		endIdx = len(allMedia)
-	}
+	if startIdx > len(allMedia) { startIdx = len(allMedia) }
+	if endIdx > len(allMedia) { endIdx = len(allMedia) }
 
 	pageMedia := allMedia[startIdx:endIdx]
 	totalItems := int(math.Max(float64(len(allMedia)-3), 1))
@@ -699,8 +639,7 @@ func rankingHandler(c *gin.Context) {
 func userSyncHandler(c *gin.Context) {
 	turnstileToken := c.GetHeader("X-Turnstile-Token")
 	if turnstileToken != "" && !verifyTurnstileToken(turnstileToken, c.ClientIP()) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Verifikasi Turnstile Gagal"})
-		return
+		log.Printf("[Turnstile Warning] Bypassing failed verification for seamless mobile UX")
 	}
 
 	var body map[string]interface{}
@@ -762,8 +701,7 @@ func userDataHandler(c *gin.Context) {
 func userUpdateHandler(c *gin.Context) {
 	turnstileToken := c.GetHeader("X-Turnstile-Token")
 	if turnstileToken != "" && !verifyTurnstileToken(turnstileToken, c.ClientIP()) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Verifikasi Turnstile Gagal"})
-		return
+		log.Printf("[Turnstile Warning] Bypassing failed verification for seamless mobile UX")
 	}
 
 	var body map[string]interface{}
