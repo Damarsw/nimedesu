@@ -59,21 +59,21 @@ type CacheItem struct {
 }
 
 type ExternalAnimeMetadata struct {
-	Synopsis     string `json:"synopsis"`
-	Japanese     string `json:"japanese"`
-	Score        string `json:"score"`
-	Status       string `json:"status"`
-	TotalEp      string `json:"total_episodes"`
-	Duration     string `json:"duration"`
-	ReleaseDate  string `json:"release_date"`
-	Studio       string `json:"studio"`
-	CoverImg     string `json:"cover_img"`
+	Synopsis    string `json:"synopsis"`
+	Japanese    string `json:"japanese"`
+	Score       string `json:"score"`
+	Status      string `json:"status"`
+	TotalEp     string `json:"total_episodes"`
+	Duration    string `json:"duration"`
+	ReleaseDate string `json:"release_date"`
+	Studio      string `json:"studio"`
+	CoverImg    string `json:"cover_img"`
 }
 
 var (
-	batchStore      = &BatchStore{}
-	localCache      = &LocalCache{
-		AnimeList: make(map[string]CacheItem), 
+	batchStore = &BatchStore{}
+	localCache = &LocalCache{
+		AnimeList: make(map[string]CacheItem),
 		ScoreMap:  make(map[string]string),
 		DetailMap: make(map[string]CacheItem),
 	}
@@ -140,7 +140,6 @@ func supabaseRequest(method, endpoint string, body []byte, headers map[string]st
 	return client.Do(req)
 }
 
-// Clean HTML tags dari sinopsis (misal dari AniList/Jikan)
 func stripHTMLTags(s string) string {
 	var builder strings.Builder
 	inTag := false
@@ -164,9 +163,52 @@ func stripHTMLTags(s string) string {
 	return strings.TrimSpace(res)
 }
 
-// ---------------------------------------------------------------------------
-// FETCH METADATA: AniList -> Jikan (MyAnimeList) Backup
-// ---------------------------------------------------------------------------
+// Helper Auto-Translate Teks ke Bahasa Indonesia via Google Translate
+func translateToID(text string) string {
+	if strings.TrimSpace(text) == "" {
+		return ""
+	}
+
+	if len(text) > 1500 {
+		text = text[:1500] + "..."
+	}
+
+	translateURL := fmt.Sprintf("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=id&dt=t&q=%s", url.QueryEscape(text))
+
+	client := &http.Client{Timeout: 4 * time.Second}
+	resp, err := client.Get(translateURL)
+	if err != nil || resp.StatusCode != 200 {
+		return text
+	}
+	defer resp.Body.Close()
+
+	var result []interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil || len(result) == 0 {
+		return text
+	}
+
+	sentences, ok := result[0].([]interface{})
+	if !ok {
+		return text
+	}
+
+	var translatedBuilder strings.Builder
+	for _, sentence := range sentences {
+		item, ok := sentence.([]interface{})
+		if ok && len(item) > 0 {
+			if str, ok := item[0].(string); ok {
+				translatedBuilder.WriteString(str)
+			}
+		}
+	}
+
+	translated := translatedBuilder.String()
+	if translated == "" {
+		return text
+	}
+	return translated
+}
+
 func fetchMetadataFromAniList(title string) (*ExternalAnimeMetadata, error) {
 	graphqlQuery := `
 	query ($search: String) {
@@ -186,7 +228,7 @@ func fetchMetadataFromAniList(title string) (*ExternalAnimeMetadata, error) {
 	}`
 
 	reqBody, _ := json.Marshal(map[string]interface{}{
-		"query": graphqlQuery,
+		"query":     graphqlQuery,
 		"variables": map[string]string{"search": title},
 	})
 
@@ -360,16 +402,19 @@ func getOrFetchAnimeMetadata(title string) *ExternalAnimeMetadata {
 	}
 	localCache.RUnlock()
 
-	// 1. Coba AniList GraphQL
+	// 1. Coba dari AniList (Bahasa Inggris)
 	meta, err := fetchMetadataFromAniList(title)
-	
-	// 2. Fallback ke Jikan API jika AniList gagal/error
+
+	// 2. Fallback ke Jikan API jika AniList gagal
 	if err != nil || meta == nil || meta.Synopsis == "" {
 		log.Printf("[Metadata Backup] AniList gagal untuk %s, mencoba Jikan...", title)
 		meta, err = fetchMetadataFromJikan(title)
 	}
 
+	// Jika sukses dapet dari API external, translate sinopsisnya ke Bahasa Indonesia
 	if meta != nil && meta.Synopsis != "" {
+		meta.Synopsis = translateToID(meta.Synopsis)
+
 		localCache.Lock()
 		localCache.DetailMap[cacheKey] = CacheItem{
 			Timestamp: now,
@@ -447,9 +492,15 @@ func startCronWorker() {
 			fav := fetchAniListBatch("favorite")
 
 			batchStore.Lock()
-			if pop != nil { batchStore.ByPopularity = pop }
-			if upc != nil { batchStore.Upcoming = upc }
-			if fav != nil { batchStore.Favorite = fav }
+			if pop != nil {
+				batchStore.ByPopularity = pop
+			}
+			if upc != nil {
+				batchStore.Upcoming = upc
+			}
+			if fav != nil {
+				batchStore.Favorite = fav
+			}
 			batchStore.LastUpdated = time.Now().Unix()
 			batchStore.Unlock()
 
@@ -462,7 +513,7 @@ func startCronWorker() {
 func securityMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
-		
+
 		if path == "/" || path == "/health" || path == "/sitemap.xml" || path == "/robots.txt" || path == "/api/clear-cache" || strings.HasPrefix(path, "/api/proxy-stream") || strings.HasPrefix(path, "/proxy-stream") {
 			c.Next()
 			return
@@ -710,8 +761,6 @@ func animeListHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, payload)
 }
 
-// OPTIMIZED DETAIL HANDLER (AniList -> Jikan Fallback -> Supabase Backup)
-// OPTIMIZED DETAIL HANDLER (AniList -> Jikan Fallback -> Supabase Backup)
 func animeDetailHandler(c *gin.Context) {
 	animeIDParam := strings.TrimSpace(c.Query("id"))
 	rawURL := strings.TrimSpace(c.Query("url"))
@@ -752,13 +801,21 @@ func animeDetailHandler(c *gin.Context) {
 	animeItem := result[0]
 	animeTitle := fmt.Sprintf("%v", animeItem["title"])
 
-	// Ambil metadata external (AniList / Backup Jikan)
+	// 1. Fetch metadata external (AniList/Jikan dalam B.Inggris) + Translate B.Indonesia
 	extMeta := getOrFetchAnimeMetadata(animeTitle)
 
-	// Fallback nilai ke database lokal Supabase jika external API kosong
-	synopsisVal := fmt.Sprintf("%v", animeItem["synopsis"])
+	// 2. Ambil data cadangan dari Supabase lokal
+	dbSynopsis := fmt.Sprintf("%v", animeItem["synopsis"])
+	if dbSynopsis == "<nil>" || dbSynopsis == "" {
+		dbSynopsis = ""
+	}
+
+	// 3. Hierarki Fallback: External (Sudah Ter-translate) -> Supabase -> Default Text
+	synopsisVal := "Sinopsis belum tersedia."
 	if extMeta != nil && extMeta.Synopsis != "" {
 		synopsisVal = extMeta.Synopsis
+	} else if dbSynopsis != "" {
+		synopsisVal = dbSynopsis
 	}
 
 	japaneseVal := fmt.Sprintf("%v", animeItem["japanese"])
@@ -941,8 +998,12 @@ func rankingHandler(c *gin.Context) {
 		endIdx = startIdx + 12
 	}
 
-	if startIdx > len(allMedia) { startIdx = len(allMedia) }
-	if endIdx > len(allMedia) { endIdx = len(allMedia) }
+	if startIdx > len(allMedia) {
+		startIdx = len(allMedia)
+	}
+	if endIdx > len(allMedia) {
+		endIdx = len(allMedia)
+	}
 
 	pageMedia := allMedia[startIdx:endIdx]
 	totalItems := int(math.Max(float64(len(allMedia)-3), 1))
