@@ -283,7 +283,7 @@ async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
             status: animeObj.status || "Ongoing",
             skor: animeObj.skor || animeObj.score || "-",
             genres: animeObj.genres || [],
-            sinopsis: animeObj.sinopsis || "Sinopsis belum tersedia.",
+            synopsis: animeObj.synopsis || "Sinopsis belum tersedia.",
             addedAt: new Date().toISOString()
         };
 
@@ -373,7 +373,7 @@ async function loadBookmarkTab(page = 1) {
         url: b.url || "",
         status: b.status || "Ongoing",
         genres: b.genres || [],
-        sinopsis: b.sinopsis || "Sinopsis belum tersedia.",
+        synopsis: b.synopsis || "Sinopsis belum tersedia.",
         thumbnail: b.thumbnail || "https://placehold.co/400x600?text=No+Image",
         japanese: b.japanese || "-",
         skor: b.skor || b.score || "-",
@@ -710,7 +710,7 @@ async function openDetailFromAniListTitle(title) {
                 url: matchedItem.url ? matchedItem.url.trim() : "",
                 status: matchedItem.status || "Ongoing",
                 genres: matchedItem.genre ? matchedItem.genre.split(',').map(g => g.trim()) : [],
-                sinopsis: matchedItem.sinopsis || "Sinopsis belum tersedia.",
+                synopsis: matchedItem.synopsis || "Sinopsis belum tersedia.",
                 thumbnail: matchedItem.img_url || matchedItem.image_url || "https://placehold.co/400x600?text=No+Image",
                 japanese: matchedItem.japanese || "-",
                 skor: cachedScore,
@@ -812,7 +812,7 @@ async function loadAnimeDatabase(page = 1) {
             url: item.url ? item.url.trim() : "",
             status: item.status || "Ongoing",
             genres: item.genre ? item.genre.split(',').map(g => g.trim()) : [],
-            sinopsis: item.sinopsis || "Sinopsis belum tersedia.",
+            synopsis: item.synopsis || "Sinopsis belum tersedia.",
             thumbnail: item.img_url || item.image_url || "https://placehold.co/400x600?text=No+Image",
             japanese: item.japanese || "-",
             skor: item.score || "-",
@@ -993,7 +993,7 @@ function liveSearchAnime() {
                     url: anime.url ? anime.url.trim() : "",
                     status: anime.status || "Ongoing",
                     genres: anime.genre ? anime.genre.split(',').map(g => g.trim()) : [],
-                    sinopsis: anime.sinopsis || "Sinopsis belum tersedia.",
+                    synopsis: anime.sinopsis || "Sinopsis belum tersedia.",
                     thumbnail: img,
                     japanese: anime.japanese || "-",
                     skor: anime.score || "-",
@@ -1203,7 +1203,7 @@ function viewDetails(id) {
     document.getElementById('detTitle').innerText = anime.title;
     document.getElementById('detThumbnail').src = anime.thumbnail;
     document.getElementById('detStatusBadge').innerText = anime.status;
-    document.getElementById('sinopsisText').innerText = anime.sinopsis;
+    document.getElementById('synopsisText').innerText = anime.sinopsis;
 
     document.getElementById('detJapanese').innerText = anime.japanese;
     document.getElementById('detSkor').innerText = cachedScore;
