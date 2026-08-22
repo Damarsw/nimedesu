@@ -1191,38 +1191,7 @@ function searchAnime() {
     scrollToSearchResults();
 }
 
-function viewDetails(id) {
-    const anime = currentData.find(a => a.id == id);
-    if(!anime) return;
-    activeAnime = anime;
-
-    switchView('detail');
-
-    const cachedScore = getCachedScore(anime.title, anime.skor);
-
-    document.getElementById('detTitle').innerText = anime.title;
-    document.getElementById('detThumbnail').src = anime.thumbnail;
-    document.getElementById('detStatusBadge').innerText = anime.status;
-    document.getElementById('synopsisText').innerText = anime.synopsis;
-
-    document.getElementById('detJapanese').innerText = anime.japanese;
-    document.getElementById('detSkor').innerText = cachedScore;
-    document.getElementById('detStatus').innerText = anime.statusText;
-    document.getElementById('detTotalEpisode').innerText = anime.totalEpisode;
-    document.getElementById('detDurasi').innerText = anime.durasi;
-    document.getElementById('detTanggalRilis').innerText = anime.tanggalRilis;
-    document.getElementById('detStudio').innerText = anime.studio;
-
-    const genreLinksContainer = document.getElementById('detGenreLinks');
-    if (anime.genres && anime.genres.length > 0) {
-        genreLinksContainer.innerHTML = anime.genres.map(genre => `
-            <button onclick="filterGenre('${genre}')" class="bg-zinc-100 text-black dark:bg-neon-darkBg dark:text-neon-yellow border border-neon-yellow/40 hover:border-neon-yellow text-[10px] font-semibold px-2.5 py-0.5 rounded-full transition shadow-xs">${genre}</button>
-        `).join('');
-    } else {
-        genreLinksContainer.innerHTML = '<span class="text-xs text-zinc-500">-</span>';
-    }
-}
-
+async function
 function openStreamingTab() {
     if (!activeAnime || !activeAnime.id) return;
     window.open(`stream.html?anime_id=${encodeURIComponent(activeAnime.id)}&eps=0`, '_blank');
