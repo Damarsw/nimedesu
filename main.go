@@ -852,7 +852,7 @@ func animeDetailHandler(c *gin.Context) {
 		"img_url":        imgVal,
 		"image_url":      imgVal,
 		"genre":          animeItem["genre"],
-		"sinopsis":       synopsisVal,
+		"sinopsis":       animeItem["sinopsis"],
 		"japanese":       japaneseVal,
 		"score":          scoreVal,
 		"status":         statusVal,
