@@ -993,7 +993,7 @@ function liveSearchAnime() {
                     url: anime.url ? anime.url.trim() : "",
                     status: anime.status || "Ongoing",
                     genres: anime.genre ? anime.genre.split(',').map(g => g.trim()) : [],
-                    synopsis: anime.sinopsis || "Sinopsis belum tersedia.",
+                    synopsis: anime.synopsis || "Sinopsis belum tersedia.",
                     thumbnail: img,
                     japanese: anime.japanese || "-",
                     skor: anime.score || "-",
@@ -1203,7 +1203,7 @@ function viewDetails(id) {
     document.getElementById('detTitle').innerText = anime.title;
     document.getElementById('detThumbnail').src = anime.thumbnail;
     document.getElementById('detStatusBadge').innerText = anime.status;
-    document.getElementById('synopsisText').innerText = anime.sinopsis;
+    document.getElementById('synopsisText').innerText = anime.synopsis;
 
     document.getElementById('detJapanese').innerText = anime.japanese;
     document.getElementById('detSkor').innerText = cachedScore;
