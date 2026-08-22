@@ -711,6 +711,7 @@ func animeListHandler(c *gin.Context) {
 }
 
 // OPTIMIZED DETAIL HANDLER (AniList -> Jikan Fallback -> Supabase Backup)
+// OPTIMIZED DETAIL HANDLER (AniList -> Jikan Fallback -> Supabase Backup)
 func animeDetailHandler(c *gin.Context) {
 	animeIDParam := strings.TrimSpace(c.Query("id"))
 	rawURL := strings.TrimSpace(c.Query("url"))
@@ -851,7 +852,7 @@ func animeDetailHandler(c *gin.Context) {
 		"img_url":        imgVal,
 		"image_url":      imgVal,
 		"genre":          animeItem["genre"],
-		"sinopsis":       animeItem["sinopsis"],
+		"sinopsis":       synopsisVal,
 		"japanese":       japaneseVal,
 		"score":          scoreVal,
 		"status":         statusVal,
