@@ -1,32 +1,29 @@
-name: Auto Cleanup and Move Root Files
+name: Generate go.sum
 
 on:
   workflow_dispatch:
 
 jobs:
-  cleanup:
+  gosum:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Move and Organize Files
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Tidy Go Modules
         run: |
-          # 1. Pindahkan file Go modul ke core/
-          [ -f go.mod ] && mv go.mod core/
-          [ -f go.sum ] && mv go.sum core/
+          cd core
+          go mod tidy
 
-          # 2. Pindahkan file SEO/Verifikasi ke web/
-          [ -f googleb96f21e07423fffb8.html ] && mv googleb96f21e07423fffb8.html web/
-          [ -f sitemap.xml ] && mv sitemap.xml web/
-
-          # 3. Hapus file duplikat & file sisa/sampah di root
-          rm -f Dockerfile main.go ongoing.py package.json package-lock.json seo.go
-
-      - name: Commit and Push Changes
+      - name: Commit and Push go.sum
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "refactor: move root assets and clean up legacy files" || exit 0
+          git add core/go.mod core/go.sum
+          git commit -m "chore: generate go.sum" || exit 0
           git push
