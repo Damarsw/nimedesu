@@ -115,10 +115,33 @@ var (
 	}
 	lastAPICallTime time.Time
 	apiCallMutex    sync.Mutex
-	minCallInterval = 750 * time.Millisecond
+	// Dinaikkan dari 750ms -> 2s karena AniList sering menurunkan rate limit
+	// publiknya mendadak (kadang jadi jauh di bawah batas normal), jadi kita
+	// main aman biar gak keburu kena 429 terus-terusan.
+	minCallInterval = 2000 * time.Millisecond
+
+	lastJikanCallTime time.Time
+	jikanCallMutex    sync.Mutex
+	// Jikan dipakai untuk 3 kategori (bypopularity/upcoming/favorite) yang bisa
+	// dipanggil hampir bersamaan saat AniList gagal. Mutex + interval ini
+	// berlaku GLOBAL lintas kategori supaya requestnya gak numpuk dan malah
+	// ikut kena limit Jikan sendiri.
+	minJikanCallInterval = 1200 * time.Millisecond
 
 	CACHE_TTL_ANIME = int64(86400)
 )
+
+// throttleJikanCall memastikan jarak antar-request ke Jikan (lintas kategori
+// dan lintas halaman) tidak lebih rapat dari minJikanCallInterval.
+func throttleJikanCall() {
+	jikanCallMutex.Lock()
+	elapsed := time.Since(lastJikanCallTime)
+	if elapsed < minJikanCallInterval {
+		time.Sleep(minJikanCallInterval - elapsed)
+	}
+	lastJikanCallTime = time.Now()
+	jikanCallMutex.Unlock()
+}
 
 func getEnvOrDefault(key, defaultValue string) string {
 	val := os.Getenv(key)
@@ -515,10 +538,21 @@ func fetchAniListBatch(category string) ([]RankMedia, error) {
 	if err != nil {
 		return nil, fmt.Errorf("anilist request error: %w", err)
 	}
+
+	// Kalau kena rate limit, kasih 1x kesempatan retry setelah jeda singkat
+	// (AniList kadang cuma throttle sesaat, bukan blokir total).
+	if resp.StatusCode == 429 {
+		resp.Body.Close()
+		time.Sleep(2500 * time.Millisecond)
+		resp, err = client.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("anilist retry request error: %w", err)
+		}
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 429 {
-		return nil, fmt.Errorf("anilist rate limited (429)")
+		return nil, fmt.Errorf("anilist rate limited (429) setelah retry")
 	}
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("anilist request failed: status %d", resp.StatusCode)
@@ -552,17 +586,35 @@ func fetchJikanBatch(category string) ([]RankMedia, error) {
 
 	client := &http.Client{Timeout: 6 * time.Second}
 	var combined []RankMedia
+	var lastErr error
 
 	for page := 1; page <= 4; page++ {
+		throttleJikanCall() // jaga jarak GLOBAL antar-request Jikan, lintas kategori & halaman
+
 		jikanURL := fmt.Sprintf("https://api.jikan.moe/v4/top/anime?filter=%s&page=%d&limit=25", filter, page)
 		req, _ := http.NewRequest("GET", jikanURL, nil)
 
 		resp, err := client.Do(req)
 		if err != nil {
+			lastErr = fmt.Errorf("jikan request error (page %d): %w", page, err)
 			break
 		}
 
+		// Kena rate limit di halaman pertama? Kasih 1x retry setelah jeda,
+		// supaya kategori ini gak langsung nyerah tanpa data sama sekali.
+		if resp.StatusCode == 429 && page == 1 {
+			resp.Body.Close()
+			time.Sleep(1500 * time.Millisecond)
+			throttleJikanCall()
+			resp, err = client.Do(req)
+			if err != nil {
+				lastErr = fmt.Errorf("jikan retry request error (page %d): %w", page, err)
+				break
+			}
+		}
+
 		if resp.StatusCode != 200 {
+			lastErr = fmt.Errorf("jikan request failed (page %d): status %d", page, resp.StatusCode)
 			resp.Body.Close()
 			break
 		}
@@ -587,7 +639,12 @@ func fetchJikanBatch(category string) ([]RankMedia, error) {
 
 		decodeErr := json.NewDecoder(resp.Body).Decode(&res)
 		resp.Body.Close()
-		if decodeErr != nil || len(res.Data) == 0 {
+		if decodeErr != nil {
+			lastErr = fmt.Errorf("jikan decode error (page %d): %w", page, decodeErr)
+			break
+		}
+		if len(res.Data) == 0 {
+			lastErr = fmt.Errorf("jikan mengembalikan data kosong (page %d)", page)
 			break
 		}
 
@@ -615,11 +672,13 @@ func fetchJikanBatch(category string) ([]RankMedia, error) {
 		if !res.Pagination.HasNextPage {
 			break
 		}
-		time.Sleep(400 * time.Millisecond) // sopan ke rate limit Jikan (~3 req/detik)
 	}
 
 	if len(combined) == 0 {
-		return nil, fmt.Errorf("jikan mengembalikan data kosong")
+		if lastErr == nil {
+			lastErr = fmt.Errorf("jikan mengembalikan data kosong")
+		}
+		return nil, lastErr
 	}
 	return combined, nil
 }
