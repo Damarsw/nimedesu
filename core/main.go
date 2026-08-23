@@ -11,8 +11,8 @@ import (
 )
 
 func main() {
-	if env.SupabaseURL == "" || env.SupabaseKey == "" {
-		log.Fatal("FATAL: SUPABASE_URL & SUPABASE_KEY must be set!")
+	if env.Core == "" || env.Token == "" {
+	    log.Fatal("FATAL: CORE & TOKEN must be set!")
 	}
 
 	gin.SetMode(gin.ReleaseMode)
