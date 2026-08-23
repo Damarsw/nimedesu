@@ -483,7 +483,6 @@ func getOrFetchAnimeMetadata(title string) *ExternalAnimeMetadata {
 	return nil
 }
 
-// PERBAIKAN: Query GraphQL disusun dengan valid tanpa pencampuran enum ilegal
 func fetchAniListBatch(category string) ([]RankMedia, error) {
 	apiCallMutex.Lock()
 	elapsed := time.Since(lastAPICallTime)
@@ -514,7 +513,7 @@ func fetchAniListBatch(category string) ([]RankMedia, error) {
 				}
 			}
 		}`
-	} else { // bypopularity / default
+	} else {
 		graphqlQuery = `{
 			Page(page: 1, perPage: 100) {
 				media(type: ANIME, sort: POPULARITY_DESC) {
@@ -569,7 +568,6 @@ func fetchAniListBatch(category string) ([]RankMedia, error) {
 	return result.Data.Page.Media, nil
 }
 
-// PERBAIKAN: Mengurangi limit dari 4 halaman ke 2 halaman (50 anime) agar Jikan tidak timeout
 func fetchJikanBatch(category string) ([]RankMedia, error) {
 	filter := category
 	if filter != "upcoming" && filter != "favorite" {
@@ -702,9 +700,10 @@ func saveRankingCacheToSupabase(category string, data []RankMedia) {
 	}()
 }
 
+// PERBAIKAN: Menggunakan fmt.Errorf (bukan fmt.Sprintf)
 func fetchRankingCacheFromSupabase(category string) ([]RankMedia, error) {
 	if supabaseURL == "" || supabaseKey == "" {
-		return nil, fmt.Sprintf("supabase belum dikonfigurasi")
+		return nil, fmt.Errorf("supabase belum dikonfigurasi")
 	}
 
 	query := fmt.Sprintf("ranking_cache?category=eq.%s&select=data&limit=1", url.QueryEscape(category))
@@ -890,7 +889,6 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Cache RAM 24 jam berhasil dibersihkan!"})
 	})
 
-	// TAMBAHAN: Endpoint diagnostik publik untuk cek koneksi AniList & Jikan langsung dari browser
 	r.GET("/api/test-apis", testAPIsHandler)
 
 	log.Printf("Server running on port %s", port)
