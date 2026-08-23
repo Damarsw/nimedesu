@@ -1002,7 +1002,8 @@ func animeListHandler(c *gin.Context) {
 	offset := (page - 1) * perPage
 	limit := perPage
 
-	query := fmt.Sprintf("select=id,title,url,status,genre,img_url&order=id.asc&offset=%d&limit=%d", offset, limit)
+	// FIXED: Menambahkan kolom 'score' agar skor tidak terbawa N/A di beranda
+	query := fmt.Sprintf("select=id,title,url,status,genre,img_url,score&order=id.asc&offset=%d&limit=%d", offset, limit)
 	if searchQuery != "" {
 		query += fmt.Sprintf("&title=ilike.*%s*", url.QueryEscape(searchQuery))
 	}
@@ -1104,6 +1105,7 @@ func animeDetailHandler(c *gin.Context) {
 
 	extMeta := getOrFetchAnimeMetadata(animeTitle)
 
+	// FIXED: Sanitasi string "<nil>" dari Supabase agar tidak bocor ke frontend
 	dbSynopsis := fmt.Sprintf("%v", animeItem["synopsis"])
 	if dbSynopsis == "<nil>" || dbSynopsis == "" {
 		dbSynopsis = ""
@@ -1117,36 +1119,43 @@ func animeDetailHandler(c *gin.Context) {
 	}
 
 	japaneseVal := fmt.Sprintf("%v", animeItem["japanese"])
+	if japaneseVal == "<nil>" { japaneseVal = "-" }
 	if extMeta != nil && extMeta.Japanese != "" {
 		japaneseVal = extMeta.Japanese
 	}
 
 	scoreVal := fmt.Sprintf("%v", animeItem["score"])
+	if scoreVal == "<nil>" { scoreVal = "-" }
 	if extMeta != nil && extMeta.Score != "" {
 		scoreVal = extMeta.Score
 	}
 
 	statusVal := fmt.Sprintf("%v", animeItem["status"])
+	if statusVal == "<nil>" { statusVal = "-" }
 	if extMeta != nil && extMeta.Status != "" {
 		statusVal = extMeta.Status
 	}
 
 	totalEpVal := fmt.Sprintf("%v", animeItem["total_episodes"])
+	if totalEpVal == "<nil>" { totalEpVal = "-" }
 	if extMeta != nil && extMeta.TotalEp != "" {
 		totalEpVal = extMeta.TotalEp
 	}
 
 	durationVal := fmt.Sprintf("%v", animeItem["duration"])
+	if durationVal == "<nil>" { durationVal = "-" }
 	if extMeta != nil && extMeta.Duration != "" {
 		durationVal = extMeta.Duration
 	}
 
 	releaseDateVal := fmt.Sprintf("%v", animeItem["release_date"])
+	if releaseDateVal == "<nil>" { releaseDateVal = "-" }
 	if extMeta != nil && extMeta.ReleaseDate != "" {
 		releaseDateVal = extMeta.ReleaseDate
 	}
 
 	studioVal := fmt.Sprintf("%v", animeItem["studio"])
+	if studioVal == "<nil>" { studioVal = "-" }
 	if extMeta != nil && extMeta.Studio != "" {
 		studioVal = extMeta.Studio
 	}
