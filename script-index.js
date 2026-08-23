@@ -108,8 +108,9 @@ function getNextSundayMidnightTimestamp() {
     return result.getTime();
 }
 
+// FIXED: Penanganan skor valid agar tidak default mengembalikan 'N/A'
 function getCachedScore(title, defaultScore) {
-    if (defaultScore && defaultScore !== '-' && defaultScore !== 'N/A') {
+    if (defaultScore && defaultScore !== '-' && defaultScore !== 'N/A' && defaultScore !== '<nil>') {
         return defaultScore;
     }
     if (!title) return 'N/A';
@@ -129,7 +130,7 @@ function getCachedScore(title, defaultScore) {
 }
 
 async function fetchAniListScoreForCard(animeTitle, elementId, defaultScore) {
-    if (defaultScore && defaultScore !== '-' && defaultScore !== 'N/A') {
+    if (defaultScore && defaultScore !== '-' && defaultScore !== 'N/A' && defaultScore !== '<nil>') {
         const targetEl = document.getElementById(elementId);
         if (targetEl) targetEl.innerHTML = `★ ${defaultScore}`;
         return;
@@ -1187,7 +1188,7 @@ function changeTab(type, element) {
             icon.classList.remove('text-neon-yellow', 'dark:text-neon-yellow');
             icon.classList.add('text-black');
         }
-}
+    }
     activeSearchQuery = "";
     activeGenreFilter = "";
 
@@ -1297,19 +1298,22 @@ async function viewDetails(id) {
         activeAnime = anime;
         const cachedScore = getCachedScore(anime.title, anime.score);
 
+        const sanitize = (val) => (!val || val === '<nil>') ? '-' : val;
+
         document.getElementById('detTitle').innerText = anime.title || '-';
         document.getElementById('detThumbnail').src = anime.img_url || anime.image_url || 'https://placehold.co/400x600?text=No+Image';
-        document.getElementById('detStatusBadge').innerText = anime.status || 'Ongoing';
+        document.getElementById('detStatusBadge').innerText = sanitize(anime.status);
         
+        // FIXED: Sanitasi sinopsis dari nilai <nil>
         document.getElementById('synopsisText').innerText = (anime.synopsis && anime.synopsis !== "<nil>") ? anime.synopsis : "Sinopsis belum tersedia.";
 
-        document.getElementById('detJapanese').innerText = anime.japanese || '-';
+        document.getElementById('detJapanese').innerText = sanitize(anime.japanese);
         document.getElementById('detSkor').innerText = cachedScore;
-        document.getElementById('detStatus').innerText = anime.status || '-';
-        document.getElementById('detTotalEpisode').innerText = anime.total_episodes || '-';
-        document.getElementById('detDurasi').innerText = anime.duration || '-';
-        document.getElementById('detTanggalRilis').innerText = anime.release_date || '-';
-        document.getElementById('detStudio').innerText = anime.studio || '-';
+        document.getElementById('detStatus').innerText = sanitize(anime.status);
+        document.getElementById('detTotalEpisode').innerText = sanitize(anime.total_episodes);
+        document.getElementById('detDurasi').innerText = sanitize(anime.duration);
+        document.getElementById('detTanggalRilis').innerText = sanitize(anime.release_date);
+        document.getElementById('detStudio').innerText = sanitize(anime.studio);
 
         const genreLinksContainer = document.getElementById('detGenreLinks');
         const genresList = anime.genre ? anime.genre.split(',').map(g => g.trim()) : [];
@@ -1543,7 +1547,6 @@ async function fetchRankingFromBackend(type, page, loadingEl, podiumEl, gridEl, 
             podiumEl.classList.add('hidden');
         }
 
-        // Kalau listData kosong padahal ada data di top3Data (kasus hanya dapat beberapa item dari Jikan)
         if (listData.length === 0 && top3Data.length > 3) {
             listData = top3Data.slice(3);
         }
@@ -1553,7 +1556,6 @@ async function fetchRankingFromBackend(type, page, loadingEl, podiumEl, gridEl, 
         if (listData.length > 0) {
             gridEl.innerHTML = listData.map((anime, idx) => renderRankListItem(anime, startRankOffset + idx)).join('');
         } else if (top3Data.length < 3) {
-            // Jika data kurang dari 3, render semua di grid list
             gridEl.innerHTML = top3Data.map((anime, idx) => renderRankListItem(anime, idx + 1)).join('');
         } else {
             gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Sisa daftar anime belum tersedia.</p>`;
@@ -1640,7 +1642,6 @@ function renderRankListItem(anime, rankNumber) {
     `;
 }
 
-// GANTI FUNGSI renderInfoPagination DI script-index.js DENGAN INI:
 function renderInfoPagination(type, page, totalPageCount, paginationEl) {
     if (!paginationEl || totalPageCount <= 1) {
         if (paginationEl) paginationEl.innerHTML = '';
