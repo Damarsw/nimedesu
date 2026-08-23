@@ -6,11 +6,11 @@ import (
 )
 
 var (
-	SupabaseURL          = os.Getenv("SUPABASE_URL")
-	SupabaseKey          = os.Getenv("SUPABASE_KEY")
-	SecretServerKey      = os.Getenv("SECRET_SERVER_KEY")
+	Core                 = os.Getenv("CORE")
+	Token                = os.Getenv("TOKEN")
+	Hash                 = os.Getenv("HASH")
 	Port                 = getEnvOrDefault("PORT", "10000")
-	TurnstileSecret      = os.Getenv("TURNSTILE_SECRET_KEY")
+	Auth                 = os.Getenv("AUTH")
 	MinCallInterval      = 2000 * time.Millisecond
 	MinJikanCallInterval = 1200 * time.Millisecond
 	CacheTTLAnime        = int64(86400)
