@@ -1,5 +1,38 @@
 document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
+// HELPER E2EE
+function timtit() {
+    return "timtit";
+}
+
+function hashAnilistID(rawId) {
+    if (!rawId) return "";
+    return CryptoJS.SHA256(String(rawId).toLowerCase().trim()).toString(CryptoJS.enc.Hex);
+}
+
+function encryptCookiesData(cookiesObj) {
+    try {
+        const jsonStr = JSON.stringify(cookiesObj);
+        return CryptoJS.AES.encrypt(jsonStr, timtit()).toString();
+    } catch (e) {
+        return "";
+    }
+}
+
+function decryptCookiesData(ciphertext) {
+    if (!ciphertext) return { history: [], bookmarks: [] };
+    if (typeof ciphertext === 'object') return ciphertext;
+
+    try {
+        const bytes = CryptoJS.AES.decrypt(ciphertext, timtit());
+        const decryptedStr = bytes.toString(CryptoJS.enc.Utf8);
+        if (!decryptedStr) return { history: [], bookmarks: [] };
+        return JSON.parse(decryptedStr);
+    } catch (e) {
+        return { history: [], bookmarks: [] };
+    }
+}
+
 const RENDER_API_URL = "/api-backend";
 let activeEpisodes = [];
 let activeEpisodeIndex = 0;
@@ -38,9 +71,16 @@ function getUserIdentifier(user) {
 async function syncUserWithSupabase(user) {
     if (!user) return null;
     const identifier = getUserIdentifier(user);
+    const hashedID = hashAnilistID(identifier);
 
     try {
         const sec = generateSecurityToken();
+        const initialPayload = encryptCookiesData({
+            history: [],
+            bookmarks: [],
+            user_info: { id: user.id, name: user.name, avatar: user.avatar?.medium || "" }
+        });
+
         const res = await fetch(`${RENDER_API_URL}/user-sync`, {
             method: "POST",
             headers: {
@@ -50,18 +90,16 @@ async function syncUserWithSupabase(user) {
                 "X-Turnstile-Token": getTurnstileToken()
             },
             body: JSON.stringify({
-                anilist_id: identifier,
-                user_info: {
-                    id: user.id,
-                    name: user.name,
-                    avatar: user.avatar?.medium || "",
-                    login_at: new Date().toISOString()
-                }
+                anilist_id: hashedID,
+                cookies_encrypted: initialPayload
             })
         });
 
         const result = await res.json();
-        return result.cookies || null;
+        if (result && result.cookies_encrypted) {
+            return decryptCookiesData(result.cookies_encrypted);
+        }
+        return null;
     } catch (err) {
         console.error("Gagal sync user di stream:", err);
         return null;
@@ -70,23 +108,18 @@ async function syncUserWithSupabase(user) {
 
 async function getSupabaseUserData(user) {
     if (!user) return { history: [], bookmarks: [] };
-    const identifier = getUserIdentifier(user);
+    const hashedID = hashAnilistID(getUserIdentifier(user));
 
     try {
         const sec = generateSecurityToken();
-        const res = await fetch(`${RENDER_API_URL}/user-data?anilist_id=${encodeURIComponent(identifier)}`, {
+        const res = await fetch(`${RENDER_API_URL}/user-data?anilist_id=${encodeURIComponent(hashedID)}`, {
             headers: {
                 "X-Client-Token": sec.token,
                 "X-Client-Time": sec.time
             }
         });
         const result = await res.json();
-        const cookies = result.cookies || {};
-        return {
-            history: Array.isArray(cookies.history) ? cookies.history : [],
-            bookmarks: Array.isArray(cookies.bookmarks) ? cookies.bookmarks : [],
-            user_info: cookies.user_info || {}
-        };
+        return decryptCookiesData(result.cookies_encrypted);
     } catch (err) {
         console.error("Gagal membaca user data:", err);
         return { history: [], bookmarks: [] };
@@ -95,7 +128,8 @@ async function getSupabaseUserData(user) {
 
 async function saveSupabaseUserData(user, payload) {
     if (!user) return false;
-    const identifier = getUserIdentifier(user);
+    const hashedID = hashAnilistID(getUserIdentifier(user));
+    const encryptedPayload = encryptCookiesData(payload);
 
     try {
         const sec = generateSecurityToken();
@@ -108,8 +142,8 @@ async function saveSupabaseUserData(user, payload) {
                 "X-Turnstile-Token": getTurnstileToken()
             },
             body: JSON.stringify({
-                anilist_id: identifier,
-                cookies: payload
+                anilist_id: hashedID,
+                cookies_encrypted: encryptedPayload
             })
         });
         const result = await res.json();
@@ -404,7 +438,6 @@ function scrollSlider(direction) {
     slider.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
 }
 
-// OPTIMIZED: Paralleled Fetching menggunakan Promise.all()
 async function renderMixedGenreRecommendations() {
     const recSlider = document.getElementById('recommendationSlider');
     if (!recSlider) return;
@@ -607,7 +640,6 @@ function formatEmbedUrl(url) {
     return finalUrl;
 }
 
-// OPTIMIZED: Switch Video Frame tanpa memicu Thread Locking
 function selectServer(element, resolution, serverNum, videoUrl) {
     document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
     document.querySelectorAll('.server-btn').forEach(btn => {
