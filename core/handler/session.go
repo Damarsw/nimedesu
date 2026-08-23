@@ -18,23 +18,12 @@ func UserSyncHandler(c *gin.Context) {
 		return
 	}
 
-	resp, err := provider.DataRequest("GET", fmt.Sprintf("login?anilist_id=eq.%s", url.QueryEscape(body.AnilistID)), nil, nil)
+	resp, err := provider.SupabaseRequest("GET", fmt.Sprintf("login?anilist_id=eq.%s", url.QueryEscape(body.AnilistID)), nil, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	defer resp.Body.Close()
 
-	var users []map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&users)
-
-	if len(users) > 0 {
-		c.JSON(http.StatusOK, gin.H{
-			"status":            "success",
-			"cookies_encrypted": users[0]["cookies_encrypted"],
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"status": "success", "cookies_encrypted": ""})
+	c.JSON(http.StatusOK, gin.H{"status": "success"})
 }
