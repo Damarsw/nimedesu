@@ -1640,6 +1640,7 @@ function renderRankListItem(anime, rankNumber) {
     `;
 }
 
+// GANTI FUNGSI renderInfoPagination DI script-index.js DENGAN INI:
 function renderInfoPagination(type, page, totalPageCount, paginationEl) {
     if (!paginationEl || totalPageCount <= 1) {
         if (paginationEl) paginationEl.innerHTML = '';
@@ -1667,7 +1668,7 @@ function renderInfoPagination(type, page, totalPageCount, paginationEl) {
     
     for (let i = sPage; i <= ePage; i++) {
         let actClass = i === page ? 'bg-neon-yellow text-black font-bold border-neon-yellow shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border-neon-yellow dark:border-neon-darkBorder shadow-xs';
-        pagHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${actClass} transition" onclick="searchInformationRanking('${escapedQuery}', '${type}', ${i})">${i}</button>`;
+        pagHTML += `<button class="w-9 h-9 rounded-lg text-xs font-semibold border ${actClass} transition" onclick="openInformation('${type}', ${i})">${i}</button>`;
     }
     
     pagHTML += `<button class="${page < totalPageCount ? baseBtn : disBtn}" ${page >= totalPageCount ? 'disabled' : ''} onclick="openInformation('${type}', ${page + 1})">&rsaquo;</button>`;
