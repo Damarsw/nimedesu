@@ -175,25 +175,41 @@ func stripHTMLTags(s string) string {
 }
 
 func translateToID(text string) string {
-	if strings.TrimSpace(text) == "" {
+	cleanText := strings.TrimSpace(text)
+	if cleanText == "" {
 		return ""
 	}
 
-	if len(text) > 1500 {
-		text = text[:1500] + "..."
+	// Potong teks jika terlalu panjang agar Google Translate API tidak mentok/error
+	if len(cleanText) > 1200 {
+		cleanText = cleanText[:1200]
 	}
 
-	translateURL := fmt.Sprintf("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=id&dt=t&q=%s", url.QueryEscape(text))
+	// Endpoint Google Translate GTX yang lebih stabil
+	translateURL := fmt.Sprintf("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=id&dt=t&q=%s", url.QueryEscape(cleanText))
 
-	client := &http.Client{Timeout: 4 * time.Second}
-	resp, err := client.Get(translateURL)
+	req, err := http.NewRequest("GET", translateURL, nil)
+	if err != nil {
+		return text
+	}
+
+	// Tambahkan User-Agent Browser biasa agar tidak diblokir Google
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil || resp.StatusCode != 200 {
 		return text
 	}
 	defer resp.Body.Close()
 
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return text
+	}
+
 	var result []interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil || len(result) == 0 {
+	if err := json.Unmarshal(bodyBytes, &result); err != nil || len(result) == 0 {
 		return text
 	}
 
@@ -212,7 +228,7 @@ func translateToID(text string) string {
 		}
 	}
 
-	translated := translatedBuilder.String()
+	translated := strings.TrimSpace(translatedBuilder.String())
 	if translated == "" {
 		return text
 	}
