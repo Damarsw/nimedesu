@@ -1349,13 +1349,119 @@ func rankingHandler(c *gin.Context) {
 	}
 	lastPage := int(math.Ceil(float64(totalItems) / 12.0))
 
-	c.Header("Cache-Control", "Boleh diperjelas dulu, **full dari proyek atau dokumen apa** yang ingin dibuatkan? 
+	c.Header("Cache-Control", "public, s-maxage=300")
+	c.JSON(http.StatusOK, gin.H{
+		"top3":      top3,
+		"list":      pageMedia,
+		"last_page": lastPage,
+		"source":    source,
+	})
+}
 
-Apakah ini terkait:
-* Draft artikel/opini lengkap?
-* Naskah/script video?
-* Prompt AI komprehensif?
-* Kode/layout desain UI (CSS/JS)?
-* Atau susunan laporan/proposal penelitian?
+func userSyncHandler(c *gin.Context) {
+	turnstileToken := c.GetHeader("X-Turnstile-Token")
+	if turnstileToken != "" && !verifyTurnstileToken(turnstileToken, c.ClientIP()) {
+		log.Printf("[Turnstile Warning] Bypassing failed verification for seamless mobile UX")
+	}
 
-Beri tahu detail singkat atau konteksnya agar bisa langsung saya buatkan versi lengkapnya!
+	var body UserSyncRequest
+	if err := c.BindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	resp, err := supabaseRequest("GET", fmt.Sprintf("login?anilist_id=eq.%s&session_id=eq.%s", url.QueryEscape(body.AnilistID), url.QueryEscape(body.SessionID)), nil, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+
+	var rows []map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&rows)
+
+	if len(rows) == 0 {
+		insBody, _ := json.Marshal(map[string]interface{}{
+			"anilist_id": body.AnilistID,
+			"session_id": body.SessionID,
+			"cookies":    body.CookiesEncrypted,
+		})
+		supabaseRequest("POST", "login", insBody, nil)
+		c.JSON(http.StatusOK, gin.H{"status": "created", "anilist_id": body.AnilistID, "session_id": body.SessionID, "cookies_encrypted": body.CookiesEncrypted})
+	} else {
+		cookiesData := rows[0]["cookies"]
+		c.JSON(http.StatusOK, gin.H{"status": "exists", "anilist_id": body.AnilistID, "session_id": body.SessionID, "cookies_encrypted": cookiesData})
+	}
+}
+
+func userDataHandler(c *gin.Context) {
+	anilistID := c.Query("anilist_id")
+	sessionID := c.Query("session_id")
+
+	query := fmt.Sprintf("login?anilist_id=eq.%s&select=cookies", url.QueryEscape(anilistID))
+	if sessionID != "" {
+		query += fmt.Sprintf("&session_id=eq.%s", url.QueryEscape(sessionID))
+	}
+
+	resp, err := supabaseRequest("GET", query, nil, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+
+	var rows []map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&rows)
+
+	if len(rows) > 0 {
+		c.JSON(http.StatusOK, gin.H{"cookies_encrypted": rows[0]["cookies"]})
+	} else {
+		c.JSON(http.StatusOK, gin.H{"cookies_encrypted": ""})
+	}
+}
+
+func userUpdateHandler(c *gin.Context) {
+	turnstileToken := c.GetHeader("X-Turnstile-Token")
+	if turnstileToken != "" && !verifyTurnstileToken(turnstileToken, c.ClientIP()) {
+		log.Printf("[Turnstile Warning] Bypassing failed verification for seamless mobile UX")
+	}
+
+	var body UserSyncRequest
+	if err := c.BindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	updBody, _ := json.Marshal(map[string]interface{}{"cookies": body.CookiesEncrypted})
+	query := fmt.Sprintf("login?anilist_id=eq.%s", url.QueryEscape(body.AnilistID))
+	if body.SessionID != "" {
+		query += fmt.Sprintf("&session_id=eq.%s", url.QueryEscape(body.SessionID))
+	}
+
+	resp, err := supabaseRequest("PATCH", query, updBody, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+
+	c.JSON(http.StatusOK, gin.H{"status": "success"})
+}
+
+func userLogoutOthersHandler(c *gin.Context) {
+	var body LogoutOthersRequest
+	if err := c.BindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	query := fmt.Sprintf("login?anilist_id=eq.%s&session_id=neq.%s", url.QueryEscape(body.AnilistID), url.QueryEscape(body.CurrentSessionID))
+	resp, err := supabaseRequest("DELETE", query, nil, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+
+	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Berhasil mengeluarkan akun dari perangkat lain."})
+}
