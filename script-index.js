@@ -1,6 +1,4 @@
 document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
-
-// HELPER E2EE
 function timtit() {
     return "timtit";
 }
