@@ -521,18 +521,15 @@ function loginAniList() {
 }
 
 function function logoutAniList() {
-    // 1. Hapus semua data auth & user cache dari LocalStorage
     localStorage.removeItem('anilist_token');
     localStorage.removeItem('anilist_user');
     localStorage.removeItem('nimedesu_scores_cache');
 
-    // 2. Clear variable cache bookmark & history di memori JS
     userBookmarksCache = [];
     currentData = [];
 
     alert("Berhasil logout! Silakan login kembali untuk mengakses data Anda.");
     
-    // 3. Hard reload halaman ke kondisi fresh tanpa hash/token OAuth di URL
     window.location.href = window.location.pathname;
 }() {
     localStorage.removeItem('anilist_token');
