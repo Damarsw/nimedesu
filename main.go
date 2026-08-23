@@ -70,6 +70,11 @@ type ExternalAnimeMetadata struct {
 	CoverImg    string `json:"cover_img"`
 }
 
+type UserSyncRequest struct {
+	AnilistID        string `json:"anilist_id"`
+	CookiesEncrypted string `json:"cookies_encrypted"`
+}
+
 var (
 	batchStore = &BatchStore{}
 	localCache = &LocalCache{
@@ -163,7 +168,6 @@ func stripHTMLTags(s string) string {
 	return strings.TrimSpace(res)
 }
 
-// Helper Auto-Translate Teks ke Bahasa Indonesia via Google Translate
 func translateToID(text string) string {
 	if strings.TrimSpace(text) == "" {
 		return ""
@@ -402,16 +406,13 @@ func getOrFetchAnimeMetadata(title string) *ExternalAnimeMetadata {
 	}
 	localCache.RUnlock()
 
-	// 1. Coba dari AniList (Bahasa Inggris)
 	meta, err := fetchMetadataFromAniList(title)
 
-	// 2. Fallback ke Jikan API jika AniList gagal
 	if err != nil || meta == nil || meta.Synopsis == "" {
 		log.Printf("[Metadata Backup] AniList gagal untuk %s, mencoba Jikan...", title)
 		meta, err = fetchMetadataFromJikan(title)
 	}
 
-	// Jika sukses dapet dari API external, translate sinopsisnya ke Bahasa Indonesia
 	if meta != nil && meta.Synopsis != "" {
 		meta.Synopsis = translateToID(meta.Synopsis)
 
@@ -801,16 +802,13 @@ func animeDetailHandler(c *gin.Context) {
 	animeItem := result[0]
 	animeTitle := fmt.Sprintf("%v", animeItem["title"])
 
-	// 1. Fetch metadata external (AniList/Jikan dalam B.Inggris) + Translate B.Indonesia
 	extMeta := getOrFetchAnimeMetadata(animeTitle)
 
-	// 2. Ambil data cadangan dari Supabase lokal
 	dbSynopsis := fmt.Sprintf("%v", animeItem["synopsis"])
 	if dbSynopsis == "<nil>" || dbSynopsis == "" {
 		dbSynopsis = ""
 	}
 
-	// 3. Hierarki Fallback: External (Sudah Ter-translate) -> Supabase -> Default Text
 	synopsisVal := "Sinopsis belum tersedia."
 	if extMeta != nil && extMeta.Synopsis != "" {
 		synopsisVal = extMeta.Synopsis
@@ -1024,16 +1022,13 @@ func userSyncHandler(c *gin.Context) {
 		log.Printf("[Turnstile Warning] Bypassing failed verification for seamless mobile UX")
 	}
 
-	var body map[string]interface{}
+	var body UserSyncRequest
 	if err := c.BindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	anilistID := fmt.Sprintf("%v", body["anilist_id"])
-	userInfo := body["user_info"]
-
-	resp, err := supabaseRequest("GET", fmt.Sprintf("login?anilist_id=eq.%s", url.QueryEscape(anilistID)), nil, nil)
+	resp, err := supabaseRequest("GET", fmt.Sprintf("login?anilist_id=eq.%s", url.QueryEscape(body.AnilistID)), nil, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1044,20 +1039,15 @@ func userSyncHandler(c *gin.Context) {
 	json.NewDecoder(resp.Body).Decode(&rows)
 
 	if len(rows) == 0 {
-		initialCookies := map[string]interface{}{
-			"history":   []interface{}{},
-			"bookmarks": []interface{}{},
-			"user_info": userInfo,
-		}
 		insBody, _ := json.Marshal(map[string]interface{}{
-			"anilist_id": anilistID,
-			"cookies":    initialCookies,
+			"anilist_id": body.AnilistID,
+			"cookies":    body.CookiesEncrypted,
 		})
 		supabaseRequest("POST", "login", insBody, nil)
-		c.JSON(http.StatusOK, gin.H{"status": "created", "anilist_id": anilistID, "cookies": initialCookies})
+		c.JSON(http.StatusOK, gin.H{"status": "created", "anilist_id": body.AnilistID, "cookies_encrypted": body.CookiesEncrypted})
 	} else {
-		cookies := rows[0]["cookies"]
-		c.JSON(http.StatusOK, gin.H{"status": "exists", "anilist_id": anilistID, "cookies": cookies})
+		cookiesData := rows[0]["cookies"]
+		c.JSON(http.StatusOK, gin.H{"status": "exists", "anilist_id": body.AnilistID, "cookies_encrypted": cookiesData})
 	}
 }
 
@@ -1074,9 +1064,9 @@ func userDataHandler(c *gin.Context) {
 	json.NewDecoder(resp.Body).Decode(&rows)
 
 	if len(rows) > 0 {
-		c.JSON(http.StatusOK, gin.H{"cookies": rows[0]["cookies"]})
+		c.JSON(http.StatusOK, gin.H{"cookies_encrypted": rows[0]["cookies"]})
 	} else {
-		c.JSON(http.StatusOK, gin.H{"cookies": gin.H{"history": []interface{}{}, "bookmarks": []interface{}{}}})
+		c.JSON(http.StatusOK, gin.H{"cookies_encrypted": ""})
 	}
 }
 
@@ -1086,17 +1076,14 @@ func userUpdateHandler(c *gin.Context) {
 		log.Printf("[Turnstile Warning] Bypassing failed verification for seamless mobile UX")
 	}
 
-	var body map[string]interface{}
+	var body UserSyncRequest
 	if err := c.BindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	anilistID := fmt.Sprintf("%v", body["anilist_id"])
-	cookies := body["cookies"]
-
-	updBody, _ := json.Marshal(map[string]interface{}{"cookies": cookies})
-	resp, err := supabaseRequest("PATCH", fmt.Sprintf("login?anilist_id=eq.%s", url.QueryEscape(anilistID)), updBody, nil)
+	updBody, _ := json.Marshal(map[string]interface{}{"cookies": body.CookiesEncrypted})
+	resp, err := supabaseRequest("PATCH", fmt.Sprintf("login?anilist_id=eq.%s", url.QueryEscape(body.AnilistID)), updBody, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
