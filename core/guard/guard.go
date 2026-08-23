@@ -39,7 +39,6 @@ func SecurityMiddleware() gin.HandlerFunc {
 				return
 			}
 
-
 			expectedPayload := fmt.Sprintf("%d_%s", reqTime, env.Hash)
 			hash := sha256.Sum256([]byte(expectedPayload))
 			expectedToken := hex.EncodeToString(hash[:])
