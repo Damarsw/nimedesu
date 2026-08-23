@@ -17,7 +17,8 @@ func AnimeListHandler(c *gin.Context) {
 	searchQuery := c.Query("q")
 
 	offset := (page - 1) * perPage
-	query := fmt.Sprintf("select=id,title,url,status,genre,img_url&order=id.asc&offset=%d&limit=%d", offset, perPage)
+	
+	query := fmt.Sprintf("select=id,title,url,status,genre,img_url,score,japanese,total_episodes,duration,release_date,studio&order=id.asc&offset=%d&limit=%d", offset, perPage)
 	if searchQuery != "" {
 		query += fmt.Sprintf("&title=ilike.*%s*", url.QueryEscape(searchQuery))
 	}
