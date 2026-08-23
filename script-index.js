@@ -1,6 +1,5 @@
 document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
-// HELPER E2EE
 function timtit() {
     return "timtit";
 }
@@ -31,6 +30,15 @@ function decryptCookiesData(ciphertext) {
     } catch (e) {
         return { history: [], bookmarks: [] };
     }
+}
+
+function getOrCreateSessionID() {
+    let sid = localStorage.getItem('nimedesu_session_id');
+    if (!sid) {
+        sid = 'sess_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+        localStorage.setItem('nimedesu_session_id', sid);
+    }
+    return sid;
 }
 
 function onTurnstileSuccess(token) {
@@ -199,6 +207,7 @@ async function syncUserWithSupabase(user) {
     if (!user) return null;
     const identifier = getUserIdentifier(user);
     const hashedID = hashAnilistID(identifier);
+    const sessionID = getOrCreateSessionID();
 
     try {
         const sec = generateSecurityToken();
@@ -218,6 +227,7 @@ async function syncUserWithSupabase(user) {
             },
             body: JSON.stringify({
                 anilist_id: hashedID,
+                session_id: sessionID,
                 cookies_encrypted: initialPayload
             })
         });
@@ -238,10 +248,11 @@ async function syncUserWithSupabase(user) {
 async function getSupabaseUserData(user) {
     if (!user) return { history: [], bookmarks: [] };
     const hashedID = hashAnilistID(getUserIdentifier(user));
+    const sessionID = getOrCreateSessionID();
 
     try {
         const sec = generateSecurityToken();
-        const res = await fetch(`${RENDER_API_URL}/user-data?anilist_id=${encodeURIComponent(hashedID)}`, {
+        const res = await fetch(`${RENDER_API_URL}/user-data?anilist_id=${encodeURIComponent(hashedID)}&session_id=${encodeURIComponent(sessionID)}`, {
             headers: {
                 "X-Client-Token": sec.token,
                 "X-Client-Time": sec.time
@@ -260,6 +271,7 @@ async function getSupabaseUserData(user) {
 async function saveSupabaseUserData(user, payload) {
     if (!user) return false;
     const hashedID = hashAnilistID(getUserIdentifier(user));
+    const sessionID = getOrCreateSessionID();
     const encryptedPayload = encryptCookiesData(payload);
 
     try {
@@ -274,6 +286,7 @@ async function saveSupabaseUserData(user, payload) {
             },
             body: JSON.stringify({
                 anilist_id: hashedID,
+                session_id: sessionID,
                 cookies_encrypted: encryptedPayload
             })
         });
@@ -283,6 +296,41 @@ async function saveSupabaseUserData(user, payload) {
     } catch (err) {
         console.error("Gagal update data user:", err);
         return false;
+    }
+}
+
+async function logoutOtherDevices() {
+    const user = getLoggedInUser();
+    if (!user) return;
+
+    if (!confirm("Apakah Anda yakin ingin mengeluarkan akun dari semua perangkat lain?")) return;
+
+    const hashedID = hashAnilistID(getUserIdentifier(user));
+    const sessionID = getOrCreateSessionID();
+
+    try {
+        const sec = generateSecurityToken();
+        const res = await fetch(`${RENDER_API_URL}/user-logout-others`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Client-Token": sec.token,
+                "X-Client-Time": sec.time
+            },
+            body: JSON.stringify({
+                anilist_id: hashedID,
+                current_session_id: sessionID
+            })
+        });
+
+        const result = await res.json();
+        if (result && result.status === "success") {
+            alert("Berhasil keluar dari semua perangkat lain!");
+        } else {
+            alert("Gagal memproses logout perangkat lain.");
+        }
+    } catch (err) {
+        alert("Terjadi kesalahan koneksi.");
     }
 }
 
@@ -520,22 +568,17 @@ function loginAniList() {
     window.location.href = authUrl;
 }
 
-function function logoutAniList() {
+function logoutAniList() {
     localStorage.removeItem('anilist_token');
     localStorage.removeItem('anilist_user');
     localStorage.removeItem('nimedesu_scores_cache');
+    localStorage.removeItem('nimedesu_session_id');
 
     userBookmarksCache = [];
     currentData = [];
 
     alert("Berhasil logout! Silakan login kembali untuk mengakses data Anda.");
-    
     window.location.href = window.location.pathname;
-}() {
-    localStorage.removeItem('anilist_token');
-    localStorage.removeItem('anilist_user');
-    alert("Berhasil logout!");
-    location.reload();
 }
 
 async function checkAniListAuthStatus() {
@@ -589,9 +632,6 @@ async function checkAniListAuthStatus() {
                 if (userWelcomeAvatarContainer) {
                     userWelcomeAvatarContainer.innerHTML = `<img src="${user.avatar.medium}" class="w-10 h-10 rounded-full border border-neon-yellow object-cover shadow-sm">`;
                 }
-                
-                const bannerLogoutBtn = userWelcomeBanner.querySelector('button');
-                if (bannerLogoutBtn) bannerLogoutBtn.style.display = 'none';
 
                 userWelcomeBanner.classList.remove('hidden');
             }
@@ -777,7 +817,7 @@ async function openDetailFromAniListTitle(title) {
 
 function switchView(viewName, shouldScrollToTop = true) {
     currentView = viewName;
-    const views = ['homeView', 'detailView', 'dmcaView', 'informationView'];
+    const views = ['homeView', 'detailView', 'dmcaView', 'informationView', 'maintenanceView'];
     views.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.add('hidden');
@@ -796,6 +836,9 @@ function switchView(viewName, shouldScrollToTop = true) {
     } else if (viewName === 'information') {
         const information = document.getElementById('informationView');
         if (information) information.classList.remove('hidden');
+    } else if (viewName === 'maintenance') {
+        const maintenance = document.getElementById('maintenanceView');
+        if (maintenance) maintenance.classList.remove('hidden');
     }
     
     if (shouldScrollToTop) {
