@@ -22,7 +22,7 @@ func AnimeListHandler(c *gin.Context) {
 		query += fmt.Sprintf("&title=ilike.*%s*", url.QueryEscape(searchQuery))
 	}
 
-	resp, err := provider.SupabaseRequest("GET", "anime?"+query, nil, map[string]string{
+	resp, err := provider.DataRequest("GET", "anime?"+query, nil, map[string]string{
 		"Prefer": "count=exact",
 	})
 	if err != nil {
