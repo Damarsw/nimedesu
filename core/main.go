@@ -12,7 +12,7 @@ import (
 
 func main() {
 	if env.Core == "" || env.Token == "" {
-	    log.Fatal("FATAL: CORE & TOKEN must be set!")
+		log.Fatal("FATAL: CORE & TOKEN must be set!")
 	}
 
 	gin.SetMode(gin.ReleaseMode)
