@@ -1,29 +1,152 @@
-name: Generate go.sum
+name: Split JS and Inject Debugger Protection
 
 on:
   workflow_dispatch:
 
 jobs:
-  gosum:
+  split-and-setup:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-
-      - name: Tidy Go Modules
+      - name: Refactor JS Files and Inject Protection
         run: |
-          cd core
-          go mod tidy
+          mkdir -p web/assets/js
 
-      - name: Commit and Push go.sum
+          # 1. Buat web/assets/js/core-utils.js (Anti-Debugger + CryptoJS Utilities)
+          cat << 'EOF' > web/assets/js/core-utils.js
+          (function() {
+              let isBlanked = false;
+              function triggerBlankScreen() {
+                  if (isBlanked) return;
+                  isBlanked = true;
+                  document.body.innerHTML = '';
+                  document.body.style.backgroundColor = '#000000';
+                  document.body.style.display = 'none';
+                  window.stop();
+              }
+              function detectDebugger() {
+                  const startTime = performance.now();
+                  (function() {}["constructor"]("debugger")());
+                  const endTime = performance.now();
+                  if (endTime - startTime > 100) {
+                      triggerBlankScreen();
+                  }
+              }
+              setInterval(detectDebugger, 500);
+              document.addEventListener('keydown', function(e) {
+                  if (
+                      e.keyCode === 123 ||
+                      (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) ||
+                      (e.ctrlKey && e.keyCode === 85)
+                  ) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      triggerBlankScreen();
+                  }
+              });
+          })();
+
+          document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+
+          function timtit() { return "timtit"; }
+
+          function hashAnilistID(rawId) {
+              if (!rawId) return "";
+              return CryptoJS.SHA256(String(rawId).toLowerCase().trim()).toString(CryptoJS.enc.Hex);
+          }
+
+          function encryptCookiesData(cookiesObj) {
+              try {
+                  const jsonStr = JSON.stringify(cookiesObj);
+                  return CryptoJS.AES.encrypt(jsonStr, timtit()).toString();
+              } catch (e) { return ""; }
+          }
+
+          function decryptCookiesData(ciphertext) {
+              if (!ciphertext) return { history: [], bookmarks: [] };
+              if (typeof ciphertext === 'object') return ciphertext;
+              try {
+                  const bytes = CryptoJS.AES.decrypt(ciphertext, timtit());
+                  const decryptedStr = bytes.toString(CryptoJS.enc.Utf8);
+                  if (!decryptedStr) return { history: [], bookmarks: [] };
+                  return JSON.parse(decryptedStr);
+              } catch (e) { return { history: [], bookmarks: [] }; }
+          }
+
+          function generateSecurityToken() {
+              const timestamp = Math.floor(Date.now() / 1000);
+              const rawPayload = `${timestamp}_NimeDesuSecretKey2026`;
+              const token = CryptoJS.SHA256(rawPayload).toString(CryptoJS.enc.Hex);
+              return { token: token, time: timestamp.toString() };
+          }
+          EOF
+
+          # 2. Salin isi logika akun ke web/assets/js/account.js
+          if [ -f web/assets/js/app.js ]; then
+              cp web/assets/js/app.js web/assets/js/account.js
+          elif [ -f web/app.js ]; then
+              cp web/app.js web/assets/js/account.js
+          fi
+
+          # 3. Salin isi logika rendering ke web/assets/js/app-render.js
+          if [ -f web/assets/js/player.js ]; then
+              cp web/assets/js/player.js web/assets/js/app-render.js
+          elif [ -f web/player.js ]; then
+              cp web/player.js web/assets/js/app-render.js
+          fi
+
+          # 4. Hapus file JS lama yang menumpuk di root web/
+          rm -f web/app.js web/player.js web/script-index.js web/script-stream.js web/assets/js/app.js web/assets/js/player.js
+
+          # 5. Update web/obfuscate.js
+          cat << 'EOF' > web/obfuscate.js
+          const fs = require('fs');
+          const JavaScriptObfuscator = require('javascript-obfuscator');
+
+          const jsFiles = [
+              'assets/js/core-utils.js',
+              'assets/js/account.js',
+              'assets/js/app-render.js'
+          ];
+
+          jsFiles.forEach(file => {
+              if (fs.existsSync(file)) {
+                  console.log(`[INFO] Memproses JS obfuscation untuk ${file}...`);
+                  const code = fs.readFileSync(file, 'utf8');
+                  const obfuscated = JavaScriptObfuscator.obfuscate(code, {
+                      compact: true,
+                      controlFlowFlattening: false,
+                      simplify: true,
+                      stringArray: true,
+                      stringArrayThreshold: 0.75
+                  }).getObfuscatedCode();
+
+                  fs.writeFileSync(file, obfuscated, 'utf8');
+                  console.log(`[SUKSES] ${file} selesai di-obfuscate.`);
+              }
+          });
+
+          const htmlFiles = ['index.html', 'stream.html'];
+          htmlFiles.forEach(file => {
+              if (fs.existsSync(file)) {
+                  console.log(`[INFO] Memeriksa import script pada ${file}...`);
+              }
+          });
+          EOF
+
+          # 6. Update tag script di web/index.html & web/stream.html
+          sed -i 's|<script src="script-index.js"></script>|<script src="assets/js/core-utils.js"></script>\n    <script src="assets/js/account.js"></script>\n    <script src="assets/js/app-render.js"></script>|g' web/index.html
+          sed -i 's|<script src="assets/js/app.js"></script>|<script src="assets/js/core-utils.js"></script>\n    <script src="assets/js/account.js"></script>\n    <script src="assets/js/app-render.js"></script>|g' web/index.html
+
+          sed -i 's|<script src="script-stream.js"></script>|<script src="assets/js/core-utils.js"></script>\n    <script src="assets/js/account.js"></script>\n    <script src="assets/js/app-render.js"></script>|g' web/stream.html
+          sed -i 's|<script src="assets/js/player.js"></script>|<script src="assets/js/core-utils.js"></script>\n    <script src="assets/js/account.js"></script>\n    <script src="assets/js/app-render.js"></script>|g' web/stream.html
+
+      - name: Commit and Push
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add core/go.mod core/go.sum
-          git commit -m "chore: generate go.sum" || exit 0
+          git add .
+          git commit -m "refactor: split JS into core-utils, account, and app-render with debugger trapper" || exit 0
           git push
