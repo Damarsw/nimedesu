@@ -1,4 +1,4 @@
-module nimedesu
+module nimedesu/core
 
 go 1.22
 
