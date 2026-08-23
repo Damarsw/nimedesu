@@ -40,10 +40,32 @@ type TurnstileResponse struct {
 
 type BatchStore struct {
 	sync.RWMutex
-	ByPopularity []interface{} `json:"bypopularity"`
-	Upcoming     []interface{} `json:"upcoming"`
-	Favorite     []interface{} `json:"favorite"`
-	LastUpdated  int64         `json:"last_updated"`
+	ByPopularity       []RankMedia `json:"bypopularity"`
+	Upcoming           []RankMedia `json:"upcoming"`
+	Favorite           []RankMedia `json:"favorite"`
+	LastUpdated        int64       `json:"last_updated"`
+	SourceByPopularity string      `json:"-"`
+	SourceUpcoming     string      `json:"-"`
+	SourceFavorite     string      `json:"-"`
+}
+
+type RankMedia struct {
+	ID           int       `json:"id"`
+	Title        RankTitle `json:"title"`
+	CoverImage   RankCover `json:"coverImage"`
+	AverageScore float64   `json:"averageScore"`
+	Popularity   int       `json:"popularity"`
+}
+
+type RankTitle struct {
+	Romaji        string `json:"romaji"`
+	English       string `json:"english"`
+	UserPreferred string `json:"userPreferred"`
+}
+
+type RankCover struct {
+	ExtraLarge string `json:"extraLarge"`
+	Large      string `json:"large"`
 }
 
 type LocalCache struct {
@@ -90,10 +112,24 @@ var (
 	}
 	lastAPICallTime time.Time
 	apiCallMutex    sync.Mutex
-	minCallInterval = 750 * time.Millisecond
+	minCallInterval = 2000 * time.Millisecond
+
+	lastJikanCallTime    time.Time
+	jikanCallMutex       sync.Mutex
+	minJikanCallInterval = 1200 * time.Millisecond
 
 	CACHE_TTL_ANIME = int64(86400)
 )
+
+func throttleJikanCall() {
+	jikanCallMutex.Lock()
+	elapsed := time.Since(lastJikanCallTime)
+	if elapsed < minJikanCallInterval {
+		time.Sleep(minJikanCallInterval - elapsed)
+	}
+	lastJikanCallTime = time.Now()
+	jikanCallMutex.Unlock()
+}
 
 func getEnvOrDefault(key, defaultValue string) string {
 	val := os.Getenv(key)
@@ -175,25 +211,38 @@ func stripHTMLTags(s string) string {
 }
 
 func translateToID(text string) string {
-	if strings.TrimSpace(text) == "" {
+	cleanText := strings.TrimSpace(text)
+	if cleanText == "" {
 		return ""
 	}
 
-	if len(text) > 1500 {
-		text = text[:1500] + "..."
+	if len(cleanText) > 1200 {
+		cleanText = cleanText[:1200]
 	}
 
-	translateURL := fmt.Sprintf("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=id&dt=t&q=%s", url.QueryEscape(text))
+	translateURL := fmt.Sprintf("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=id&dt=t&q=%s", url.QueryEscape(cleanText))
 
-	client := &http.Client{Timeout: 4 * time.Second}
-	resp, err := client.Get(translateURL)
+	req, err := http.NewRequest("GET", translateURL, nil)
+	if err != nil {
+		return text
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil || resp.StatusCode != 200 {
 		return text
 	}
 	defer resp.Body.Close()
 
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return text
+	}
+
 	var result []interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil || len(result) == 0 {
+	if err := json.Unmarshal(bodyBytes, &result); err != nil || len(result) == 0 {
 		return text
 	}
 
@@ -212,7 +261,7 @@ func translateToID(text string) string {
 		}
 	}
 
-	translated := translatedBuilder.String()
+	translated := strings.TrimSpace(translatedBuilder.String())
 	if translated == "" {
 		return text
 	}
@@ -243,6 +292,7 @@ func fetchMetadataFromAniList(title string) (*ExternalAnimeMetadata, error) {
 	})
 
 	req, _ := http.NewRequest("POST", "https://graphql.anilist.co", bytes.NewBuffer(reqBody))
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{Timeout: 4 * time.Second}
 
@@ -434,7 +484,7 @@ func getOrFetchAnimeMetadata(title string) *ExternalAnimeMetadata {
 	return nil
 }
 
-func fetchAniListBatch(category string) []interface{} {
+func fetchAniListBatch(category string) ([]RankMedia, error) {
 	apiCallMutex.Lock()
 	elapsed := time.Since(lastAPICallTime)
 	if elapsed < minCallInterval {
@@ -443,75 +493,298 @@ func fetchAniListBatch(category string) []interface{} {
 	lastAPICallTime = time.Now()
 	apiCallMutex.Unlock()
 
-	sortQuery := "POPULARITY_DESC"
-	statusQuery := ""
+	var graphqlQuery string
 	if category == "upcoming" {
-		statusQuery = ", status: NOT_YET_RELEASED"
-	} else if category == "favorite" {
-		sortQuery = "SCORE_DESC"
-	}
-
-	graphqlQuery := fmt.Sprintf(`{
-		Page(page: 1, perPage: 100) {
-			media(type: ANIME, sort: %s%s) {
-				id title { romaji english userPreferred }
-				coverImage { extraLarge large }
-				averageScore popularity
+		graphqlQuery = `{
+			Page(page: 1, perPage: 100) {
+				media(type: ANIME, status: NOT_YET_RELEASED, sort: POPULARITY_DESC) {
+					id title { romaji english userPreferred }
+					coverImage { extraLarge large }
+					averageScore popularity
+				}
 			}
-		}
-	}`, sortQuery, statusQuery)
+		}`
+	} else if category == "favorite" {
+		graphqlQuery = `{
+			Page(page: 1, perPage: 100) {
+				media(type: ANIME, sort: SCORE_DESC) {
+					id title { romaji english userPreferred }
+					coverImage { extraLarge large }
+					averageScore popularity
+				}
+			}
+		}`
+	} else {
+		graphqlQuery = `{
+			Page(page: 1, perPage: 100) {
+				media(type: ANIME, sort: POPULARITY_DESC) {
+					id title { romaji english userPreferred }
+					coverImage { extraLarge large }
+					averageScore popularity
+				}
+			}
+		}`
+	}
 
 	reqBody, _ := json.Marshal(map[string]string{"query": graphqlQuery})
 	req, _ := http.NewRequest("POST", "https://graphql.anilist.co", bytes.NewBuffer(reqBody))
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Origin", "https://anilist.co")
+	req.Header.Set("Referer", "https://anilist.co/")
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: 8 * time.Second}
 	resp, err := client.Do(req)
-	if err != nil || resp.StatusCode != 200 {
-		return nil
+	if err != nil {
+		return nil, fmt.Errorf("anilist request error: %w", err)
+	}
+
+	if resp.StatusCode == 429 {
+		resp.Body.Close()
+		time.Sleep(2500 * time.Millisecond)
+		resp, err = client.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("anilist retry request error: %w", err)
+		}
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("anilist request failed: status %d - body: %s", resp.StatusCode, string(bodyBytes))
+	}
 
 	var result struct {
 		Data struct {
 			Page struct {
-				Media []interface{} `json:"media"`
+				Media []RankMedia `json:"media"`
 			} `json:"Page"`
 		} `json:"data"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&result); err == nil {
-		return result.Data.Page.Media
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("anilist decode error: %w", err)
 	}
-	return nil
+	if len(result.Data.Page.Media) == 0 {
+		return nil, fmt.Errorf("anilist mengembalikan data kosong")
+	}
+	return result.Data.Page.Media, nil
+}
+
+func fetchJikanBatch(category string) ([]RankMedia, error) {
+	filter := category
+	if filter != "upcoming" && filter != "favorite" {
+		filter = "bypopularity"
+	}
+
+	client := &http.Client{Timeout: 6 * time.Second}
+	var combined []RankMedia
+	var lastErr error
+
+	for page := 1; page <= 2; page++ {
+		throttleJikanCall()
+
+		jikanURL := fmt.Sprintf("https://api.jikan.moe/v4/top/anime?filter=%s&page=%d&limit=25", filter, page)
+		req, _ := http.NewRequest("GET", jikanURL, nil)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("jikan request error (page %d): %w", page, err)
+			break
+		}
+
+		if resp.StatusCode == 429 && page == 1 {
+			resp.Body.Close()
+			time.Sleep(1500 * time.Millisecond)
+			throttleJikanCall()
+			resp, err = client.Do(req)
+			if err != nil {
+				lastErr = fmt.Errorf("jikan retry request error (page %d): %w", page, err)
+				break
+			}
+		}
+
+		if resp.StatusCode != 200 {
+			lastErr = fmt.Errorf("jikan request failed (page %d): status %d", page, resp.StatusCode)
+			resp.Body.Close()
+			break
+		}
+
+		var res struct {
+			Data []struct {
+				MalID   int    `json:"mal_id"`
+				Title   string `json:"title"`
+				TitleEn string `json:"title_english"`
+				Images  struct {
+					JPG struct {
+						LargeImageURL string `json:"large_image_url"`
+					} `json:"jpg"`
+				} `json:"images"`
+				Score   float64 `json:"score"`
+				Members int     `json:"members"`
+			} `json:"data"`
+			Pagination struct {
+				HasNextPage bool `json:"has_next_page"`
+			} `json:"pagination"`
+		}
+
+		decodeErr := json.NewDecoder(resp.Body).Decode(&res)
+		resp.Body.Close()
+		if decodeErr != nil {
+			lastErr = fmt.Errorf("jikan decode error (page %d): %w", page, decodeErr)
+			break
+		}
+		if len(res.Data) == 0 {
+			lastErr = fmt.Errorf("jikan mengembalikan data kosong (page %d)", page)
+			break
+		}
+
+		for _, item := range res.Data {
+			english := item.TitleEn
+			if english == "" {
+				english = item.Title
+			}
+			combined = append(combined, RankMedia{
+				ID: item.MalID,
+				Title: RankTitle{
+					Romaji:        item.Title,
+					English:       english,
+					UserPreferred: english,
+				},
+				CoverImage: RankCover{
+					ExtraLarge: item.Images.JPG.LargeImageURL,
+					Large:      item.Images.JPG.LargeImageURL,
+				},
+				AverageScore: item.Score * 10,
+				Popularity:   item.Members,
+			})
+		}
+
+		if !res.Pagination.HasNextPage {
+			break
+		}
+	}
+
+	if len(combined) == 0 {
+		if lastErr == nil {
+			lastErr = fmt.Errorf("jikan mengembalikan data kosong")
+		}
+		return nil, lastErr
+	}
+	return combined, nil
+}
+
+func saveRankingCacheToSupabase(category string, data []RankMedia) {
+	if supabaseURL == "" || supabaseKey == "" || len(data) == 0 {
+		return
+	}
+	payload, err := json.Marshal(map[string]interface{}{
+		"category":   category,
+		"data":       data,
+		"updated_at": time.Now().UTC().Format(time.RFC3339),
+	})
+	if err != nil {
+		return
+	}
+
+	go func() {
+		resp, err := supabaseRequest("POST", "ranking_cache?on_conflict=category", payload, map[string]string{
+			"Prefer": "resolution=merge-duplicates",
+		})
+		if err != nil {
+			log.Printf("[Ranking Cache] Gagal menyimpan cache Supabase untuk %s: %v", category, err)
+			return
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode >= 300 {
+			body, _ := io.ReadAll(resp.Body)
+			log.Printf("[Ranking Cache] Upsert Supabase '%s' gagal (status %d): %s", category, resp.StatusCode, string(body))
+		}
+	}()
+}
+
+func fetchRankingCacheFromSupabase(category string) ([]RankMedia, error) {
+	if supabaseURL == "" || supabaseKey == "" {
+		return nil, fmt.Errorf("supabase belum dikonfigurasi")
+	}
+
+	query := fmt.Sprintf("ranking_cache?category=eq.%s&select=data&limit=1", url.QueryEscape(category))
+	resp, err := supabaseRequest("GET", query, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("supabase request error: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("supabase request failed: status %d", resp.StatusCode)
+	}
+
+	var rows []struct {
+		Data []RankMedia `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&rows); err != nil {
+		return nil, fmt.Errorf("supabase decode error: %w", err)
+	}
+	if len(rows) == 0 || len(rows[0].Data) == 0 {
+		return nil, fmt.Errorf("cache supabase kosong untuk kategori %s", category)
+	}
+	return rows[0].Data, nil
+}
+
+func fetchBatchWithFallback(category string) ([]RankMedia, string) {
+	if data, err := fetchAniListBatch(category); err == nil && len(data) > 0 {
+		saveRankingCacheToSupabase(category, data)
+		return data, "anilist"
+	} else {
+		log.Printf("[Ranking Fallback] AniList gagal untuk '%s': %v -- mencoba Jikan...", category, err)
+	}
+
+	if data, err := fetchJikanBatch(category); err == nil && len(data) > 0 {
+		saveRankingCacheToSupabase(category, data)
+		return data, "jikan"
+	} else {
+		log.Printf("[Ranking Fallback] Jikan gagal untuk '%s': %v -- mencoba cache Supabase...", category, err)
+	}
+
+	if data, err := fetchRankingCacheFromSupabase(category); err == nil && len(data) > 0 {
+		log.Printf("[Ranking Fallback] Memakai cache Supabase untuk '%s'", category)
+		return data, "supabase_cache"
+	} else {
+		log.Printf("[Ranking Fallback] Cache Supabase juga gagal untuk '%s': %v", category, err)
+	}
+
+	return nil, "unavailable"
 }
 
 func startCronWorker() {
 	ticker := time.NewTicker(5 * time.Minute)
 	go func() {
 		for {
-			log.Println("[Cron Worker] Refreshing AniList batch ranking...")
-			pop := fetchAniListBatch("bypopularity")
+			log.Println("[Cron Worker] Refreshing batch ranking (AniList -> Jikan -> Supabase)...")
+			pop, popSrc := fetchBatchWithFallback("bypopularity")
 			time.Sleep(1 * time.Second)
-			upc := fetchAniListBatch("upcoming")
+			upc, upcSrc := fetchBatchWithFallback("upcoming")
 			time.Sleep(1 * time.Second)
-			fav := fetchAniListBatch("favorite")
+			fav, favSrc := fetchBatchWithFallback("favorite")
 
 			batchStore.Lock()
-			if pop != nil {
+			if len(pop) > 0 {
 				batchStore.ByPopularity = pop
+				batchStore.SourceByPopularity = popSrc
 			}
-			if upc != nil {
+			if len(upc) > 0 {
 				batchStore.Upcoming = upc
+				batchStore.SourceUpcoming = upcSrc
 			}
-			if fav != nil {
+			if len(fav) > 0 {
 				batchStore.Favorite = fav
+				batchStore.SourceFavorite = favSrc
 			}
 			batchStore.LastUpdated = time.Now().Unix()
 			batchStore.Unlock()
 
-			log.Println("[Cron Worker] Batch ranking update success!")
+			log.Printf("[Cron Worker] Batch ranking update selesai! (pop:%s, upcoming:%s, favorite:%s)", popSrc, upcSrc, favSrc)
 			<-ticker.C
 		}
 	}()
@@ -521,7 +794,7 @@ func securityMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
 
-		if path == "/" || path == "/health" || path == "/sitemap.xml" || path == "/robots.txt" || path == "/api/clear-cache" || strings.HasPrefix(path, "/api/proxy-stream") || strings.HasPrefix(path, "/proxy-stream") {
+		if path == "/" || path == "/health" || path == "/sitemap.xml" || path == "/robots.txt" || path == "/api/clear-cache" || path == "/api/test-apis" || strings.HasPrefix(path, "/api/proxy-stream") || strings.HasPrefix(path, "/proxy-stream") {
 			c.Next()
 			return
 		}
@@ -619,8 +892,28 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Cache RAM 24 jam berhasil dibersihkan!"})
 	})
 
+	r.GET("/api/test-apis", testAPIsHandler)
+
 	log.Printf("Server running on port %s", port)
 	r.Run(":" + port)
+}
+
+func testAPIsHandler(c *gin.Context) {
+	anilistData, anilistErr := fetchAniListBatch("bypopularity")
+	jikanData, jikanErr := fetchJikanBatch("bypopularity")
+
+	c.JSON(http.StatusOK, gin.H{
+		"anilist": gin.H{
+			"status":      anilistErr == nil,
+			"items_count": len(anilistData),
+			"error":       fmt.Sprintf("%v", anilistErr),
+		},
+		"jikan": gin.H{
+			"status":      jikanErr == nil,
+			"items_count": len(jikanData),
+			"error":       fmt.Sprintf("%v", jikanErr),
+		},
+	})
 }
 
 func healthHandler(c *gin.Context) {
@@ -946,6 +1239,7 @@ func anilistScoreHandler(c *gin.Context) {
 	reqBody, _ := json.Marshal(map[string]interface{}{"query": graphqlQuery, "variables": map[string]string{"search": title}})
 
 	req, _ := http.NewRequest("POST", "https://graphql.anilist.co", bytes.NewBuffer(reqBody))
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{Timeout: 3 * time.Second}
 
@@ -976,50 +1270,91 @@ func rankingHandler(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 
 	batchStore.RLock()
-	var allMedia []interface{}
+	var allMedia []RankMedia
+	var source string
 	switch category {
 	case "upcoming":
 		allMedia = batchStore.Upcoming
+		source = batchStore.SourceUpcoming
 	case "favorite":
 		allMedia = batchStore.Favorite
+		source = batchStore.SourceFavorite
 	default:
 		allMedia = batchStore.ByPopularity
+		source = batchStore.SourceByPopularity
 	}
 	batchStore.RUnlock()
 
 	if len(allMedia) == 0 {
-		allMedia = fetchAniListBatch(category)
+		fetched, src := fetchBatchWithFallback(category)
+		if len(fetched) > 0 {
+			allMedia = fetched
+			source = src
+
+			batchStore.Lock()
+			switch category {
+			case "upcoming":
+				batchStore.Upcoming = fetched
+				batchStore.SourceUpcoming = src
+			case "favorite":
+				batchStore.Favorite = fetched
+				batchStore.SourceFavorite = src
+			default:
+				batchStore.ByPopularity = fetched
+				batchStore.SourceByPopularity = src
+			}
+			batchStore.LastUpdated = time.Now().Unix()
+			batchStore.Unlock()
+		}
 	}
 
-	top3 := make([]interface{}, 0)
+	if len(allMedia) == 0 {
+		c.Header("Cache-Control", "no-store")
+		c.JSON(http.StatusOK, gin.H{
+			"top3":      []RankMedia{},
+			"list":      []RankMedia{},
+			"last_page": 1,
+			"source":    "unavailable",
+			"error":     "Data belum siap",
+		})
+		return
+	}
+
+	top3 := make([]RankMedia, 0)
 	if len(allMedia) >= 3 {
 		top3 = allMedia[:3]
+	} else {
+		top3 = allMedia
 	}
 
+	var pageMedia []RankMedia
 	startIdx := 3
-	endIdx := 15
 	if page > 1 {
 		startIdx = (page-1)*12 + 3
-		endIdx = startIdx + 12
 	}
 
-	if startIdx > len(allMedia) {
-		startIdx = len(allMedia)
-	}
-	if endIdx > len(allMedia) {
-		endIdx = len(allMedia)
+	if startIdx < len(allMedia) {
+		endIdx := startIdx + 12
+		if endIdx > len(allMedia) {
+			endIdx = len(allMedia)
+		}
+		pageMedia = allMedia[startIdx:endIdx]
+	} else {
+		pageMedia = []RankMedia{}
 	}
 
-	pageMedia := allMedia[startIdx:endIdx]
-	totalItems := int(math.Max(float64(len(allMedia)-3), 1))
+	totalItems := len(allMedia) - 3
+	if totalItems < 1 {
+		totalItems = 1
+	}
 	lastPage := int(math.Ceil(float64(totalItems) / 12.0))
 
-	c.Header("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=3600")
+	c.Header("Cache-Control", "public, s-maxage=300")
 	c.JSON(http.StatusOK, gin.H{
 		"top3":      top3,
 		"list":      pageMedia,
 		"last_page": lastPage,
-		"source":    "batch_memory_store",
+		"source":    source,
 	})
 }
 
