@@ -528,8 +528,6 @@ func fetchAniListBatch(category string) ([]RankMedia, error) {
 
 	reqBody, _ := json.Marshal(map[string]string{"query": graphqlQuery})
 	req, _ := http.NewRequest("POST", "https://graphql.anilist.co", bytes.NewBuffer(reqBody))
-	
-	// HEADER BYPASS CLOUDFLARE 400
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
@@ -592,7 +590,7 @@ func fetchJikanBatch(category string) ([]RankMedia, error) {
 
 		resp, err := client.Do(req)
 		if err != nil {
-			lastErr = fmt.Errorf("jikan request error (page %d): %w", page, err)
+			lastErr = fmt.Sprintf("jikan request error (page %d): %v", page, err)
 			break
 		}
 
@@ -602,13 +600,13 @@ func fetchJikanBatch(category string) ([]RankMedia, error) {
 			throttleJikanCall()
 			resp, err = client.Do(req)
 			if err != nil {
-				lastErr = fmt.Errorf("jikan retry request error (page %d): %w", page, err)
+				lastErr = fmt.Sprintf("jikan retry request error (page %d): %v", page, err)
 				break
 			}
 		}
 
 		if resp.StatusCode != 200 {
-			lastErr = fmt.Errorf("jikan request failed (page %d): status %d", page, resp.StatusCode)
+			lastErr = fmt.Sprintf("jikan request failed (page %d): status %d", page, resp.StatusCode)
 			resp.Body.Close()
 			break
 		}
@@ -634,11 +632,11 @@ func fetchJikanBatch(category string) ([]RankMedia, error) {
 		decodeErr := json.NewDecoder(resp.Body).Decode(&res)
 		resp.Body.Close()
 		if decodeErr != nil {
-			lastErr = fmt.Errorf("jikan decode error (page %d): %w", page, decodeErr)
+			lastErr = fmt.Sprintf("jikan decode error (page %d): %v", page, decodeErr)
 			break
 		}
 		if len(res.Data) == 0 {
-			lastErr = fmt.Errorf("jikan mengembalikan data kosong (page %d)", page)
+			lastErr = fmt.Sprintf("jikan mengembalikan data kosong (page %d)", page)
 			break
 		}
 
@@ -669,10 +667,10 @@ func fetchJikanBatch(category string) ([]RankMedia, error) {
 	}
 
 	if len(combined) == 0 {
-		if lastErr == nil {
-			lastErr = fmt.Errorf("jikan mengembalikan data kosong")
+		if lastErr == "" {
+			lastErr = "jikan mengembalikan data kosong"
 		}
-		return nil, lastErr
+		return nil, fmt.Errorf("%s", lastErr)
 	}
 	return combined, nil
 }
@@ -1267,6 +1265,7 @@ func anilistScoreHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"score": "N/A"})
 }
 
+// PERBAIKAN LOGIKA SLICE TOP 3 VS LIST
 func rankingHandler(c *gin.Context) {
 	category := c.DefaultQuery("type", "bypopularity")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -1317,7 +1316,7 @@ func rankingHandler(c *gin.Context) {
 			"list":      []RankMedia{},
 			"last_page": 1,
 			"source":    "unavailable",
-			"error":     "AniList, Jikan, dan cache Supabase semuanya gagal dimuat. Coba lagi sebentar lagi.",
+			"error":     "Data belum siap",
 		})
 		return
 	}
@@ -1325,32 +1324,33 @@ func rankingHandler(c *gin.Context) {
 	top3 := make([]RankMedia, 0)
 	if len(allMedia) >= 3 {
 		top3 = allMedia[:3]
+	} else {
+		top3 = allMedia
 	}
 
+	var pageMedia []RankMedia
 	startIdx := 3
-	endIdx := 15
 	if page > 1 {
 		startIdx = (page-1)*12 + 3
-		endIdx = startIdx + 12
 	}
 
-	if startIdx > len(allMedia) {
-		startIdx = len(allMedia)
-	}
-	if endIdx > len(allMedia) {
-		endIdx = len(allMedia)
+	if startIdx < len(allMedia) {
+		endIdx := startIdx + 12
+		if endIdx > len(allMedia) {
+			endIdx = len(allMedia)
+		}
+		pageMedia = allMedia[startIdx:endIdx]
+	} else {
+		pageMedia = []RankMedia{}
 	}
 
-	pageMedia := allMedia[startIdx:endIdx]
-	totalItems := int(math.Max(float64(len(allMedia)-3), 1))
+	totalItems := len(allMedia) - 3
+	if totalItems < 1 {
+		totalItems = 1
+	}
 	lastPage := int(math.Ceil(float64(totalItems) / 12.0))
 
-	if source == "anilist" {
-		c.Header("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=3600")
-	} else {
-		c.Header("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600")
-	}
-
+	c.Header("Cache-Control", "public, s-maxage=300")
 	c.JSON(http.StatusOK, gin.H{
 		"top3":      top3,
 		"list":      pageMedia,
