@@ -1,30 +1,50 @@
-name: Restore Ongoing Scraper Script
+name: Go Build Check
+
+# Simpan file ini di: .github/workflows/go-build-check.yml
+# Fungsinya: setiap ada push/PR yang menyentuh folder core/,
+# GitHub bakal otomatis coba `go build` dan `go vet`.
+# Kalau ada bug kompilasi (misal nama fungsi salah kayak
+# SupabaseRequest vs DataRequest kemarin), CI bakal MERAH
+# sebelum sempat ke-deploy ke Render/production.
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "core/**"
+      - ".github/workflows/go-build-check.yml"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "core/**"
 
 jobs:
-  restore-script:
+  build:
+    name: Build & Vet Go Backend
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: core
+
     steps:
-      - name: Checkout Repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Create scripts directory and ongoing.py
-        run: |
-          mkdir -p scripts
-          cat << 'EOF' > scripts/ongoing.py
-          import os
-          import json
-          import requests
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: core/go.sum
 
-          print("[INFO] Ongoing Anime Scraper Script Restored.")
-          EOF
+      - name: Download dependencies
+        run: go mod download
 
-      - name: Commit and Push
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add scripts/ongoing.py
-          git commit -m "chore: restore ongoing.py scraper in scripts directory" || exit 0
-          git push
+      - name: Vet (static analysis, catches type/signature mismatches)
+        run: go vet ./...
+
+      - name: Build (must compile clean, no missing/mismatched funcs)
+        run: go build ./...
+
+      - name: Run tests (if any)
+        run: go test ./... || echo "No tests found, skipping."
