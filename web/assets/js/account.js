@@ -244,15 +244,6 @@ async function syncUserWithSupabase(user) {
     }
 }
 
-function handleInvalidSession() {
-    alert("Sesi tidak valid / Anda telah di-logout dari perangkat lain. Silakan login kembali.");
-    localStorage.removeItem('anilist_token');
-    localStorage.removeItem('anilist_user');
-    localStorage.removeItem('nimedesu_session_id');
-    localStorage.removeItem('nimedesu_scores_cache');
-    window.location.reload();
-}
-
 async function getSupabaseUserData(user) {
     if (!user) return { history: [], bookmarks: [] };
     const hashedID = hashAnilistID(getUserIdentifier(user));
@@ -266,12 +257,6 @@ async function getSupabaseUserData(user) {
                 "X-Client-Time": sec.time
             }
         });
-
-        if (res.status === 401) {
-            handleInvalidSession();
-            return { history: [], bookmarks: [] };
-        }
-
         const result = await res.json();
         const decryptedCookies = decryptCookiesData(result.cookies_encrypted);
         userBookmarksCache = Array.isArray(decryptedCookies.bookmarks) ? decryptedCookies.bookmarks : [];
@@ -338,15 +323,16 @@ async function logoutOtherDevices() {
         });
 
         const result = await res.json();
-        if (res.ok && result.status === "success") {
+        if (result && result.status === "success") {
             alert("Berhasil keluar dari semua perangkat lain!");
         } else {
-            alert(result.message || "Gagal memproses logout perangkat lain.");
+            alert("Gagal memproses logout perangkat lain.");
         }
     } catch (err) {
         alert("Terjadi kesalahan koneksi.");
     }
 }
+
 async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
     const user = getLoggedInUser();
     if (!user) {
