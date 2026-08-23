@@ -590,7 +590,7 @@ func fetchJikanBatch(category string) ([]RankMedia, error) {
 
 		resp, err := client.Do(req)
 		if err != nil {
-			lastErr = fmt.Sprintf("jikan request error (page %d): %v", page, err)
+			lastErr = fmt.Errorf("jikan request error (page %d): %w", page, err)
 			break
 		}
 
@@ -600,13 +600,13 @@ func fetchJikanBatch(category string) ([]RankMedia, error) {
 			throttleJikanCall()
 			resp, err = client.Do(req)
 			if err != nil {
-				lastErr = fmt.Sprintf("jikan retry request error (page %d): %v", page, err)
+				lastErr = fmt.Errorf("jikan retry request error (page %d): %w", page, err)
 				break
 			}
 		}
 
 		if resp.StatusCode != 200 {
-			lastErr = fmt.Sprintf("jikan request failed (page %d): status %d", page, resp.StatusCode)
+			lastErr = fmt.Errorf("jikan request failed (page %d): status %d", page, resp.StatusCode)
 			resp.Body.Close()
 			break
 		}
@@ -632,11 +632,11 @@ func fetchJikanBatch(category string) ([]RankMedia, error) {
 		decodeErr := json.NewDecoder(resp.Body).Decode(&res)
 		resp.Body.Close()
 		if decodeErr != nil {
-			lastErr = fmt.Sprintf("jikan decode error (page %d): %v", page, decodeErr)
+			lastErr = fmt.Errorf("jikan decode error (page %d): %w", page, decodeErr)
 			break
 		}
 		if len(res.Data) == 0 {
-			lastErr = fmt.Sprintf("jikan mengembalikan data kosong (page %d)", page)
+			lastErr = fmt.Errorf("jikan mengembalikan data kosong (page %d)", page)
 			break
 		}
 
@@ -667,10 +667,10 @@ func fetchJikanBatch(category string) ([]RankMedia, error) {
 	}
 
 	if len(combined) == 0 {
-		if lastErr == "" {
-			lastErr = "jikan mengembalikan data kosong"
+		if lastErr == nil {
+			lastErr = fmt.Errorf("jikan mengembalikan data kosong")
 		}
-		return nil, fmt.Errorf("%s", lastErr)
+		return nil, lastErr
 	}
 	return combined, nil
 }
@@ -1265,7 +1265,6 @@ func anilistScoreHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"score": "N/A"})
 }
 
-// PERBAIKAN LOGIKA SLICE TOP 3 VS LIST
 func rankingHandler(c *gin.Context) {
 	category := c.DefaultQuery("type", "bypopularity")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -1350,119 +1349,13 @@ func rankingHandler(c *gin.Context) {
 	}
 	lastPage := int(math.Ceil(float64(totalItems) / 12.0))
 
-	c.Header("Cache-Control", "public, s-maxage=300")
-	c.JSON(http.StatusOK, gin.H{
-		"top3":      top3,
-		"list":      pageMedia,
-		"last_page": lastPage,
-		"source":    source,
-	})
-}
+	c.Header("Cache-Control", "Boleh diperjelas dulu, **full dari proyek atau dokumen apa** yang ingin dibuatkan? 
 
-func userSyncHandler(c *gin.Context) {
-	turnstileToken := c.GetHeader("X-Turnstile-Token")
-	if turnstileToken != "" && !verifyTurnstileToken(turnstileToken, c.ClientIP()) {
-		log.Printf("[Turnstile Warning] Bypassing failed verification for seamless mobile UX")
-	}
+Apakah ini terkait:
+* Draft artikel/opini lengkap?
+* Naskah/script video?
+* Prompt AI komprehensif?
+* Kode/layout desain UI (CSS/JS)?
+* Atau susunan laporan/proposal penelitian?
 
-	var body UserSyncRequest
-	if err := c.BindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	resp, err := supabaseRequest("GET", fmt.Sprintf("login?anilist_id=eq.%s&session_id=eq.%s", url.QueryEscape(body.AnilistID), url.QueryEscape(body.SessionID)), nil, nil)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	defer resp.Body.Close()
-
-	var rows []map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&rows)
-
-	if len(rows) == 0 {
-		insBody, _ := json.Marshal(map[string]interface{}{
-			"anilist_id": body.AnilistID,
-			"session_id": body.SessionID,
-			"cookies":    body.CookiesEncrypted,
-		})
-		supabaseRequest("POST", "login", insBody, nil)
-		c.JSON(http.StatusOK, gin.H{"status": "created", "anilist_id": body.AnilistID, "session_id": body.SessionID, "cookies_encrypted": body.CookiesEncrypted})
-	} else {
-		cookiesData := rows[0]["cookies"]
-		c.JSON(http.StatusOK, gin.H{"status": "exists", "anilist_id": body.AnilistID, "session_id": body.SessionID, "cookies_encrypted": cookiesData})
-	}
-}
-
-func userDataHandler(c *gin.Context) {
-	anilistID := c.Query("anilist_id")
-	sessionID := c.Query("session_id")
-
-	query := fmt.Sprintf("login?anilist_id=eq.%s&select=cookies", url.QueryEscape(anilistID))
-	if sessionID != "" {
-		query += fmt.Sprintf("&session_id=eq.%s", url.QueryEscape(sessionID))
-	}
-
-	resp, err := supabaseRequest("GET", query, nil, nil)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	defer resp.Body.Close()
-
-	var rows []map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&rows)
-
-	if len(rows) > 0 {
-		c.JSON(http.StatusOK, gin.H{"cookies_encrypted": rows[0]["cookies"]})
-	} else {
-		c.JSON(http.StatusOK, gin.H{"cookies_encrypted": ""})
-	}
-}
-
-func userUpdateHandler(c *gin.Context) {
-	turnstileToken := c.GetHeader("X-Turnstile-Token")
-	if turnstileToken != "" && !verifyTurnstileToken(turnstileToken, c.ClientIP()) {
-		log.Printf("[Turnstile Warning] Bypassing failed verification for seamless mobile UX")
-	}
-
-	var body UserSyncRequest
-	if err := c.BindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	updBody, _ := json.Marshal(map[string]interface{}{"cookies": body.CookiesEncrypted})
-	query := fmt.Sprintf("login?anilist_id=eq.%s", url.QueryEscape(body.AnilistID))
-	if body.SessionID != "" {
-		query += fmt.Sprintf("&session_id=eq.%s", url.QueryEscape(body.SessionID))
-	}
-
-	resp, err := supabaseRequest("PATCH", query, updBody, nil)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	defer resp.Body.Close()
-
-	c.JSON(http.StatusOK, gin.H{"status": "success"})
-}
-
-func userLogoutOthersHandler(c *gin.Context) {
-	var body LogoutOthersRequest
-	if err := c.BindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	query := fmt.Sprintf("login?anilist_id=eq.%s&session_id=neq.%s", url.QueryEscape(body.AnilistID), url.QueryEscape(body.CurrentSessionID))
-	resp, err := supabaseRequest("DELETE", query, nil, nil)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	defer resp.Body.Close()
-
-	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Berhasil mengeluarkan akun dari perangkat lain."})
-}
+Beri tahu detail singkat atau konteksnya agar bisa langsung saya buatkan versi lengkapnya!
