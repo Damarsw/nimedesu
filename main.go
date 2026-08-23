@@ -700,7 +700,6 @@ func saveRankingCacheToSupabase(category string, data []RankMedia) {
 	}()
 }
 
-// PERBAIKAN: Menggunakan fmt.Errorf (bukan fmt.Sprintf)
 func fetchRankingCacheFromSupabase(category string) ([]RankMedia, error) {
 	if supabaseURL == "" || supabaseKey == "" {
 		return nil, fmt.Errorf("supabase belum dikonfigurasi")
