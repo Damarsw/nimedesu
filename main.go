@@ -72,7 +72,13 @@ type ExternalAnimeMetadata struct {
 
 type UserSyncRequest struct {
 	AnilistID        string `json:"anilist_id"`
+	SessionID        string `json:"session_id"`
 	CookiesEncrypted string `json:"cookies_encrypted"`
+}
+
+type LogoutOthersRequest struct {
+	AnilistID        string `json:"anilist_id"`
+	CurrentSessionID string `json:"current_session_id"`
 }
 
 var (
@@ -601,6 +607,7 @@ func main() {
 	r.POST("/api/user-sync", userSyncHandler)
 	r.GET("/api/user-data", userDataHandler)
 	r.POST("/api/user-update", userUpdateHandler)
+	r.POST("/api/user-logout-others", userLogoutOthersHandler)
 
 	SetupSEORoutes(r)
 	r.GET("/api/clear-cache", func(c *gin.Context) {
@@ -1028,7 +1035,7 @@ func userSyncHandler(c *gin.Context) {
 		return
 	}
 
-	resp, err := supabaseRequest("GET", fmt.Sprintf("login?anilist_id=eq.%s", url.QueryEscape(body.AnilistID)), nil, nil)
+	resp, err := supabaseRequest("GET", fmt.Sprintf("login?anilist_id=eq.%s&session_id=eq.%s", url.QueryEscape(body.AnilistID), url.QueryEscape(body.SessionID)), nil, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1041,19 +1048,27 @@ func userSyncHandler(c *gin.Context) {
 	if len(rows) == 0 {
 		insBody, _ := json.Marshal(map[string]interface{}{
 			"anilist_id": body.AnilistID,
+			"session_id": body.SessionID,
 			"cookies":    body.CookiesEncrypted,
 		})
 		supabaseRequest("POST", "login", insBody, nil)
-		c.JSON(http.StatusOK, gin.H{"status": "created", "anilist_id": body.AnilistID, "cookies_encrypted": body.CookiesEncrypted})
+		c.JSON(http.StatusOK, gin.H{"status": "created", "anilist_id": body.AnilistID, "session_id": body.SessionID, "cookies_encrypted": body.CookiesEncrypted})
 	} else {
 		cookiesData := rows[0]["cookies"]
-		c.JSON(http.StatusOK, gin.H{"status": "exists", "anilist_id": body.AnilistID, "cookies_encrypted": cookiesData})
+		c.JSON(http.StatusOK, gin.H{"status": "exists", "anilist_id": body.AnilistID, "session_id": body.SessionID, "cookies_encrypted": cookiesData})
 	}
 }
 
 func userDataHandler(c *gin.Context) {
 	anilistID := c.Query("anilist_id")
-	resp, err := supabaseRequest("GET", fmt.Sprintf("login?anilist_id=eq.%s&select=cookies", url.QueryEscape(anilistID)), nil, nil)
+	sessionID := c.Query("session_id")
+
+	query := fmt.Sprintf("login?anilist_id=eq.%s&select=cookies", url.QueryEscape(anilistID))
+	if sessionID != "" {
+		query += fmt.Sprintf("&session_id=eq.%s", url.QueryEscape(sessionID))
+	}
+
+	resp, err := supabaseRequest("GET", query, nil, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1083,7 +1098,12 @@ func userUpdateHandler(c *gin.Context) {
 	}
 
 	updBody, _ := json.Marshal(map[string]interface{}{"cookies": body.CookiesEncrypted})
-	resp, err := supabaseRequest("PATCH", fmt.Sprintf("login?anilist_id=eq.%s", url.QueryEscape(body.AnilistID)), updBody, nil)
+	query := fmt.Sprintf("login?anilist_id=eq.%s", url.QueryEscape(body.AnilistID))
+	if body.SessionID != "" {
+		query += fmt.Sprintf("&session_id=eq.%s", url.QueryEscape(body.SessionID))
+	}
+
+	resp, err := supabaseRequest("PATCH", query, updBody, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1091,4 +1111,22 @@ func userUpdateHandler(c *gin.Context) {
 	defer resp.Body.Close()
 
 	c.JSON(http.StatusOK, gin.H{"status": "success"})
+}
+
+func userLogoutOthersHandler(c *gin.Context) {
+	var body LogoutOthersRequest
+	if err := c.BindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	query := fmt.Sprintf("login?anilist_id=eq.%s&session_id=neq.%s", url.QueryEscape(body.AnilistID), url.QueryEscape(body.CurrentSessionID))
+	resp, err := supabaseRequest("DELETE", query, nil, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+
+	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Berhasil mengeluarkan akun dari perangkat lain."})
 }
