@@ -182,8 +182,9 @@ function loginAniList() {
 function logoutAniList() {
     localStorage.removeItem('anilist_token');
     localStorage.removeItem('anilist_user');
-    alert("Berhasil logout!");
-    location.reload();
+
+    alert("Berhasil logout! Silakan login kembali.");
+    window.location.reload();
 }
 
 async function checkAniListAuthStatus() {
