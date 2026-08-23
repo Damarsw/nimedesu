@@ -292,6 +292,7 @@ func fetchMetadataFromAniList(title string) (*ExternalAnimeMetadata, error) {
 	})
 
 	req, _ := http.NewRequest("POST", "https://graphql.anilist.co", bytes.NewBuffer(reqBody))
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{Timeout: 4 * time.Second}
 
@@ -527,8 +528,13 @@ func fetchAniListBatch(category string) ([]RankMedia, error) {
 
 	reqBody, _ := json.Marshal(map[string]string{"query": graphqlQuery})
 	req, _ := http.NewRequest("POST", "https://graphql.anilist.co", bytes.NewBuffer(reqBody))
+	
+	// HEADER BYPASS CLOUDFLARE 400
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Origin", "https://anilist.co")
+	req.Header.Set("Referer", "https://anilist.co/")
 
 	client := &http.Client{Timeout: 8 * time.Second}
 	resp, err := client.Do(req)
@@ -1235,6 +1241,7 @@ func anilistScoreHandler(c *gin.Context) {
 	reqBody, _ := json.Marshal(map[string]interface{}{"query": graphqlQuery, "variables": map[string]string{"search": title}})
 
 	req, _ := http.NewRequest("POST", "https://graphql.anilist.co", bytes.NewBuffer(reqBody))
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{Timeout: 3 * time.Second}
 
