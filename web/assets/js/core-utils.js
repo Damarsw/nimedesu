@@ -8,26 +8,6 @@
         document.body.style.display = 'none';
         window.stop();
     }
-    function detectDebugger() {
-        const startTime = performance.now();
-        (function() {}["constructor"]("debugger")());
-        const endTime = performance.now();
-        if (endTime - startTime > 100) {
-            triggerBlankScreen();
-        }
-    }
-    setInterval(detectDebugger, 500);
-    document.addEventListener('keydown', function(e) {
-        if (
-            e.keyCode === 123 ||
-            (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) ||
-            (e.ctrlKey && e.keyCode === 85)
-        ) {
-            e.preventDefault();
-            e.stopPropagation();
-            triggerBlankScreen();
-        }
-    });
 })();
 
 document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
