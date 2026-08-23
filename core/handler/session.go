@@ -12,21 +12,20 @@ type SyncRequest struct {
 }
 
 func GetUserDataHandler(c *gin.Context) {
-	anilistID := c.Query("anilist_id")
-	sessionID := c.Query("session_id")
-	
-	sessionExists := checkSessionInSupabase(anilistID, sessionID) 
+    anilistID := c.Query("anilist_id")
+    sessionID := c.Query("session_id")
 
-	if !sessionExists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  "session_invalid",
-			"message": "Sesi tidak valid / telah dikeluarkan. Silakan login kembali.",
-		})
-		return
-	}
+    cookiesData, err := fetchCookiesFromSupabase(anilistID, sessionID)
 
-	cookiesData := fetchCookiesFromSupabase(sessionID)
-	c.JSON(http.StatusOK, gin.H{"cookies_encrypted": cookiesData})
+    if err != nil || cookiesData == "" {
+        c.JSON(http.StatusUnauthorized, gin.H{
+            "status":  "session_invalid",
+            "message": "Sesi tidak ditemukan atau telah di-logout.",
+        })
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"cookies_encrypted": cookiesData})
 }
 
 func LogoutOtherDevicesHandler(c *gin.Context) {
