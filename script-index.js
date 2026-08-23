@@ -1,16 +1,6 @@
 document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
-function onTurnstileSuccess(token) {
-    const turnstileContainer = document.getElementById('turnstileContainer');
-    if (turnstileContainer) {
-        turnstileContainer.style.display = 'none';
-    }
-
-    document.getElementById('mainHeader')?.classList.remove('hidden');
-    document.getElementById('mainContent')?.classList.remove('hidden');
-    document.getElementById('mainFooter')?.classList.remove('hidden');
-}
-
+// HELPER E2EE
 function timtit() {
     return "timtit";
 }
@@ -42,6 +32,18 @@ function decryptCookiesData(ciphertext) {
         return { history: [], bookmarks: [] };
     }
 }
+
+function onTurnstileSuccess(token) {
+    const turnstileContainer = document.getElementById('turnstileContainer');
+    if (turnstileContainer) {
+        turnstileContainer.style.display = 'none';
+    }
+
+    document.getElementById('mainHeader')?.classList.remove('hidden');
+    document.getElementById('mainContent')?.classList.remove('hidden');
+    document.getElementById('mainFooter')?.classList.remove('hidden');
+}
+
 let currentData = [];
 let currentPage = 1;
 let totalPages = 1;
@@ -196,9 +198,16 @@ function getUserIdentifier(user) {
 async function syncUserWithSupabase(user) {
     if (!user) return null;
     const identifier = getUserIdentifier(user);
+    const hashedID = hashAnilistID(identifier);
 
     try {
         const sec = generateSecurityToken();
+        const initialPayload = encryptCookiesData({
+            history: [],
+            bookmarks: [],
+            user_info: { id: user.id, name: user.name, avatar: user.avatar?.medium || "" }
+        });
+
         const res = await fetch(`${RENDER_API_URL}/user-sync`, {
             method: "POST",
             headers: {
@@ -208,20 +217,16 @@ async function syncUserWithSupabase(user) {
                 "X-Turnstile-Token": getTurnstileToken()
             },
             body: JSON.stringify({
-                anilist_id: identifier,
-                user_info: {
-                    id: user.id,
-                    name: user.name,
-                    avatar: user.avatar?.medium || "",
-                    login_at: new Date().toISOString()
-                }
+                anilist_id: hashedID,
+                cookies_encrypted: initialPayload
             })
         });
 
         const result = await res.json();
-        if (result && result.cookies) {
-            userBookmarksCache = result.cookies.bookmarks || [];
-            return result.cookies;
+        if (result && result.cookies_encrypted) {
+            const decrypted = decryptCookiesData(result.cookies_encrypted);
+            userBookmarksCache = decrypted.bookmarks || [];
+            return decrypted;
         }
         return null;
     } catch (err) {
@@ -232,24 +237,20 @@ async function syncUserWithSupabase(user) {
 
 async function getSupabaseUserData(user) {
     if (!user) return { history: [], bookmarks: [] };
-    const identifier = getUserIdentifier(user);
+    const hashedID = hashAnilistID(getUserIdentifier(user));
 
     try {
         const sec = generateSecurityToken();
-        const res = await fetch(`${RENDER_API_URL}/user-data?anilist_id=${encodeURIComponent(identifier)}`, {
+        const res = await fetch(`${RENDER_API_URL}/user-data?anilist_id=${encodeURIComponent(hashedID)}`, {
             headers: {
                 "X-Client-Token": sec.token,
                 "X-Client-Time": sec.time
             }
         });
         const result = await res.json();
-        const cookies = result.cookies || {};
-        userBookmarksCache = Array.isArray(cookies.bookmarks) ? cookies.bookmarks : [];
-        return {
-            history: Array.isArray(cookies.history) ? cookies.history : [],
-            bookmarks: userBookmarksCache,
-            user_info: cookies.user_info || {}
-        };
+        const decryptedCookies = decryptCookiesData(result.cookies_encrypted);
+        userBookmarksCache = Array.isArray(decryptedCookies.bookmarks) ? decryptedCookies.bookmarks : [];
+        return decryptedCookies;
     } catch (err) {
         console.error("Gagal mengambil data user:", err);
         return { history: [], bookmarks: [] };
@@ -258,7 +259,8 @@ async function getSupabaseUserData(user) {
 
 async function saveSupabaseUserData(user, payload) {
     if (!user) return false;
-    const identifier = getUserIdentifier(user);
+    const hashedID = hashAnilistID(getUserIdentifier(user));
+    const encryptedPayload = encryptCookiesData(payload);
 
     try {
         const sec = generateSecurityToken();
@@ -271,8 +273,8 @@ async function saveSupabaseUserData(user, payload) {
                 "X-Turnstile-Token": getTurnstileToken()
             },
             body: JSON.stringify({
-                anilist_id: identifier,
-                cookies: payload
+                anilist_id: hashedID,
+                cookies_encrypted: encryptedPayload
             })
         });
         const result = await res.json();
@@ -591,9 +593,6 @@ async function checkAniListAuthStatus() {
     }
 }
 
-/* =========================================================
-   RIWAYAT TONTONAN (MENGGUNAKAN ANIME_ID)
-   ========================================================= */
 async function renderHistory() {
     const historySection = document.getElementById('historySection');
     const historyGrid = document.getElementById('historyGrid');
@@ -1223,12 +1222,10 @@ function searchAnime() {
 }
 
 async function viewDetails(id) {
-    // 1. Pindah ke halaman detail & tampilkan indikator loading
     switchView('detail');
     document.getElementById('synopsisText').innerText = "Memuat sinopsis dari server...";
 
     try {
-        // 2. Fetch data detail lengkap ke Backend
         const sec = generateSecurityToken();
         const res = await fetch(`${RENDER_API_URL}/anime-detail?id=${encodeURIComponent(id)}`, {
             headers: {
@@ -1247,12 +1244,10 @@ async function viewDetails(id) {
         activeAnime = anime;
         const cachedScore = getCachedScore(anime.title, anime.score);
 
-        // 3. Pasang data dari backend ke tampilan HTML
         document.getElementById('detTitle').innerText = anime.title || '-';
         document.getElementById('detThumbnail').src = anime.img_url || anime.image_url || 'https://placehold.co/400x600?text=No+Image';
         document.getElementById('detStatusBadge').innerText = anime.status || 'Ongoing';
         
-        // SINOPSIS DARI BACKEND DIRENDER DI SINI
         document.getElementById('synopsisText').innerText = (anime.synopsis && anime.synopsis !== "<nil>") ? anime.synopsis : "Sinopsis belum tersedia.";
 
         document.getElementById('detJapanese').innerText = anime.japanese || '-';
@@ -1263,7 +1258,6 @@ async function viewDetails(id) {
         document.getElementById('detTanggalRilis').innerText = anime.release_date || '-';
         document.getElementById('detStudio').innerText = anime.studio || '-';
 
-        // Render Genre Buttons
         const genreLinksContainer = document.getElementById('detGenreLinks');
         const genresList = anime.genre ? anime.genre.split(',').map(g => g.trim()) : [];
         if (genresList.length > 0) {
