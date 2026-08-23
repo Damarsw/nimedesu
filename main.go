@@ -40,10 +40,35 @@ type TurnstileResponse struct {
 
 type BatchStore struct {
 	sync.RWMutex
-	ByPopularity []interface{} `json:"bypopularity"`
-	Upcoming     []interface{} `json:"upcoming"`
-	Favorite     []interface{} `json:"favorite"`
-	LastUpdated  int64         `json:"last_updated"`
+	ByPopularity       []RankMedia `json:"bypopularity"`
+	Upcoming           []RankMedia `json:"upcoming"`
+	Favorite           []RankMedia `json:"favorite"`
+	LastUpdated        int64       `json:"last_updated"`
+	SourceByPopularity string      `json:"-"`
+	SourceUpcoming     string      `json:"-"`
+	SourceFavorite     string      `json:"-"`
+}
+
+// RankMedia adalah struktur seragam untuk data ranking anime, dipakai
+// bersama oleh AniList (utama), Jikan (cadangan 1), dan cache Supabase
+// (cadangan 2) supaya format respons ke frontend selalu konsisten.
+type RankMedia struct {
+	ID           int       `json:"id"`
+	Title        RankTitle `json:"title"`
+	CoverImage   RankCover `json:"coverImage"`
+	AverageScore float64   `json:"averageScore"`
+	Popularity   int       `json:"popularity"`
+}
+
+type RankTitle struct {
+	Romaji        string `json:"romaji"`
+	English       string `json:"english"`
+	UserPreferred string `json:"userPreferred"`
+}
+
+type RankCover struct {
+	ExtraLarge string `json:"extraLarge"`
+	Large      string `json:"large"`
 }
 
 type LocalCache struct {
@@ -450,7 +475,10 @@ func getOrFetchAnimeMetadata(title string) *ExternalAnimeMetadata {
 	return nil
 }
 
-func fetchAniListBatch(category string) []interface{} {
+// fetchAniListBatch adalah sumber data UTAMA untuk ranking. Dipanggil pertama
+// kali setiap refresh; kalau gagal/timeout/kena rate limit, caller akan
+// jatuh ke fetchJikanBatch lalu fetchRankingCacheFromSupabase.
+func fetchAniListBatch(category string) ([]RankMedia, error) {
 	apiCallMutex.Lock()
 	elapsed := time.Since(lastAPICallTime)
 	if elapsed < minCallInterval {
@@ -482,52 +510,240 @@ func fetchAniListBatch(category string) []interface{} {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: 8 * time.Second}
 	resp, err := client.Do(req)
-	if err != nil || resp.StatusCode != 200 {
-		return nil
+	if err != nil {
+		return nil, fmt.Errorf("anilist request error: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == 429 {
+		return nil, fmt.Errorf("anilist rate limited (429)")
+	}
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("anilist request failed: status %d", resp.StatusCode)
+	}
 
 	var result struct {
 		Data struct {
 			Page struct {
-				Media []interface{} `json:"media"`
+				Media []RankMedia `json:"media"`
 			} `json:"Page"`
 		} `json:"data"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&result); err == nil {
-		return result.Data.Page.Media
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("anilist decode error: %w", err)
 	}
-	return nil
+	if len(result.Data.Page.Media) == 0 {
+		return nil, fmt.Errorf("anilist mengembalikan data kosong")
+	}
+	return result.Data.Page.Media, nil
+}
+
+// fetchJikanBatch adalah CADANGAN PERTAMA, dipakai kalau AniList gagal,
+// timeout, atau kena rate limit. Filter Jikan (bypopularity/upcoming/favorite)
+// kebetulan sama persis dengan kategori yang dipakai di endpoint ini.
+func fetchJikanBatch(category string) ([]RankMedia, error) {
+	filter := category
+	if filter != "upcoming" && filter != "favorite" {
+		filter = "bypopularity"
+	}
+
+	client := &http.Client{Timeout: 6 * time.Second}
+	var combined []RankMedia
+
+	for page := 1; page <= 4; page++ {
+		jikanURL := fmt.Sprintf("https://api.jikan.moe/v4/top/anime?filter=%s&page=%d&limit=25", filter, page)
+		req, _ := http.NewRequest("GET", jikanURL, nil)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			break
+		}
+
+		if resp.StatusCode != 200 {
+			resp.Body.Close()
+			break
+		}
+
+		var res struct {
+			Data []struct {
+				MalID   int    `json:"mal_id"`
+				Title   string `json:"title"`
+				TitleEn string `json:"title_english"`
+				Images  struct {
+					JPG struct {
+						LargeImageURL string `json:"large_image_url"`
+					} `json:"jpg"`
+				} `json:"images"`
+				Score   float64 `json:"score"`
+				Members int     `json:"members"`
+			} `json:"data"`
+			Pagination struct {
+				HasNextPage bool `json:"has_next_page"`
+			} `json:"pagination"`
+		}
+
+		decodeErr := json.NewDecoder(resp.Body).Decode(&res)
+		resp.Body.Close()
+		if decodeErr != nil || len(res.Data) == 0 {
+			break
+		}
+
+		for _, item := range res.Data {
+			english := item.TitleEn
+			if english == "" {
+				english = item.Title
+			}
+			combined = append(combined, RankMedia{
+				ID: item.MalID,
+				Title: RankTitle{
+					Romaji:        item.Title,
+					English:       english,
+					UserPreferred: english,
+				},
+				CoverImage: RankCover{
+					ExtraLarge: item.Images.JPG.LargeImageURL,
+					Large:      item.Images.JPG.LargeImageURL,
+				},
+				AverageScore: item.Score * 10, // samakan skala 0-100 seperti AniList
+				Popularity:   item.Members,
+			})
+		}
+
+		if !res.Pagination.HasNextPage {
+			break
+		}
+		time.Sleep(400 * time.Millisecond) // sopan ke rate limit Jikan (~3 req/detik)
+	}
+
+	if len(combined) == 0 {
+		return nil, fmt.Errorf("jikan mengembalikan data kosong")
+	}
+	return combined, nil
+}
+
+// saveRankingCacheToSupabase menyimpan hasil batch (dari AniList atau Jikan
+// yang berhasil) ke tabel Supabase "ranking_cache" secara async, supaya bisa
+// dipakai sebagai CADANGAN TERAKHIR kalau kedua API eksternal down bersamaan.
+func saveRankingCacheToSupabase(category string, data []RankMedia) {
+	if supabaseURL == "" || supabaseKey == "" || len(data) == 0 {
+		return
+	}
+	payload, err := json.Marshal(map[string]interface{}{
+		"category":   category,
+		"data":       data,
+		"updated_at": time.Now().UTC().Format(time.RFC3339),
+	})
+	if err != nil {
+		return
+	}
+
+	go func() {
+		resp, err := supabaseRequest("POST", "ranking_cache?on_conflict=category", payload, map[string]string{
+			"Prefer": "resolution=merge-duplicates",
+		})
+		if err != nil {
+			log.Printf("[Ranking Cache] Gagal menyimpan cache Supabase untuk %s: %v", category, err)
+			return
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode >= 300 {
+			body, _ := io.ReadAll(resp.Body)
+			log.Printf("[Ranking Cache] Upsert Supabase '%s' gagal (status %d): %s", category, resp.StatusCode, string(body))
+		}
+	}()
+}
+
+// fetchRankingCacheFromSupabase adalah CADANGAN KEDUA/TERAKHIR: dipakai hanya
+// kalau AniList maupun Jikan sama-sama gagal/timeout/limit. Mengembalikan
+// data terakhir yang pernah berhasil disimpan (milik Supabase user sendiri).
+func fetchRankingCacheFromSupabase(category string) ([]RankMedia, error) {
+	if supabaseURL == "" || supabaseKey == "" {
+		return nil, fmt.Errorf("supabase belum dikonfigurasi")
+	}
+
+	query := fmt.Sprintf("ranking_cache?category=eq.%s&select=data&limit=1", url.QueryEscape(category))
+	resp, err := supabaseRequest("GET", query, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("supabase request error: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("supabase request failed: status %d", resp.StatusCode)
+	}
+
+	var rows []struct {
+		Data []RankMedia `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&rows); err != nil {
+		return nil, fmt.Errorf("supabase decode error: %w", err)
+	}
+	if len(rows) == 0 || len(rows[0].Data) == 0 {
+		return nil, fmt.Errorf("cache supabase kosong untuk kategori %s", category)
+	}
+	return rows[0].Data, nil
+}
+
+// fetchBatchWithFallback menjalankan rantai prioritas:
+// 1) AniList (utama) -> 2) Jikan (cadangan) -> 3) Cache Supabase (cadangan terakhir).
+// Setiap kali AniList/Jikan berhasil, hasilnya otomatis disimpan ke Supabase
+// supaya cache selalu segar untuk fallback berikutnya.
+func fetchBatchWithFallback(category string) ([]RankMedia, string) {
+	if data, err := fetchAniListBatch(category); err == nil && len(data) > 0 {
+		saveRankingCacheToSupabase(category, data)
+		return data, "anilist"
+	} else {
+		log.Printf("[Ranking Fallback] AniList gagal untuk '%s': %v -- mencoba Jikan...", category, err)
+	}
+
+	if data, err := fetchJikanBatch(category); err == nil && len(data) > 0 {
+		saveRankingCacheToSupabase(category, data)
+		return data, "jikan"
+	} else {
+		log.Printf("[Ranking Fallback] Jikan gagal untuk '%s': %v -- mencoba cache Supabase...", category, err)
+	}
+
+	if data, err := fetchRankingCacheFromSupabase(category); err == nil && len(data) > 0 {
+		log.Printf("[Ranking Fallback] Memakai cache Supabase untuk '%s'", category)
+		return data, "supabase_cache"
+	} else {
+		log.Printf("[Ranking Fallback] Cache Supabase juga gagal untuk '%s': %v", category, err)
+	}
+
+	return nil, "unavailable"
 }
 
 func startCronWorker() {
 	ticker := time.NewTicker(5 * time.Minute)
 	go func() {
 		for {
-			log.Println("[Cron Worker] Refreshing AniList batch ranking...")
-			pop := fetchAniListBatch("bypopularity")
+			log.Println("[Cron Worker] Refreshing batch ranking (AniList -> Jikan -> Supabase)...")
+			pop, popSrc := fetchBatchWithFallback("bypopularity")
 			time.Sleep(1 * time.Second)
-			upc := fetchAniListBatch("upcoming")
+			upc, upcSrc := fetchBatchWithFallback("upcoming")
 			time.Sleep(1 * time.Second)
-			fav := fetchAniListBatch("favorite")
+			fav, favSrc := fetchBatchWithFallback("favorite")
 
 			batchStore.Lock()
-			if pop != nil {
+			if len(pop) > 0 {
 				batchStore.ByPopularity = pop
+				batchStore.SourceByPopularity = popSrc
 			}
-			if upc != nil {
+			if len(upc) > 0 {
 				batchStore.Upcoming = upc
+				batchStore.SourceUpcoming = upcSrc
 			}
-			if fav != nil {
+			if len(fav) > 0 {
 				batchStore.Favorite = fav
+				batchStore.SourceFavorite = favSrc
 			}
 			batchStore.LastUpdated = time.Now().Unix()
 			batchStore.Unlock()
 
-			log.Println("[Cron Worker] Batch ranking update success!")
+			log.Printf("[Cron Worker] Batch ranking update selesai! (pop:%s, upcoming:%s, favorite:%s)", popSrc, upcSrc, favSrc)
 			<-ticker.C
 		}
 	}()
@@ -992,22 +1208,59 @@ func rankingHandler(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 
 	batchStore.RLock()
-	var allMedia []interface{}
+	var allMedia []RankMedia
+	var source string
 	switch category {
 	case "upcoming":
 		allMedia = batchStore.Upcoming
+		source = batchStore.SourceUpcoming
 	case "favorite":
 		allMedia = batchStore.Favorite
+		source = batchStore.SourceFavorite
 	default:
 		allMedia = batchStore.ByPopularity
+		source = batchStore.SourceByPopularity
 	}
 	batchStore.RUnlock()
 
+	// Kalau memory store masih kosong (mis. baru start / cron belum sempat jalan),
+	// jalankan langsung rantai fallback: AniList -> Jikan -> cache Supabase.
 	if len(allMedia) == 0 {
-		allMedia = fetchAniListBatch(category)
+		fetched, src := fetchBatchWithFallback(category)
+		if len(fetched) > 0 {
+			allMedia = fetched
+			source = src
+
+			batchStore.Lock()
+			switch category {
+			case "upcoming":
+				batchStore.Upcoming = fetched
+				batchStore.SourceUpcoming = src
+			case "favorite":
+				batchStore.Favorite = fetched
+				batchStore.SourceFavorite = src
+			default:
+				batchStore.ByPopularity = fetched
+				batchStore.SourceByPopularity = src
+			}
+			batchStore.LastUpdated = time.Now().Unix()
+			batchStore.Unlock()
+		}
 	}
 
-	top3 := make([]interface{}, 0)
+	if len(allMedia) == 0 {
+		c.Header("Cache-Control", "no-store")
+		c.JSON(http.StatusOK, gin.H{
+			"top3":      []RankMedia{},
+			"list":      []RankMedia{},
+			"last_page": 1,
+			"source":    "unavailable",
+			"error":     "AniList, Jikan, dan cache Supabase semuanya gagal dimuat. Coba lagi sebentar lagi.",
+		})
+		return
+	}
+
+	top3 := make([]RankMedia, 0)
 	if len(allMedia) >= 3 {
 		top3 = allMedia[:3]
 	}
@@ -1030,12 +1283,19 @@ func rankingHandler(c *gin.Context) {
 	totalItems := int(math.Max(float64(len(allMedia)-3), 1))
 	lastPage := int(math.Ceil(float64(totalItems) / 12.0))
 
-	c.Header("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=3600")
+	// Cache lebih pendek kalau sumbernya bukan AniList langsung, supaya
+	// klien lebih cepat coba lagi dapat data segar begitu API utama pulih.
+	if source == "anilist" {
+		c.Header("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=3600")
+	} else {
+		c.Header("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600")
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"top3":      top3,
 		"list":      pageMedia,
 		"last_page": lastPage,
-		"source":    "batch_memory_store",
+		"source":    source,
 	})
 }
 
