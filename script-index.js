@@ -1,5 +1,4 @@
 document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
-
 function timtit() {
     return "timtit";
 }
@@ -1534,16 +1533,31 @@ async function fetchRankingFromBackend(type, page, loadingEl, podiumEl, gridEl, 
         loadingEl.classList.add('hidden');
 
         const top3Data = json.top3 || [];
-        const listData = json.list || [];
+        let listData = json.list || [];
         const lastPage = json.last_page || 1;
 
         if (top3Data.length >= 3) {
             renderPodiumData(top3Data);
             podiumEl.classList.remove('hidden');
+        } else {
+            podiumEl.classList.add('hidden');
+        }
+
+        // Kalau listData kosong padahal ada data di top3Data (kasus hanya dapat beberapa item dari Jikan)
+        if (listData.length === 0 && top3Data.length > 3) {
+            listData = top3Data.slice(3);
         }
 
         const startRankOffset = page === 1 ? 4 : ((page - 1) * 12 + 4);
-        gridEl.innerHTML = listData.map((anime, idx) => renderRankListItem(anime, startRankOffset + idx)).join('');
+        
+        if (listData.length > 0) {
+            gridEl.innerHTML = listData.map((anime, idx) => renderRankListItem(anime, startRankOffset + idx)).join('');
+        } else if (top3Data.length < 3) {
+            // Jika data kurang dari 3, render semua di grid list
+            gridEl.innerHTML = top3Data.map((anime, idx) => renderRankListItem(anime, idx + 1)).join('');
+        } else {
+            gridEl.innerHTML = `<p class="text-zinc-600 dark:text-zinc-400 col-span-full text-center py-10 font-medium">Sisa daftar anime belum tersedia.</p>`;
+        }
 
         renderInfoPagination(type, page, lastPage, paginationEl);
 
@@ -1626,6 +1640,7 @@ function renderRankListItem(anime, rankNumber) {
     `;
 }
 
+// GANTI FUNGSI renderInfoPagination DI script-index.js DENGAN INI:
 function renderInfoPagination(type, page, totalPageCount, paginationEl) {
     if (!paginationEl || totalPageCount <= 1) {
         if (paginationEl) paginationEl.innerHTML = '';
