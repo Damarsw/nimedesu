@@ -2,11 +2,11 @@
   "rewrites": [
     {
       "source": "/api-backend/proxy-stream",
-      "destination": "https://nimedesu.onrender.com/api/proxy-stream"
+      "destination": "@SYS_TELEMETRY_HOST/proxy-stream"
     },
     {
       "source": "/api-backend/:path*",
-      "destination": "https://nimedesu.onrender.com/api/:path*"
+      "destination": "@SYS_TELEMETRY_HOST/:path*"
     }
   ],
   "headers": [
