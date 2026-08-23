@@ -624,6 +624,8 @@ async function checkAniListAuthStatus() {
         if (user) {
             localStorage.setItem('anilist_user', JSON.stringify(user));
 
+            const userData = await getSupabaseUserData(user);
+
             if (headerAuthContainer) {
                 headerAuthContainer.innerHTML = `
                     <div class="flex items-center bg-white dark:bg-zinc-800/90 p-0.5 rounded-full border border-neon-yellow shadow-xs">
@@ -649,14 +651,12 @@ async function checkAniListAuthStatus() {
                 userWelcomeBanner.classList.remove('hidden');
             }
 
-            await syncUserWithSupabase(user);
             renderHistory();
         }
     } catch (err) {
         console.error("Auth check failed:", err);
     }
 }
-
 async function renderHistory() {
     const historySection = document.getElementById('historySection');
     const historyGrid = document.getElementById('historyGrid');
