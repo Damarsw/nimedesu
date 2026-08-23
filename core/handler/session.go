@@ -1,28 +1,50 @@
 package handler
 
 import (
-	"fmt"
 	"net/http"
-	"net/url"
-	"nimedesu/core/dto"
-	"nimedesu/core/provider"
-
 	"github.com/gin-gonic/gin"
 )
 
-func UserSyncHandler(c *gin.Context) {
-	var body dto.UserSyncRequest
+type SyncRequest struct {
+	AnilistID        string `json:"anilist_id"`
+	SessionID        string `json:"session_id"`
+	CookiesEncrypted string `json:"cookies_encrypted"`
+}
+
+func GetUserDataHandler(c *gin.Context) {
+	anilistID := c.Query("anilist_id")
+	sessionID := c.Query("session_id")
+	
+	sessionExists := checkSessionInSupabase(anilistID, sessionID) 
+
+	if !sessionExists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  "session_invalid",
+			"message": "Sesi tidak valid / telah dikeluarkan. Silakan login kembali.",
+		})
+		return
+	}
+
+	cookiesData := fetchCookiesFromSupabase(sessionID)
+	c.JSON(http.StatusOK, gin.H{"cookies_encrypted": cookiesData})
+}
+
+func LogoutOtherDevicesHandler(c *gin.Context) {
+	var body struct {
+		AnilistID        string `json:"anilist_id"`
+		CurrentSessionID string `json:"current_session_id"`
+	}
+
 	if err := c.BindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	resp, err := provider.DataRequest("GET", fmt.Sprintf("login?anilist_id=eq.%s", url.QueryEscape(body.AnilistID)), nil, nil)
+	err := deleteOtherSessionsFromSupabase(body.AnilistID, body.CurrentSessionID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menghapus sesi lain."})
 		return
 	}
-	defer resp.Body.Close()
 
-	c.JSON(http.StatusOK, gin.H{"status": "success"})
+	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Perangkat lain berhasil di-logout."})
 }
