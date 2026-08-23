@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -24,5 +25,16 @@ func UserSyncHandler(c *gin.Context) {
 	}
 	defer resp.Body.Close()
 
-	c.JSON(http.StatusOK, gin.H{"status": "success"})
+	var users []map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&users)
+
+	if len(users) > 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"status":            "success",
+			"cookies_encrypted": users[0]["cookies_encrypted"],
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "success", "cookies_encrypted": ""})
 }
