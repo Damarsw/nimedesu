@@ -2,22 +2,11 @@
   "rewrites": [
     {
       "source": "/api-backend/proxy-stream",
-      "destination": "@SYS_TELEMETRY_HOST/proxy-stream"
+      "destination": "@TELEMETRY/proxy-stream"
     },
     {
       "source": "/api-backend/:path*",
-      "destination": "@SYS_TELEMETRY_HOST/:path*"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/(.*\\.json)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=86400, stale-while-revalidate=604800"
-        }
-      ]
+      "destination": "@TELEMETRY/:path*"
     }
   ]
 }
