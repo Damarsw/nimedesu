@@ -36,7 +36,7 @@
                         darkBg: '#0f0e0a',         
                         darkCard: '#1a1912',       
                         darkBorder: '#33311f',     
-                        yellow: '#F6BE00',         /* Warna Kuning Header Cerah */
+                        yellow: '#F6BE00',         
                         yellowHover: '#d4a000'     
                     }
                 },
@@ -121,7 +121,6 @@
             animation: rotateBeam 3.7s linear infinite 1.2s;
         }
     
-        /* Fix Chrome Autofill, Background & Text Color pada Search Input */
         input#searchField {
             background-color: transparent !important;
             color: #000000 !important;
@@ -149,7 +148,6 @@
 </head>
 <body class="bg-neon-lightBg text-black dark:bg-neon-darkBg dark:text-white transition-colors duration-300 min-h-screen flex flex-col">
 
-    <!-- FIXED HEADER (Hidden by default until Turnstile completes) -->
     <header id="mainHeader" class="hidden fixed top-0 left-0 right-0 z-50 bg-[#F6BE00]/90 dark:bg-[#14130e]/90 backdrop-blur-md border-b border-neon-yellow/50 dark:border-neon-darkBorder shadow-sm dark:shadow-[0_4px_20px_rgba(217,155,0,0.15)] transition-transform duration-300">
         <div class="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-3">
@@ -166,12 +164,10 @@
             </div>
 
             <div class="flex items-center space-x-2">
-                <!-- Tombol Search (Kiri) -->
                 <button id="btnSearchToggle" onclick="toggleSearchInput(event)" class="p-2.5 rounded-full bg-transparent hover:bg-black/10 dark:hover:bg-yellow-500/25 transition text-black dark:text-neon-yellow" title="Cari Anime">
                     <i class="fa-solid fa-magnifying-glass text-sm"></i>
                 </button>
 
-                <!-- Tombol Login / User Icon (Kanan) -->
                 <div id="headerAuthContainer">
                     <button onclick="loginAniList()" class="p-2.5 rounded-full bg-transparent hover:bg-black/10 dark:hover:bg-yellow-500/25 transition text-black dark:text-neon-yellow" title="Login AniList">
                         <i class="fa-solid fa-user text-sm"></i>
@@ -180,7 +176,6 @@
             </div>
         </div>
 
-        <!-- SEARCH BAR TOGGLE (NONGTOL / MENYEMBUL LANGSUNG DARI BAWAH HEADER) -->
         <div id="searchContainer" class="hidden w-full bg-white/95 dark:bg-[#1a1912]/95 border-b-2 border-neon-yellow shadow-xl py-3 px-4 sm:px-8 transition-all duration-300 relative z-50">
             <div id="searchBoxWrapper" class="relative max-w-2xl mx-auto flex flex-col">
                 <div class="flex items-center bg-zinc-100 dark:bg-zinc-900 rounded-2xl border border-neon-yellow/60 overflow-hidden px-2 py-1 shadow-inner">
@@ -192,7 +187,6 @@
                         <i class="fa-solid fa-xmark text-base"></i>
                     </button>
                 </div>
-                <!-- Live Search Suggestions Dropdown di Bawah Input Search Header -->
                 <div id="searchSuggestions" class="hidden w-full bg-white dark:bg-[#1a1912] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-h-72 overflow-y-auto mt-2 p-2 z-50"></div>
             </div>
         </div>
@@ -233,6 +227,10 @@
                 </div>
             </div>
 
+            <button onclick="switchView('maintenance'); toggleSidebar();" class="flex items-center gap-3 p-3 rounded-xl hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left">
+                <i class="fa-solid fa-wrench text-black dark:text-neon-yellow w-5 text-center"></i> Update & Maintenance
+            </button>
+
             <button onclick="switchView('dmca'); toggleSidebar();" class="flex items-center gap-3 p-3 rounded-xl hover:bg-black/10 dark:hover:bg-neon-yellow/20 text-black dark:text-white transition text-left">
                 <i class="fa-solid fa-lock text-black dark:text-neon-yellow w-5 text-center"></i> DMCA
             </button>
@@ -245,13 +243,10 @@
         </div>
     </div>
 
-    <!-- MAIN CONTENT (Hidden by default until Turnstile completes) -->
     <main id="mainContent" class="hidden flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full mt-16 text-black dark:text-white">
 
-        <!-- HOME VIEW -->
         <div id="homeView">
-            <!-- UCAPAN SELAMAT DATANG USER (GREETING BANNER) -->
-            <div id="userWelcomeBanner" class="hidden mb-6 p-4 rounded-2xl bg-neon-lightCard dark:bg-neon-darkCard border border-neon-yellow/50 shadow-sm flex items-center justify-between">
+            <div id="userWelcomeBanner" class="hidden mb-6 p-4 rounded-2xl bg-neon-lightCard dark:bg-neon-darkCard border border-neon-yellow/50 shadow-sm flex items-center justify-between flex-wrap gap-3">
                 <div class="flex items-center gap-3">
                     <div id="userWelcomeAvatarContainer"></div>
                     <div>
@@ -259,9 +254,14 @@
                         <h3 id="userWelcomeName" class="text-base sm:text-lg font-extrabold text-black dark:text-neon-yellow leading-tight">-</h3>
                     </div>
                 </div>
-                <button onclick="logoutAniList()" class="px-3 py-1.5 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-bold transition flex items-center gap-1.5" title="Logout">
-                    <i class="fa-solid fa-right-from-bracket text-xs"></i> <span class="hidden sm:inline">Logout</span>
-                </button>
+                <div class="flex items-center gap-2">
+                    <button onclick="logoutOtherDevices()" class="px-3 py-1.5 rounded-full bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-600 dark:text-neon-yellow text-xs font-bold transition flex items-center gap-1.5" title="Logout Sesi Lain">
+                        <i class="fa-solid fa-mobile-screen-button text-xs"></i> <span class="hidden sm:inline">Logout Perangkat Lain</span>
+                    </button>
+                    <button onclick="logoutAniList()" class="px-3 py-1.5 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-bold transition flex items-center gap-1.5" title="Logout">
+                        <i class="fa-solid fa-right-from-bracket text-xs"></i> <span class="hidden sm:inline">Logout</span>
+                    </button>
+                </div>
             </div>
 
             <div id="historySection" class="mb-10 hidden">
@@ -274,11 +274,8 @@
                 <div id="historyGrid" class="flex gap-4 overflow-x-auto no-scrollbar scroll-smooth pb-2 pt-1"></div>
             </div>
 
-            <!-- TAB NAVIGASI BERANDA DENGAN TOGGLE CONTAINER -->
             <div class="relative mb-6">
-                <!-- Baris Tombol Utama (Scrollable Horisontal di HP) -->
                 <div class="flex items-center gap-2 overflow-x-auto no-scrollbar flex-nowrap pb-1 pr-8 scroll-smooth" id="navTabScrollContainer">
-                    <!-- TOMBOL BOOKMARK -->
                     <button id="btnBookmarkTab"
                         class="nav-tab-btn px-4 py-2 rounded-lg bg-neon-lightCard dark:bg-neon-darkCard text-sm font-semibold border border-neon-yellow/60 dark:border-neon-darkBorder transition text-black dark:text-white shadow-xs flex items-center gap-2 hover:border-neon-yellow shrink-0"
                         onclick="changeTab('bookmark', this)"
@@ -294,13 +291,11 @@
                     </button>
                 </div>
 
-                <!-- Petunjuk Panah Scroll Kanan di HP -->
                 <div class="pointer-events-none absolute right-0 top-0 bottom-1 w-12 bg-gradient-to-l from-neon-lightBg dark:from-neon-darkBg to-transparent flex items-center justify-end pr-0.5 sm:hidden">
                     <i class="fa-solid fa-chevron-right text-neon-yellow text-xs animate-pulse drop-shadow-md"></i>
                 </div>
             </div>
 
-            <!-- CONTAINER LIST GENRE (GRID TABEL SIMETRIS RAPI) -->
             <div id="genreContainer" class="hidden mb-6 p-4 bg-neon-lightCard dark:bg-neon-darkCard rounded-2xl border border-neon-yellow dark:border-neon-darkBorder shadow-md">
                 <div class="flex items-center justify-between mb-3 pb-2 border-b border-zinc-200 dark:border-zinc-800">
                     <span class="text-xs font-bold text-black dark:text-neon-yellow uppercase tracking-wider flex items-center gap-1.5">
@@ -416,7 +411,6 @@
             <div id="paginationBox" class="flex justify-center items-center space-x-1.5 sm:space-x-2 mt-8 flex-wrap gap-y-2"></div>
         </div>
 
-        <!-- INFORMATION & RANKING VIEW -->
         <div id="informationView" class="hidden">
             <div class="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
                 <div>
@@ -597,6 +591,28 @@
             </div>
         </div>
 
+        <!-- UPDATE & MAINTENANCE VIEW -->
+        <div id="maintenanceView" class="hidden max-w-3xl mx-auto bg-neon-lightCard dark:bg-neon-darkCard p-6 sm:p-8 rounded-2xl border border-neon-yellow dark:border-neon-darkBorder shadow-sm space-y-6 text-xs sm:text-sm leading-relaxed text-zinc-700 dark:text-white">
+            <h2 class="text-xl font-bold border-l-4 border-neon-yellow pl-3 text-black dark:text-white">UPDATE & MAINTENANCE</h2>
+            
+            <div class="space-y-4">
+                <div class="p-4 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+                    <h3 class="font-bold text-black dark:text-neon-yellow flex items-center gap-2 text-sm sm:text-base">
+                        <i class="fa-solid fa-shield-halved"></i> ・Penambahan fitur End-to-End untuk login anilist
+                    </h3>
+                    <div class="rounded-lg overflow-hidden border border-neon-yellow/40 shadow-sm mt-2">
+                        <img src="https://i.ibb.co.com/sd6jKBs3/End.png" alt="End to End Encryption" class="w-full object-cover">
+                    </div>
+                </div>
+
+                <div class="p-4 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-2">
+                    <h3 class="font-bold text-black dark:text-neon-yellow flex items-center gap-2 text-sm sm:text-base">
+                        <i class="fa-solid fa-desktop"></i> ・Penambahan fitur logout dari perangkat lain
+                    </h3>
+                </div>
+            </div>
+        </div>
+
         <!-- DMCA VIEW -->
         <div id="dmcaView" class="hidden max-w-3xl mx-auto bg-neon-lightCard dark:bg-neon-darkCard p-6 sm:p-8 rounded-2xl border border-neon-yellow dark:border-neon-darkBorder shadow-sm space-y-4 text-xs sm:text-sm leading-relaxed text-zinc-700 dark:text-white">
             <h2 class="text-xl font-bold border-l-4 border-neon-yellow pl-3 text-black dark:text-white">PEMBERITAHUAN KEPADA PENGUNJUNG</h2>
@@ -612,13 +628,11 @@
 
     </main>
 
-    <!-- FOOTER (Hidden by default until Turnstile completes) -->
     <footer id="mainFooter" class="hidden border-t border-neon-yellow dark:border-neon-darkBorder py-6 mt-12 text-center text-xs text-zinc-600 dark:text-zinc-400">
         <p>NimeDesu - Nonton Anime Sub Indonesia</p>
         <p class="mt-1">Butuh bantuan atau kirim masukan? <a href="mailto:damdesu@proton.me" class="text-black dark:text-neon-yellow underline font-medium">Hubungi saya</a></p>
     </footer>
 
-    <!-- Floating Theme Switcher Button (Kanan Bawah Kontras) -->
     <button onclick="toggleTheme()" 
             class="fixed bottom-10 right-6 z-50 w-12 h-12 rounded-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-neon-yellow border-2 border-neon-yellow shadow-lg shadow-black/40 flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-300" 
             title="Ganti Tema">
