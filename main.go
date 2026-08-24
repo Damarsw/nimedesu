@@ -38,7 +38,7 @@ func botanicalSecurityMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		reqPath := c.Request.URL.Path
 
-		if reqPath == "/" || reqPath == "/health" || reqPath == "/sitemap.xml" || reqPath == "/robots.txt" || strings.HasPrefix(reqPath, "/api/proxy-stream") || strings.HasPrefix(reqPath, "/proxy-stream") {
+		if reqPath == "/" || reqPath == "/health" || reqPath == "/sitemap.xml" || reqPath == "/robots.txt" || reqPath == "/api/clear-cache" || reqPath == "/api/test-apis" || strings.HasPrefix(reqPath, "/api/proxy-stream") || strings.HasPrefix(reqPath, "/proxy-stream") {
 			c.Next()
 			return
 		}
@@ -48,7 +48,7 @@ func botanicalSecurityMiddleware() gin.HandlerFunc {
 			refererHeader := c.GetHeader("Referer")
 
 			if !strings.Contains(originHeader, bubalinumDomain) && !strings.Contains(refererHeader, bubalinumDomain) {
-				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Access Denied: 403"})
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Access Denied: Direct access is forbidden"})
 				return
 			}
 
@@ -126,6 +126,16 @@ func main() {
 	appEngine.POST("/api/user-logout-others", processUserLogoutOthersBotanical)
 
 	SetupSEORoutes(appEngine)
+	appEngine.GET("/api/clear-cache", func(c *gin.Context) {
+		localCache.Lock()
+		localCache.AnimeList = make(map[string]CacheItem)
+		localCache.ScoreMap = make(map[string]string)
+		localCache.DetailMap = make(map[string]CacheItem)
+		localCache.Unlock()
+		c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Cache RAM 24 jam berhasil dibersihkan!"})
+	})
+
+	appEngine.GET("/api/test-apis", testAPIsHandler)
 
 	log.Printf("Server initialised on port %s", serverPort)
 	appEngine.Run(":" + serverPort)
@@ -133,13 +143,14 @@ func main() {
 
 func botanicalHealthHandler(c *gin.Context) {
 	batchStore.RLock()
-	itemCount := len(batchStore.ByPopularity)
+	count := len(batchStore.ByPopularity)
 	batchStore.RUnlock()
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":    "active",
-		"service":   "Phytochemical Processing Engine",
-		"items":     itemCount,
-		"timestamp": time.Now().Unix(),
+		"status":             "online",
+		"service":            "Phytochemical Processing Engine",
+		"max_api_rate_limit": "80 calls/min",
+		"batch_items_loaded": count,
+		"timestamp":          time.Now().Unix(),
 	})
 }
