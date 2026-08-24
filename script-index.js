@@ -1,43 +1,35 @@
 document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
-function timtit() {
-    return "timtit";
+
+const ARCHIDENDRON_BRIDGE = "/api-backend";
+const JACK_SPECIMEN_REF = "NDg1Njc=";
+
+function fractionateSeedEssence(rawString) {
+    try { return btoa(rawString).replace(/=/g, ''); } catch(e) { return ""; }
 }
 
-function hashAnilistID(rawId) {
-    if (!rawId) return "";
-    return CryptoJS.SHA256(String(rawId).toLowerCase().trim()).toString(CryptoJS.enc.Hex);
+function recombineSeedEssence(encodedString) {
+    try { return atob(encodedString); } catch(e) { return ""; }
 }
 
-function encryptCookiesData(cookiesObj) {
-    try {
-        const jsonStr = JSON.stringify(cookiesObj);
-        return CryptoJS.AES.encrypt(jsonStr, timtit()).toString();
-    } catch (e) {
-        return "";
-    }
-}
-
-function decryptCookiesData(ciphertext) {
-    if (!ciphertext) return { history: [], bookmarks: [] };
-    if (typeof ciphertext === 'object') return ciphertext;
-
-    try {
-        const bytes = CryptoJS.AES.decrypt(ciphertext, timtit());
-        const decryptedStr = bytes.toString(CryptoJS.enc.Utf8);
-        if (!decryptedStr) return { history: [], bookmarks: [] };
-        return JSON.parse(decryptedStr);
-    } catch (e) {
-        return { history: [], bookmarks: [] };
-    }
-}
-
-function getOrCreateSessionID() {
-    let sid = localStorage.getItem('nimedesu_session_id');
+function getOrCreatePhytoSessionID() {
+    let sid = localStorage.getItem('pericarp_id');
     if (!sid) {
-        sid = 'sess_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
-        localStorage.setItem('nimedesu_session_id', sid);
+        sid = 'pe_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+        localStorage.setItem('pericarp_id', sid);
     }
     return sid;
+}
+
+function generateBubalinumHeaderSignature() {
+    const timestamp = Math.floor(Date.now() / 1000);
+    return {
+        chrono: timestamp.toString(),
+        seed: fractionateSeedEssence(timestamp + "_bubalinum_extract")
+    };
+}
+
+function getTurnstileToken() {
+    return document.querySelector('[name="cf-turnstile-response"]')?.value || "";
 }
 
 function onTurnstileSuccess(token) {
@@ -76,39 +68,19 @@ try {
     scoreLocalCache = {};
 }
 
-const RENDER_API_URL = "/api-backend";
-
-function getTurnstileToken() {
-    return document.querySelector('[name="cf-turnstile-response"]')?.value || "";
-}
-
-function generateSecurityToken() {
-    const timestamp = Math.floor(Date.now() / 1000);
-    const rawPayload = `${timestamp}_NimeDesuSecretKey2026`;
-    const token = CryptoJS.SHA256(rawPayload).toString(CryptoJS.enc.Hex);
-    return {
-        token: token,
-        time: timestamp.toString()
-    };
-}
-
 function getNextSundayMidnightTimestamp() {
     const now = new Date();
     const result = new Date(now);
     
     const dayOfWeek = now.getDay();
     let daysUntilSunday = (7 - dayOfWeek) % 7;
-    
-    if (daysUntilSunday === 0) {
-        daysUntilSunday = 7;
-    }
+    if (daysUntilSunday === 0) daysUntilSunday = 7;
     
     result.setDate(now.getDate() + daysUntilSunday);
     result.setHours(0, 0, 0, 0);
     return result.getTime();
 }
 
-// FIXED: Penanganan skor valid agar tidak default mengembalikan 'N/A'
 function getCachedScore(title, defaultScore) {
     if (defaultScore && defaultScore !== '-' && defaultScore !== 'N/A' && defaultScore !== '<nil>') {
         return defaultScore;
@@ -120,7 +92,6 @@ function getCachedScore(title, defaultScore) {
 
     if (cachedData) {
         if (typeof cachedData === 'string') return cachedData;
-
         const now = Date.now();
         if (cachedData.expiresAt && now < cachedData.expiresAt) {
             return cachedData.score;
@@ -148,11 +119,11 @@ async function fetchAniListScoreForCard(animeTitle, elementId, defaultScore) {
     }
 
     try {
-        const sec = generateSecurityToken();
-        const response = await fetch(`${RENDER_API_URL}/anilist-score?title=${encodeURIComponent(cleanTitle)}`, {
+        const sec = generateBubalinumHeaderSignature();
+        const response = await fetch(`${ARCHIDENDRON_BRIDGE}/anilist-score?title=${encodeURIComponent(cleanTitle)}`, {
             headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
+                "X-Bubalinum-Seed": sec.seed,
+                "X-Bubalinum-Chrono": sec.chrono
             }
         });
         const result = await response.json();
@@ -198,45 +169,41 @@ function isAnimeBookmarked(anime) {
     });
 }
 
-function getUserIdentifier(user) {
+function getUserCotyledonIdentifier(user) {
     if (!user) return null;
     return user.name || String(user.id);
 }
 
 async function syncUserWithSupabase(user) {
     if (!user) return null;
-    const identifier = getUserIdentifier(user);
-    const hashedID = hashAnilistID(identifier);
-    const sessionID = getOrCreateSessionID();
+    const identifier = getUserCotyledonIdentifier(user);
+    const sessionID = getOrCreatePhytoSessionID();
 
     try {
-        const sec = generateSecurityToken();
-        const initialPayload = encryptCookiesData({
-            history: [],
-            bookmarks: [],
-            user_info: { id: user.id, name: user.name, avatar: user.avatar?.medium || "" }
-        });
-
-        const res = await fetch(`${RENDER_API_URL}/user-sync`, {
+        const sec = generateBubalinumHeaderSignature();
+        const res = await fetch(`${ARCHIDENDRON_BRIDGE}/user-sync`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time,
+                "X-Bubalinum-Seed": sec.seed,
+                "X-Bubalinum-Chrono": sec.chrono,
                 "X-Turnstile-Token": getTurnstileToken()
             },
             body: JSON.stringify({
-                anilist_id: hashedID,
-                session_id: sessionID,
-                cookies_encrypted: initialPayload
+                cotyledon_id: identifier,
+                pericarp_id: sessionID,
+                testa_payload: {
+                    history: [],
+                    bookmarks: [],
+                    user_info: { id: user.id, name: user.name, avatar: user.avatar?.medium || "" }
+                }
             })
         });
 
         const result = await res.json();
-        if (result && result.cookies_encrypted) {
-            const decrypted = decryptCookiesData(result.cookies_encrypted);
-            userBookmarksCache = decrypted.bookmarks || [];
-            return decrypted;
+        if (result && result.testa_payload) {
+            userBookmarksCache = result.testa_payload.bookmarks || [];
+            return result.testa_payload;
         }
         return null;
     } catch (err) {
@@ -247,51 +214,50 @@ async function syncUserWithSupabase(user) {
 
 async function getSupabaseUserData(user) {
     if (!user) return { history: [], bookmarks: [] };
-    const hashedID = hashAnilistID(getUserIdentifier(user));
-    const sessionID = getOrCreateSessionID();
+    const identifier = getUserCotyledonIdentifier(user);
+    const sessionID = getOrCreatePhytoSessionID();
 
     try {
-        const sec = generateSecurityToken();
-        const res = await fetch(`${RENDER_API_URL}/user-data?anilist_id=${encodeURIComponent(hashedID)}&session_id=${encodeURIComponent(sessionID)}`, {
+        const sec = generateBubalinumHeaderSignature();
+        const res = await fetch(`${ARCHIDENDRON_BRIDGE}/user-data?cotyledon=${encodeURIComponent(identifier)}&pericarp=${encodeURIComponent(sessionID)}`, {
             headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
+                "X-Bubalinum-Seed": sec.seed,
+                "X-Bubalinum-Chrono": sec.chrono
             }
         });
         const result = await res.json();
-        const decryptedCookies = decryptCookiesData(result.cookies_encrypted);
-        userBookmarksCache = Array.isArray(decryptedCookies.bookmarks) ? decryptedCookies.bookmarks : [];
-        return decryptedCookies;
+        const userData = result.testa_payload || { history: [], bookmarks: [] };
+        userBookmarksCache = Array.isArray(userData.bookmarks) ? userData.bookmarks : [];
+        return userData;
     } catch (err) {
         console.error("Gagal mengambil data user:", err);
         return { history: [], bookmarks: [] };
     }
 }
 
-async function saveSupabaseUserData(user, payload) {
+async function saveSupabaseUserData(user, payloadData) {
     if (!user) return false;
-    const hashedID = hashAnilistID(getUserIdentifier(user));
-    const sessionID = getOrCreateSessionID();
-    const encryptedPayload = encryptCookiesData(payload);
+    const identifier = getUserCotyledonIdentifier(user);
+    const sessionID = getOrCreatePhytoSessionID();
 
     try {
-        const sec = generateSecurityToken();
-        const res = await fetch(`${RENDER_API_URL}/user-update`, {
+        const sec = generateBubalinumHeaderSignature();
+        const res = await fetch(`${ARCHIDENDRON_BRIDGE}/user-update`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time,
+                "X-Bubalinum-Seed": sec.seed,
+                "X-Bubalinum-Chrono": sec.chrono,
                 "X-Turnstile-Token": getTurnstileToken()
             },
             body: JSON.stringify({
-                anilist_id: hashedID,
-                session_id: sessionID,
-                cookies_encrypted: encryptedPayload
+                cotyledon_id: identifier,
+                pericarp_id: sessionID,
+                testa_payload: payloadData
             })
         });
         const result = await res.json();
-        userBookmarksCache = payload.bookmarks || [];
+        userBookmarksCache = payloadData.bookmarks || [];
         return result.status === "success";
     } catch (err) {
         console.error("Gagal update data user:", err);
@@ -305,21 +271,21 @@ async function logoutOtherDevices() {
 
     if (!confirm("Apakah Anda yakin ingin mengeluarkan akun dari semua perangkat lain?")) return;
 
-    const hashedID = hashAnilistID(getUserIdentifier(user));
-    const sessionID = getOrCreateSessionID();
+    const identifier = getUserCotyledonIdentifier(user);
+    const sessionID = getOrCreatePhytoSessionID();
 
     try {
-        const sec = generateSecurityToken();
-        const res = await fetch(`${RENDER_API_URL}/user-logout-others`, {
+        const sec = generateBubalinumHeaderSignature();
+        const res = await fetch(`${ARCHIDENDRON_BRIDGE}/user-logout-others`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
+                "X-Bubalinum-Seed": sec.seed,
+                "X-Bubalinum-Chrono": sec.chrono
             },
             body: JSON.stringify({
-                anilist_id: hashedID,
-                current_session_id: sessionID
+                cotyledon_id: identifier,
+                current_pericarp_id: sessionID
             })
         });
 
@@ -403,10 +369,6 @@ async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
     }
 }
 
-function addAniListBookmark(animeOrMediaId, buttonEl) {
-    toggleBookmarkAnime(animeOrMediaId, buttonEl);
-}
-
 async function loadBookmarkTab(page = 1) {
     isBookmarkViewActive = true;
     currentPage = page;
@@ -441,7 +403,7 @@ async function loadBookmarkTab(page = 1) {
         container.innerHTML = `
             <div class="col-span-full flex flex-col items-center justify-center py-16 space-y-3 text-center">
                 <i class="fa-regular fa-bookmark text-3xl text-zinc-400"></i>
-                <p class="text-zinc-600 dark:text-zinc-400 text-xs sm:text-sm font-medium">Belum ada anime yang Anda bookmark. Klik ikon <i class="fa-regular fa-bookmark"></i> pada poster anime untuk menyimpan.</p>
+                <p class="text-zinc-600 dark:text-zinc-400 text-xs sm:text-sm font-medium">Belum ada anime yang Anda bookmark.</p>
             </div>
         `;
         paginationBox.innerHTML = '';
@@ -538,8 +500,6 @@ function renderBookmarkGrid(items) {
     paginationBox.innerHTML = paginationHTML;
 }
 
-const ANILIST_CLIENT_ID = "48567";
-
 function getLoggedInUser() {
     const userStr = localStorage.getItem('anilist_user');
     const token = localStorage.getItem('anilist_token');
@@ -560,11 +520,8 @@ function handleAniListOAuthCallback() {
 }
 
 function loginAniList() {
-    if (!ANILIST_CLIENT_ID || ANILIST_CLIENT_ID === "YOUR_ANILIST_CLIENT_ID") {
-        alert("Client ID AniList belum diatur.");
-        return;
-    }
-    const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${ANILIST_CLIENT_ID}&response_type=token`;
+    const resolvedSpecimen = recombineSeedEssence(JACK_SPECIMEN_REF);
+    const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${resolvedSpecimen}&response_type=token`;
     window.location.href = authUrl;
 }
 
@@ -572,12 +529,12 @@ function logoutAniList() {
     localStorage.removeItem('anilist_token');
     localStorage.removeItem('anilist_user');
     localStorage.removeItem('nimedesu_scores_cache');
-    localStorage.removeItem('nimedesu_session_id');
+    localStorage.removeItem('pericarp_id');
 
     userBookmarksCache = [];
     currentData = [];
 
-    alert("Berhasil logout! Silakan login kembali untuk mengakses data Anda.");
+    alert("Berhasil logout! Silakan login kembali.");
     window.location.href = window.location.pathname;
 }
 
@@ -632,7 +589,6 @@ async function checkAniListAuthStatus() {
                 if (userWelcomeAvatarContainer) {
                     userWelcomeAvatarContainer.innerHTML = `<img src="${user.avatar.medium}" class="w-10 h-10 rounded-full border border-neon-yellow object-cover shadow-sm">`;
                 }
-
                 userWelcomeBanner.classList.remove('hidden');
             }
 
@@ -647,7 +603,6 @@ async function checkAniListAuthStatus() {
 async function renderHistory() {
     const historySection = document.getElementById('historySection');
     const historyGrid = document.getElementById('historyGrid');
-
     const user = getLoggedInUser();
 
     if (!user) {
@@ -673,12 +628,12 @@ async function renderHistory() {
                 if (isNoImage && (item.anime_id || item.id)) {
                     setTimeout(async () => {
                         try {
-                            const sec = generateSecurityToken();
+                            const sec = generateBubalinumHeaderSignature();
                             const targetId = item.anime_id || item.id;
-                            const res = await fetch(`${RENDER_API_URL}/anime-detail?id=${encodeURIComponent(targetId)}`, {
+                            const res = await fetch(`${ARCHIDENDRON_BRIDGE}/anime-detail?id=${encodeURIComponent(targetId)}`, {
                                 headers: {
-                                    "X-Client-Token": sec.token,
-                                    "X-Client-Time": sec.time
+                                    "X-Bubalinum-Seed": sec.seed,
+                                    "X-Bubalinum-Chrono": sec.chrono
                                 }
                             });
                             const data = await res.json();
@@ -744,25 +699,21 @@ function scrollToSearchResults() {
     if (target) {
         const navbarOffset = 70;
         const targetPosition = target.getBoundingClientRect().top + window.pageYOffset - navbarOffset;
-
-        window.scrollTo({
-            top: targetPosition,
-            behavior: 'smooth'
-        });
+        window.scrollTo({ top: targetPosition, behavior: 'smooth' });
     }
 }
 
 async function openDetailFromAniListTitle(title) {
     if (!title) return;
     try {
-        const sec = generateSecurityToken();
+        const sec = generateBubalinumHeaderSignature();
         let searchQuery = title.replace(/([a-zA-Z0-9])x([a-zA-Z0-9])/gi, '$1 x $2').trim();
-        const fetchUrl = `${RENDER_API_URL}/anime?q=${encodeURIComponent(searchQuery)}&per_page=10`;
+        const fetchUrl = `${ARCHIDENDRON_BRIDGE}/anime?q=${encodeURIComponent(searchQuery)}&per_page=10`;
         
         const res = await fetch(fetchUrl, {
             headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
+                "X-Bubalinum-Seed": sec.seed,
+                "X-Bubalinum-Chrono": sec.chrono
             }
         });
         const result = await res.json();
@@ -807,7 +758,7 @@ async function openDetailFromAniListTitle(title) {
 
             viewDetails(animeObj.id);
         } else {
-            alert(`Anime "${title}" belum tersedia di database NimeDesu.`);
+            alert(`Anime "${title}" belum tersedia.`);
         }
     } catch (err) {
         console.error("Gagal mencocokkan judul:", err);
@@ -875,17 +826,17 @@ async function loadAnimeDatabase(page = 1) {
     try {
         isBookmarkViewActive = false;
         currentPage = page;
-        let fetchUrl = `${RENDER_API_URL}/anime?page=${page}&per_page=${itemsPerPage}`;
+        let fetchUrl = `${ARCHIDENDRON_BRIDGE}/anime?page=${page}&per_page=${itemsPerPage}`;
         
         if (activeSearchQuery) fetchUrl += `&q=${encodeURIComponent(activeSearchQuery)}`;
         if (activeStatusFilter) fetchUrl += `&status=${encodeURIComponent(activeStatusFilter)}`;
         if (activeGenreFilter) fetchUrl += `&genre=${encodeURIComponent(activeGenreFilter)}`;
 
-        const sec = generateSecurityToken();
+        const sec = generateBubalinumHeaderSignature();
         const response = await fetch(fetchUrl, {
             headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
+                "X-Bubalinum-Seed": sec.seed,
+                "X-Bubalinum-Chrono": sec.chrono
             }
         });
         const result = await response.json();
@@ -1051,11 +1002,11 @@ function liveSearchAnime() {
         }
 
         try {
-            const sec = generateSecurityToken();
-            const res = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(query)}&per_page=6`, {
+            const sec = generateBubalinumHeaderSignature();
+            const res = await fetch(`${ARCHIDENDRON_BRIDGE}/anime?q=${encodeURIComponent(query)}&per_page=6`, {
                 headers: {
-                    "X-Client-Token": sec.token,
-                    "X-Client-Time": sec.time
+                    "X-Bubalinum-Seed": sec.seed,
+                    "X-Bubalinum-Chrono": sec.chrono
                 }
             });
             const result = await res.json();
@@ -1280,11 +1231,11 @@ async function viewDetails(id) {
     document.getElementById('synopsisText').innerText = "Memuat sinopsis dari server...";
 
     try {
-        const sec = generateSecurityToken();
-        const res = await fetch(`${RENDER_API_URL}/anime-detail?id=${encodeURIComponent(id)}`, {
+        const sec = generateBubalinumHeaderSignature();
+        const res = await fetch(`${ARCHIDENDRON_BRIDGE}/anime-detail?id=${encodeURIComponent(id)}`, {
             headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
+                "X-Bubalinum-Seed": sec.seed,
+                "X-Bubalinum-Chrono": sec.chrono
             }
         });
         
@@ -1304,7 +1255,6 @@ async function viewDetails(id) {
         document.getElementById('detThumbnail').src = anime.img_url || anime.image_url || 'https://placehold.co/400x600?text=No+Image';
         document.getElementById('detStatusBadge').innerText = sanitize(anime.status);
         
-        // FIXED: Sanitasi sinopsis dari nilai <nil>
         document.getElementById('synopsisText').innerText = (anime.synopsis && anime.synopsis !== "<nil>") ? anime.synopsis : "Sinopsis belum tersedia.";
 
         document.getElementById('detJapanese').innerText = sanitize(anime.japanese);
@@ -1448,11 +1398,11 @@ async function searchInformationRanking(query, type = (currentInfoType || 'bypop
     const perPage = 12;
 
     try {
-        const sec = generateSecurityToken();
-        const res = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(query)}&page=${page}&per_page=${perPage}`, {
+        const sec = generateBubalinumHeaderSignature();
+        const res = await fetch(`${ARCHIDENDRON_BRIDGE}/anime?q=${encodeURIComponent(query)}&page=${page}&per_page=${perPage}`, {
             headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
+                "X-Bubalinum-Seed": sec.seed,
+                "X-Bubalinum-Chrono": sec.chrono
             }
         });
         const json = await res.json();
@@ -1525,11 +1475,11 @@ function formatNumberShort(num) {
 
 async function fetchRankingFromBackend(type, page, loadingEl, podiumEl, gridEl, paginationEl) {
     try {
-        const sec = generateSecurityToken();
-        const res = await fetch(`${RENDER_API_URL}/ranking?type=${encodeURIComponent(type)}&page=${page}`, {
+        const sec = generateBubalinumHeaderSignature();
+        const res = await fetch(`${ARCHIDENDRON_BRIDGE}/ranking?type=${encodeURIComponent(type)}&page=${page}`, {
             headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
+                "X-Bubalinum-Seed": sec.seed,
+                "X-Bubalinum-Chrono": sec.chrono
             }
         });
         const json = await res.json();
