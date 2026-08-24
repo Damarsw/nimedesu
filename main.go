@@ -1,9 +1,8 @@
 package main
 
 import (
-	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/hex"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"math"
@@ -38,6 +37,7 @@ func botanicalSecurityMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		reqPath := c.Request.URL.Path
 
+		// Bypass pemeriksaan untuk path umum dan proxy stream
 		if reqPath == "/" || reqPath == "/health" || reqPath == "/sitemap.xml" || reqPath == "/robots.txt" || reqPath == "/api/clear-cache" || reqPath == "/api/test-apis" || strings.HasPrefix(reqPath, "/api/proxy-stream") || strings.HasPrefix(reqPath, "/proxy-stream") {
 			c.Next()
 			return
