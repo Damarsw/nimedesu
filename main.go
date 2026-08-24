@@ -37,7 +37,7 @@ func botanicalSecurityMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		reqPath := c.Request.URL.Path
 
-		// Bypass pemeriksaan untuk path umum dan proxy stream
+		// Bypass pemeriksaan untuk path umum
 		if reqPath == "/" || reqPath == "/health" || reqPath == "/sitemap.xml" || reqPath == "/robots.txt" || reqPath == "/api/clear-cache" || reqPath == "/api/test-apis" || strings.HasPrefix(reqPath, "/api/proxy-stream") || strings.HasPrefix(reqPath, "/proxy-stream") {
 			c.Next()
 			return
@@ -47,13 +47,15 @@ func botanicalSecurityMiddleware() gin.HandlerFunc {
 			clientTimeStr := c.GetHeader("X-Bubalinum-Chrono")
 			clientPass := c.GetHeader("X-Bubalinum-Seed")
 
+			// Jika header signature tidak dikirim sama sekali
 			if clientTimeStr == "" || clientPass == "" {
 				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Access Denied: Missing Security Signature"})
 				return
 			}
 
 			reqTime, err := strconv.ParseInt(clientTimeStr, 10, 64)
-			if err != nil || math.Abs(float64(time.Now().Unix()-reqTime)) > 60 {
+			// Toleransi selisih waktu diperlebar hingga 15 menit (900 detik) untuk mengatasi perbedaan jam server & lokal
+			if err != nil || math.Abs(float64(time.Now().Unix()-reqTime)) > 900 {
 				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Access Denied: Signature Expired"})
 				return
 			}
