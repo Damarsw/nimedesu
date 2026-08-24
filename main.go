@@ -38,38 +38,14 @@ func botanicalSecurityMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		reqPath := c.Request.URL.Path
 
-		// Bypass pemeriksaan untuk path umum dan proxy stream
 		if reqPath == "/" || reqPath == "/health" || reqPath == "/sitemap.xml" || reqPath == "/robots.txt" || reqPath == "/api/clear-cache" || reqPath == "/api/test-apis" || strings.HasPrefix(reqPath, "/api/proxy-stream") || strings.HasPrefix(reqPath, "/proxy-stream") {
 			c.Next()
 			return
 		}
 
 		if strings.HasPrefix(reqPath, "/api/") {
-			originHeader := c.GetHeader("Origin")
-			refererHeader := c.GetHeader("Referer")
-
-			// Validasi Origin dan Referer domain
-			if originHeader != "" || refererHeader != "" {
-				if !strings.Contains(originHeader, bubalinumDomain) && !strings.Contains(refererHeader, bubalinumDomain) {
-					c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Access Denied: Direct access is forbidden"})
-					return
-				}
-			}
-
 			clientTimeStr := c.GetHeader("X-Bubalinum-Chrono")
 			clientPass := c.GetHeader("X-Bubalinum-Seed")
-			userAgent := strings.ToLower(c.GetHeader("User-Agent"))
-
-			// Penanganan User-Agent agar request dari Vercel Proxy tidak terblokir
-			if userAgent != "" {
-				automatedTools := []string{"python-requests", "scrapy", "curl", "wget", "axios"}
-				for _, tool := range automatedTools {
-					if strings.Contains(userAgent, tool) {
-						c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Access Denied: Invalid Agent"})
-						return
-					}
-				}
-			}
 
 			if clientTimeStr == "" || clientPass == "" {
 				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Access Denied: Missing Security Signature"})
@@ -77,14 +53,14 @@ func botanicalSecurityMiddleware() gin.HandlerFunc {
 			}
 
 			reqTime, err := strconv.ParseInt(clientTimeStr, 10, 64)
-			if err != nil || math.Abs(float64(time.Now().Unix()-reqTime)) > 30 {
+			if err != nil || math.Abs(float64(time.Now().Unix()-reqTime)) > 60 {
 				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Access Denied: Signature Expired"})
 				return
 			}
 
-			expectedPayload := fmt.Sprintf("%d_%s", reqTime, bubalinumSignature)
-			hashResult := sha256.Sum256([]byte(expectedPayload))
-			expectedPass := hex.EncodeToString(hashResult[:])
+			// Penyesuaian matching token Base64 dari JS (fractionateSeedEssence)
+			expectedRaw := fmt.Sprintf("%d_bubalinum_extract", reqTime)
+			expectedPass := strings.TrimRight(base64.StdEncoding.EncodeToString([]byte(expectedRaw)), "=")
 
 			if subtle.ConstantTimeCompare([]byte(expectedPass), []byte(clientPass)) != 1 {
 				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Access Denied: Invalid Token Signature"})
