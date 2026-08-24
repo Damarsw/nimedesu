@@ -1,38 +1,8 @@
 document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
-function timtit() {
-    return "timtit";
-}
+const ARCHIDENDRON_BRIDGE = "/api-backend";
+const JACK_SPECIMEN_REF = "NDg1Njc="; // AniList Client ID (Base64)
 
-function hashAnilistID(rawId) {
-    if (!rawId) return "";
-    return CryptoJS.SHA256(String(rawId).toLowerCase().trim()).toString(CryptoJS.enc.Hex);
-}
-
-function encryptCookiesData(cookiesObj) {
-    try {
-        const jsonStr = JSON.stringify(cookiesObj);
-        return CryptoJS.AES.encrypt(jsonStr, timtit()).toString();
-    } catch (e) {
-        return "";
-    }
-}
-
-function decryptCookiesData(ciphertext) {
-    if (!ciphertext) return { history: [], bookmarks: [] };
-    if (typeof ciphertext === 'object') return ciphertext;
-
-    try {
-        const bytes = CryptoJS.AES.decrypt(ciphertext, timtit());
-        const decryptedStr = bytes.toString(CryptoJS.enc.Utf8);
-        if (!decryptedStr) return { history: [], bookmarks: [] };
-        return JSON.parse(decryptedStr);
-    } catch (e) {
-        return { history: [], bookmarks: [] };
-    }
-}
-
-const RENDER_API_URL = "/api-backend";
 let activeEpisodes = [];
 let activeEpisodeIndex = 0;
 let globalAnimeTitle = "Anime";
@@ -40,6 +10,14 @@ let currentAnimeThumbnail = "";
 let currentAnimeGenres = []; 
 let currentAnimeId = null;
 let searchDebounceTimer = null;
+
+function fractionateSeedEssence(rawString) {
+    try { return btoa(rawString).replace(/=/g, ''); } catch(e) { return ""; }
+}
+
+function recombineSeedEssence(encodedString) {
+    try { return atob(encodedString); } catch(e) { return ""; }
+}
 
 function getTurnstileToken() {
     return document.querySelector('[name="cf-turnstile-response"]')?.value || "";
@@ -51,52 +29,58 @@ function onTurnstileSuccess(token) {
         turnstileContainer.style.display = 'none';
     }
 }
-    
-function generateSecurityToken() {
+
+function getOrCreatePhytoSessionID() {
+    let sid = localStorage.getItem('pericarp_id');
+    if (!sid) {
+        sid = 'pe_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+        localStorage.setItem('pericarp_id', sid);
+    }
+    return sid;
+}
+
+function generateBubalinumHeaderSignature() {
     const timestamp = Math.floor(Date.now() / 1000);
-    const rawPayload = `${timestamp}_NimeDesuSecretKey2026`;
-    const token = CryptoJS.SHA256(rawPayload).toString(CryptoJS.enc.Hex);
     return {
-        token: token,
-        time: timestamp.toString()
+        chrono: timestamp.toString(),
+        seed: fractionateSeedEssence(timestamp + "_bubalinum_extract")
     };
 }
 
-function getUserIdentifier(user) {
+function getUserCotyledonIdentifier(user) {
     if (!user) return null;
     return user.name || String(user.id);
 }
 
 async function syncUserWithSupabase(user) {
     if (!user) return null;
-    const identifier = getUserIdentifier(user);
-    const hashedID = hashAnilistID(identifier);
+    const identifier = getUserCotyledonIdentifier(user);
+    const sessionID = getOrCreatePhytoSessionID();
 
     try {
-        const sec = generateSecurityToken();
-        const initialPayload = encryptCookiesData({
-            history: [],
-            bookmarks: [],
-            user_info: { id: user.id, name: user.name, avatar: user.avatar?.medium || "" }
-        });
-
-        const res = await fetch(`${RENDER_API_URL}/user-sync`, {
+        const sec = generateBubalinumHeaderSignature();
+        const res = await fetch(`${ARCHIDENDRON_BRIDGE}/user-sync`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time,
+                "X-Bubalinum-Seed": sec.seed,
+                "X-Bubalinum-Chrono": sec.chrono,
                 "X-Turnstile-Token": getTurnstileToken()
             },
             body: JSON.stringify({
-                anilist_id: hashedID,
-                cookies_encrypted: initialPayload
+                cotyledon_id: identifier,
+                pericarp_id: sessionID,
+                testa_payload: {
+                    history: [],
+                    bookmarks: [],
+                    user_info: { id: user.id, name: user.name, avatar: user.avatar?.medium || "" }
+                }
             })
         });
 
         const result = await res.json();
-        if (result && result.cookies_encrypted) {
-            return decryptCookiesData(result.cookies_encrypted);
+        if (result && result.testa_payload) {
+            return result.testa_payload;
         }
         return null;
     } catch (err) {
@@ -107,42 +91,44 @@ async function syncUserWithSupabase(user) {
 
 async function getSupabaseUserData(user) {
     if (!user) return { history: [], bookmarks: [] };
-    const hashedID = hashAnilistID(getUserIdentifier(user));
+    const identifier = getUserCotyledonIdentifier(user);
+    const sessionID = getOrCreatePhytoSessionID();
 
     try {
-        const sec = generateSecurityToken();
-        const res = await fetch(`${RENDER_API_URL}/user-data?anilist_id=${encodeURIComponent(hashedID)}`, {
+        const sec = generateBubalinumHeaderSignature();
+        const res = await fetch(`${ARCHIDENDRON_BRIDGE}/user-data?cotyledon=${encodeURIComponent(identifier)}&pericarp=${encodeURIComponent(sessionID)}`, {
             headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
+                "X-Bubalinum-Seed": sec.seed,
+                "X-Bubalinum-Chrono": sec.chrono
             }
         });
         const result = await res.json();
-        return decryptCookiesData(result.cookies_encrypted);
+        return result.testa_payload || { history: [], bookmarks: [] };
     } catch (err) {
         console.error("Gagal membaca user data:", err);
         return { history: [], bookmarks: [] };
     }
 }
 
-async function saveSupabaseUserData(user, payload) {
+async function saveSupabaseUserData(user, payloadData) {
     if (!user) return false;
-    const hashedID = hashAnilistID(getUserIdentifier(user));
-    const encryptedPayload = encryptCookiesData(payload);
+    const identifier = getUserCotyledonIdentifier(user);
+    const sessionID = getOrCreatePhytoSessionID();
 
     try {
-        const sec = generateSecurityToken();
-        const res = await fetch(`${RENDER_API_URL}/user-update`, {
+        const sec = generateBubalinumHeaderSignature();
+        const res = await fetch(`${ARCHIDENDRON_BRIDGE}/user-update`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time,
+                "X-Bubalinum-Seed": sec.seed,
+                "X-Bubalinum-Chrono": sec.chrono,
                 "X-Turnstile-Token": getTurnstileToken()
             },
             body: JSON.stringify({
-                anilist_id: hashedID,
-                cookies_encrypted: encryptedPayload
+                cotyledon_id: identifier,
+                pericarp_id: sessionID,
+                testa_payload: payloadData
             })
         });
         const result = await res.json();
@@ -152,8 +138,6 @@ async function saveSupabaseUserData(user, payload) {
         return false;
     }
 }
-
-const ANILIST_CLIENT_ID = "48567";
 
 function getLoggedInUser() {
     const userStr = localStorage.getItem('anilist_user');
@@ -175,7 +159,8 @@ function handleAniListOAuthCallback() {
 }
 
 function loginAniList() {
-    const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${ANILIST_CLIENT_ID}&response_type=token`;
+    const resolvedClientId = recombineSeedEssence(JACK_SPECIMEN_REF);
+    const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${resolvedClientId}&response_type=token`;
     window.location.href = authUrl;
 }
 
@@ -302,11 +287,11 @@ function liveSearchAnime() {
         }
 
         try {
-            const sec = generateSecurityToken();
-            const res = await fetch(`${RENDER_API_URL}/anime?q=${encodeURIComponent(query)}&per_page=6`, {
+            const sec = generateBubalinumHeaderSignature();
+            const res = await fetch(`${ARCHIDENDRON_BRIDGE}/anime?q=${encodeURIComponent(query)}&per_page=6`, {
                 headers: {
-                    "X-Client-Token": sec.token,
-                    "X-Client-Time": sec.time
+                    "X-Bubalinum-Seed": sec.seed,
+                    "X-Bubalinum-Chrono": sec.chrono
                 }
             });
             const result = await res.json();
@@ -362,8 +347,8 @@ async function initStream() {
     }
 
     try {
-        const sec = generateSecurityToken();
-        let apiEndpoint = `${RENDER_API_URL}/anime-detail?`;
+        const sec = generateBubalinumHeaderSignature();
+        let apiEndpoint = `${ARCHIDENDRON_BRIDGE}/anime-detail?`;
         if (animeId) {
             apiEndpoint += `id=${encodeURIComponent(animeId)}`;
         } else {
@@ -372,8 +357,8 @@ async function initStream() {
 
         const response = await fetch(apiEndpoint, {
             headers: {
-                "X-Client-Token": sec.token,
-                "X-Client-Time": sec.time
+                "X-Bubalinum-Seed": sec.seed,
+                "X-Bubalinum-Chrono": sec.chrono
             }
         });
         const data = await response.json();
@@ -443,15 +428,15 @@ async function renderMixedGenreRecommendations() {
     if (!recSlider) return;
 
     try {
-        const sec = generateSecurityToken();
+        const sec = generateBubalinumHeaderSignature();
         let targetGenres = currentAnimeGenres.slice(0, 3);
         if (targetGenres.length === 0) targetGenres = ['Action', 'Drama'];
 
         const fetchPromises = targetGenres.map(genre =>
-            fetch(`${RENDER_API_URL}/anime?genre=${encodeURIComponent(genre)}&per_page=10`, {
+            fetch(`${ARCHIDENDRON_BRIDGE}/anime?genre=${encodeURIComponent(genre)}&per_page=10`, {
                 headers: {
-                    "X-Client-Token": sec.token,
-                    "X-Client-Time": sec.time
+                    "X-Bubalinum-Seed": sec.seed,
+                    "X-Bubalinum-Chrono": sec.chrono
                 }
             }).then(res => res.json()).catch(() => ({ data: [] }))
         );
@@ -621,7 +606,7 @@ function formatEmbedUrl(url) {
 
     let finalUrl = url;
     try {
-        let decoded = atob(url);
+        let decoded = recombineSeedEssence(url);
         if (decoded && decoded.startsWith('http')) {
             finalUrl = decoded;
         }
