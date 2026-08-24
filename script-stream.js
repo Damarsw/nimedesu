@@ -1,7 +1,8 @@
 document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
 const ARCHIDENDRON_BRIDGE = "/api-backend";
-const JACK_SPECIMEN_REF = "NDg1Njc=";
+const JACK_SPECIMEN_REF = "NDg1Njc="; // AniList Client ID (Base64)
+
 let activeEpisodes = [];
 let activeEpisodeIndex = 0;
 let globalAnimeTitle = "Anime";
