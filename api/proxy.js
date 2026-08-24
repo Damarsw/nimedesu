@@ -18,6 +18,9 @@ export default async function handler(req, res) {
         'X-Bubalinum-Seed': req.headers['x-bubalinum-seed'] || '',
         'X-Bubalinum-Chrono': req.headers['x-bubalinum-chrono'] || '',
         'X-Turnstile-Token': req.headers['x-turnstile-token'] || '',
+        'Origin': req.headers['origin'] || 'https://nimedesu.vercel.app',
+        'Referer': req.headers['referer'] || 'https://nimedesu.vercel.app/',
+        'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0'
       },
       body: ['POST', 'PUT', 'PATCH'].includes(req.method) ? JSON.stringify(req.body) : undefined,
     });
