@@ -23,31 +23,30 @@
     </script>
     <link rel="icon" href="https://i.ibb.co.com/Ld2r8ZLS/logo.png" type="image/png" />
     <script src="https://cdn.tailwindcss.com"></script>
-<script>
-    tailwind.config = {
-        darkMode: 'class',
-        theme: {
-            extend: {
-                colors: {
-                    neon: {
-                        lightBg: '#F8F9FA',        
-                        lightCard: '#FFFFFF',      
-                        lightBorder: '#F6BE00',    
-                        darkBg: '#0f0e0a',         
-                        darkCard: '#1a1912',       
-                        darkBorder: '#33311f',     
-                        yellow: '#F6BE00',         
-                        yellowHover: '#d4a000'     
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        neon: {
+                            lightBg: '#F8F9FA',        
+                            lightCard: '#FFFFFF',      
+                            lightBorder: '#F6BE00',    
+                            darkBg: '#0f0e0a',         
+                            darkCard: '#1a1912',       
+                            darkBorder: '#33311f',     
+                            yellow: '#F6BE00',         
+                            yellowHover: '#d4a000'     
+                        }
+                    },
+                    boxShadow: {
+                        'glow-yellow': '0 0 15px rgba(246, 190, 0, 0.4), inset 0 0 5px rgba(246, 190, 0, 0.2)'
                     }
-                },
-                boxShadow: {
-                    'glow-yellow': '0 0 15px rgba(246, 190, 0, 0.4), inset 0 0 5px rgba(246, 190, 0, 0.2)'
                 }
             }
         }
-    }
-</script>
-
+    </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style> 
@@ -641,8 +640,8 @@
     </button>
 
     <script src="script-index.js"></script>
-<div id="turnstileContainer" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-neon-lightBg dark:bg-neon-darkBg p-4">
-    <div class="cf-turnstile" data-sitekey="0x4AAAAAAEWna6ttG5FYWu12" data-callback="onTurnstileSuccess"></div>
-</div>
+    <div id="turnstileContainer" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-neon-lightBg dark:bg-neon-darkBg p-4">
+        <div class="cf-turnstile" data-sitekey="0x4AAAAAAEWna6ttG5FYWu12" data-callback="onTurnstileSuccess"></div>
+    </div>
 </body>
 </html>
