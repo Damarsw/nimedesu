@@ -2,7 +2,7 @@ export default async function handler(req, res) {
   const backendUrl = process.env.FABALES_BACKEND_URL;
 
   if (!backendUrl) {
-    return res.status(500).json({ error: "FABALES_BACKEND_URL is missing in Vercel ENV." });
+    return res.status(500).json({ error: "Missing" });
   }
 
   const { path } = req.query;
