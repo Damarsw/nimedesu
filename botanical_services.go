@@ -1391,4 +1391,3 @@ func rankingHandler(c *gin.Context) {
 	})
 }
 
-func SetupSEORoutes(r *gin.Engine) {}
