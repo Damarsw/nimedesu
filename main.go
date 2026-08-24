@@ -38,6 +38,7 @@ func botanicalSecurityMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		reqPath := c.Request.URL.Path
 
+		// Bypass pemeriksaan untuk path umum dan proxy stream
 		if reqPath == "/" || reqPath == "/health" || reqPath == "/sitemap.xml" || reqPath == "/robots.txt" || reqPath == "/api/clear-cache" || reqPath == "/api/test-apis" || strings.HasPrefix(reqPath, "/api/proxy-stream") || strings.HasPrefix(reqPath, "/proxy-stream") {
 			c.Next()
 			return
@@ -47,20 +48,26 @@ func botanicalSecurityMiddleware() gin.HandlerFunc {
 			originHeader := c.GetHeader("Origin")
 			refererHeader := c.GetHeader("Referer")
 
-			if !strings.Contains(originHeader, bubalinumDomain) && !strings.Contains(refererHeader, bubalinumDomain) {
-				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Access Denied: Direct access is forbidden"})
-				return
+			// Validasi Origin dan Referer domain
+			if originHeader != "" || refererHeader != "" {
+				if !strings.Contains(originHeader, bubalinumDomain) && !strings.Contains(refererHeader, bubalinumDomain) {
+					c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Access Denied: Direct access is forbidden"})
+					return
+				}
 			}
 
 			clientTimeStr := c.GetHeader("X-Bubalinum-Chrono")
 			clientPass := c.GetHeader("X-Bubalinum-Seed")
 			userAgent := strings.ToLower(c.GetHeader("User-Agent"))
 
-			automatedTools := []string{"python-requests", "scrapy", "curl", "wget", "axios", "headless"}
-			for _, tool := range automatedTools {
-				if strings.Contains(userAgent, tool) || userAgent == "" {
-					c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Access Denied: Invalid Agent"})
-					return
+			// Penanganan User-Agent agar request dari Vercel Proxy tidak terblokir
+			if userAgent != "" {
+				automatedTools := []string{"python-requests", "scrapy", "curl", "wget", "axios"}
+				for _, tool := range automatedTools {
+					if strings.Contains(userAgent, tool) {
+						c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Access Denied: Invalid Agent"})
+						return
+					}
 				}
 			}
 
@@ -100,11 +107,11 @@ func main() {
 	appEngine.Use(gin.Recovery())
 
 	appEngine.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://*" + bubalinumDomain},
+		AllowOrigins:     []string{"*"},
 		AllowMethods:     []string{"GET", "POST", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "X-Bubalinum-Seed", "X-Bubalinum-Chrono", "X-Turnstile-Token"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "X-Bubalinum-Seed", "X-Bubalinum-Chrono", "X-Turnstile-Token", "User-Agent", "Referer"},
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
+		AllowCredentials: false,
 		MaxAge:           12 * time.Hour,
 	}))
 
@@ -125,7 +132,6 @@ func main() {
 	appEngine.POST("/api/user-update", processUserUpdateBotanical)
 	appEngine.POST("/api/user-logout-others", processUserLogoutOthersBotanical)
 
-	SetupSEORoutes(appEngine)
 	appEngine.GET("/api/clear-cache", func(c *gin.Context) {
 		localCache.Lock()
 		localCache.AnimeList = make(map[string]CacheItem)
