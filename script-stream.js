@@ -1,7 +1,7 @@
 document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
 const ARCHIDENDRON_BRIDGE = "/api-backend";
-const JACK_SPECIMEN_REF = "NDg1Njc=";
+const JACK_SPECIMEN_REF = "NDg1Njc="; // AniList Client ID (Base64)
 
 let activeEpisodes = [];
 let activeEpisodeIndex = 0;
@@ -167,10 +167,9 @@ function loginAniList() {
 function logoutAniList() {
     localStorage.removeItem('anilist_token');
     localStorage.removeItem('anilist_user');
-    localStorage.removeItem('nimedesu_scores_cache');
-    localStorage.removeItem('pericarp_id');
 
-    loginAniList();
+    alert("Berhasil logout! Silakan login kembali.");
+    window.location.reload();
 }
 
 async function checkAniListAuthStatus() {
@@ -189,12 +188,6 @@ async function checkAniListAuthStatus() {
             },
             body: JSON.stringify({ query: query })
         });
-
-        if (!response.ok) {
-            logoutAniList();
-            return;
-        }
-
         const result = await response.json();
         const user = result?.data?.Viewer;
 
@@ -208,8 +201,6 @@ async function checkAniListAuthStatus() {
                 `;
             }
             await syncUserWithSupabase(user);
-        } else {
-            logoutAniList();
         }
     } catch (err) {
         console.error("Auth check failed:", err);
