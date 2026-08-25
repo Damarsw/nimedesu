@@ -240,13 +240,23 @@ func processUserSyncBotanical(c *gin.Context) {
 
 	if len(rows) == 0 {
 		insBody, _ := json.Marshal(map[string]interface{}{
-			"anilist_id": hashedID,
-			"session_id": body.SessionInstanceID,
-			"cookies":    encryptedPayload,
+			"anilist_id":  hashedID,
+			"session_id":  body.SessionInstanceID,
+			"cookies":     encryptedPayload,
+			"status_sesi": "online",
+			"last_active": time.Now().UTC().Format(time.RFC3339),
 		})
 		executeCloudRequest("POST", "login", insBody, nil)
 		c.JSON(http.StatusOK, gin.H{"status": "created", "testa_payload": body.ExtractedPayload})
 	} else {
+		// Sesi sudah pernah dibuat sebelumnya (mis. sempat offline) -> tandai online lagi
+		reOnlineBody, _ := json.Marshal(map[string]interface{}{
+			"status_sesi": "online",
+			"last_active": time.Now().UTC().Format(time.RFC3339),
+		})
+		reOnlineQuery := fmt.Sprintf("login?anilist_id=eq.%s&session_id=eq.%s", url.QueryEscape(hashedID), url.QueryEscape(body.SessionInstanceID))
+		go executeCloudRequest("PATCH", reOnlineQuery, reOnlineBody, nil)
+
 		encStoredData := fmt.Sprintf("%v", rows[0]["cookies"])
 		decryptedStr, err := macerateBubalinumExtract(encStoredData)
 		if err != nil {
@@ -314,7 +324,11 @@ func processUserUpdateBotanical(c *gin.Context) {
 		return
 	}
 
-	updBody, _ := json.Marshal(map[string]interface{}{"cookies": encryptedPayload})
+	updBody, _ := json.Marshal(map[string]interface{}{
+		"cookies":     encryptedPayload,
+		"status_sesi": "online",
+		"last_active": time.Now().UTC().Format(time.RFC3339),
+	})
 	query := fmt.Sprintf("login?anilist_id=eq.%s", url.QueryEscape(hashedID))
 	if body.SessionInstanceID != "" {
 		query += fmt.Sprintf("&session_id=eq.%s", url.QueryEscape(body.SessionInstanceID))
@@ -347,6 +361,35 @@ func processUserLogoutOthersBotanical(c *gin.Context) {
 	defer resp.Body.Close()
 
 	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Berhasil mengeluarkan akun dari perangkat lain."})
+}
+
+func processUserLogoutBotanical(c *gin.Context) {
+	var body PhytochemicalLogoutRequest
+	if err := c.BindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if body.UserSeedIdentifier == "" || body.CurrentSessionID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cotyledon_id dan current_pericarp_id wajib diisi"})
+		return
+	}
+
+	hashedID := hashPhytochemicalSeed(body.UserSeedIdentifier)
+	updBody, _ := json.Marshal(map[string]interface{}{
+		"status_sesi": "offline",
+		"last_active": time.Now().UTC().Format(time.RFC3339),
+	})
+	query := fmt.Sprintf("login?anilist_id=eq.%s&session_id=eq.%s", url.QueryEscape(hashedID), url.QueryEscape(body.CurrentSessionID))
+
+	resp, err := executeCloudRequest("PATCH", query, updBody, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+
+	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Sesi ditandai offline."})
 }
 
 func throttleJikanCall() {
