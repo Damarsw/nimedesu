@@ -251,7 +251,7 @@ async def main():
 
         print(f"\n[+] Total {len(anime_items)} anime unik ditemukan dari page {PAGE_START} sampai {PAGE_END}.")
 
-        # 3. Eksekusi Pencocokan & Penambahan/Update Status
+        # 3. Eksekusi Pencocokan & Penambahan/Update Status ke ONGOING
         if anime_items:
             semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
             pbar = tqdm(total=len(anime_items), desc="Pencocokan Judul", unit="anime", leave=True)
@@ -263,9 +263,30 @@ async def main():
             await asyncio.gather(*tasks)
             pbar.close()
 
-            print("\n[✔] Proses pencocokan page 1-10 selesai!")
-        else:
-            print("\n[INFO] Tidak ada item anime yang ditemukan.")
+        # 4. FITUR BARU: UBAH ANIME ONGOING YANG SUDAH HILANG DARI PAGE 1-10 MENJADI FINISHED
+        print("\n[*] Memeriksa anime ONGOING di Supabase yang sudah tamat...")
+        
+        # Ambil daftar anime di Supabase yang statusnya ONGOING
+        supabase_ongoing_titles = [title for title, status in title_map.items() if status == "ONGOING"]
+        
+        finished_count = 0
+        for title in supabase_ongoing_titles:
+            # Jika judul anime ONGOING di database TIDAK ADA di hasil scan page 1-10 web
+            if title not in seen_titles:
+                try:
+                    supabase.table("anime").upsert({
+                        "title": title,
+                        "status": "FINISHED"
+                    }, on_conflict="title").execute()
+                    print(f"    [✓] [ANIME TAMAT] {title} -> Status diubah ke FINISHED")
+                    finished_count += 1
+                except Exception as e:
+                    print(f"    [ERROR] Gagal mengubah status tamat untuk {title}: {e}")
+
+        if finished_count == 0:
+            print("    [INFO] Tidak ada anime ONGOING yang tamat.")
+
+        print("\n[✔] Proses pencocokan & pembaruan status selesai sepenuhnya!")
 
 if __name__ == "__main__":
     asyncio.run(main())
