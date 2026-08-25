@@ -15,7 +15,7 @@ jobs:
         env:
           PING: ${{ secrets.PING }}
           JATI: ${{ secrets.KETUMBAR }}
-          MAHONI: ${{ secrets.KUNYIT }}
+          MAHONI: ${{ secrets.PUBLIC }}
         run: |
           echo "Checking Node Beringin..."
           curl -s "$PING" || exit 0
@@ -25,4 +25,5 @@ jobs:
 
           echo "Checking Node Jati..."
           curl -s "$JATI/rest/v1/" \
+            -H "apikey: $MAHONI" \
             -H "Authorization: Bearer $MAHONI" || exit 0
