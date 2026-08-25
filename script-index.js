@@ -171,7 +171,7 @@ function isAnimeBookmarked(anime) {
 
 function getUserCotyledonIdentifier(user) {
     if (!user) return null;
-    return user.name || String(user.id);
+    return String(user.id);
 }
 
 async function syncUserWithSupabase(user) {
@@ -226,6 +226,9 @@ async function getSupabaseUserData(user) {
             }
         });
         const result = await res.json();
+        if (!result || result.testa_payload === null) {
+            return null;
+        }
         const userData = result.testa_payload || { history: [], bookmarks: [] };
         userBookmarksCache = Array.isArray(userData.bookmarks) ? userData.bookmarks : [];
         return userData;
@@ -291,7 +294,9 @@ async function logoutOtherDevices() {
 
         const result = await res.json();
         if (result && result.status === "success") {
-            alert("Berhasil keluar dari semua perangkat lain!");
+            alert(result.message || "Berhasil keluar dari semua perangkat lain!");
+        } else if (result && result.status === "warning") {
+            alert(result.message);
         } else {
             alert("Gagal memproses logout perangkat lain.");
         }
@@ -319,6 +324,12 @@ async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
 
     try {
         const userData = await getSupabaseUserData(user);
+        if (!userData) {
+            alert("Sesi Anda telah diakhiri dari perangkat lain.");
+            logoutAniList();
+            return;
+        }
+
         let bookmarks = userData.bookmarks || [];
 
         const bookmarkItem = {
@@ -397,6 +408,12 @@ async function loadBookmarkTab(page = 1) {
     `;
 
     const userData = await getSupabaseUserData(user);
+    if (!userData) {
+        alert("Sesi Anda telah diakhiri dari perangkat lain.");
+        logoutAniList();
+        return;
+    }
+
     const bookmarks = userData.bookmarks || [];
 
     if (bookmarks.length === 0) {
@@ -534,7 +551,7 @@ function logoutAniList() {
     userBookmarksCache = [];
     currentData = [];
 
-    alert("Berhasil logout! Silakan login kembali.");
+    alert("Berhasil logout!");
     window.location.href = window.location.pathname;
 }
 
@@ -592,6 +609,14 @@ async function checkAniListAuthStatus() {
                 userWelcomeBanner.classList.remove('hidden');
             }
 
+            // Validasi apakah sesi HP ini masih ada di Supabase
+            const dbData = await getSupabaseUserData(user);
+            if (!dbData) {
+                alert("Sesi Anda telah diakhiri dari perangkat lain.");
+                logoutAniList();
+                return;
+            }
+
             await syncUserWithSupabase(user);
             renderHistory();
         }
@@ -612,6 +637,8 @@ async function renderHistory() {
 
     try {
         const userData = await getSupabaseUserData(user);
+        if (!userData) return;
+        
         const history = userData.history || [];
 
         if (history.length === 0) {
@@ -682,6 +709,12 @@ async function clearHistory() {
 
     try {
         const userData = await getSupabaseUserData(user);
+        if (!userData) {
+            alert("Sesi Anda telah diakhiri dari perangkat lain.");
+            logoutAniList();
+            return;
+        }
+
         userData.history = [];
         await saveSupabaseUserData(user, userData);
         document.getElementById('historySection').classList.add('hidden');
