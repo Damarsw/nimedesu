@@ -14,7 +14,7 @@ jobs:
       - name: Ping Render Backend & Main Website
         env:
           PING: ${{ secrets.PING }}
-          WEB_URL: ${{ secrets.WEB_URL }}
+          WEB_URL: ${{ secrets.KETUMBAR }}
         run: |
           echo "Pinging Backend Render..."
           curl -s "$PING" || exit 0
