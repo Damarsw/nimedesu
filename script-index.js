@@ -186,6 +186,7 @@ async function syncUserWithSupabase(user) {
         const sec = generateBubalinumHeaderSignature();
         const res = await fetch(`${ARCHIDENDRON_BRIDGE}/user-sync`, {
             method: "POST",
+            credentials: "include", // <-- TAMBAHKAN BARIS INI
             headers: {
                 "Content-Type": "application/json",
                 "X-Bubalinum-Seed": sec.seed,
@@ -223,6 +224,8 @@ async function getSupabaseUserData(user) {
     try {
         const sec = generateBubalinumHeaderSignature();
         const res = await fetch(`${ARCHIDENDRON_BRIDGE}/user-data?cotyledon=${encodeURIComponent(identifier)}&pericarp=${encodeURIComponent(sessionID)}`, {
+            method: "GET",
+            credentials: "include", // <-- TAMBAHKAN BARIS INI
             headers: {
                 "X-Bubalinum-Seed": sec.seed,
                 "X-Bubalinum-Chrono": sec.chrono
@@ -247,6 +250,7 @@ async function saveSupabaseUserData(user, payloadData) {
         const sec = generateBubalinumHeaderSignature();
         const res = await fetch(`${ARCHIDENDRON_BRIDGE}/user-update`, {
             method: "POST",
+            credentials: "include", // <-- TAMBAHKAN BARIS INI
             headers: {
                 "Content-Type": "application/json",
                 "X-Bubalinum-Seed": sec.seed,
@@ -527,7 +531,21 @@ function loginAniList() {
     window.location.href = authUrl;
 }
 
-function logoutAniList() {
+async function logoutAniList() {
+    try {
+        const sec = generateBubalinumHeaderSignature();
+        await fetch(`${ARCHIDENDRON_BRIDGE}/user-logout`, {
+            method: "POST",
+            credentials: "include",
+            headers: {
+                "X-Bubalinum-Seed": sec.seed,
+                "X-Bubalinum-Chrono": sec.chrono
+            }
+        });
+    } catch (e) {
+        console.error("Gagal logout server:", e);
+    }
+
     sessionStorage.removeItem('anilist_token');
     sessionStorage.removeItem('anilist_user');
     userBookmarksCache = [];
