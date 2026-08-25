@@ -23,7 +23,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var bubalinumSaponinPass = getBotanicalEnv("SAPONIN_COMPOUND", "ArchidendronBubalinumExtract2026") // Wajib 32 karakter untuk AES-256
+var bubalinumSaponinPass = getBotanicalEnv("SAPONIN_COMPOUND", "ArchidendronBubalinumExtract2026")
 
 type BotanicalBatchStore struct {
 	sync.RWMutex
@@ -339,14 +339,34 @@ func processUserLogoutOthersBotanical(c *gin.Context) {
 
 	hashedID := hashPhytochemicalSeed(body.UserSeedIdentifier)
 	query := fmt.Sprintf("login?anilist_id=eq.%s&session_id=neq.%s", url.QueryEscape(hashedID), url.QueryEscape(body.CurrentSessionID))
-	resp, err := executeCloudRequest("DELETE", query, nil, nil)
+
+	// Mengirim header Prefer agar Supabase mengembalikan data yang benar-benar terhapus
+	headers := map[string]string{
+		"Prefer": "return=representation",
+	}
+
+	resp, err := executeCloudRequest("DELETE", query, nil, headers)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	defer resp.Body.Close()
 
-	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Berhasil mengeluarkan akun dari perangkat lain."})
+	var deletedRows []map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&deletedRows)
+
+	if len(deletedRows) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "warning",
+			"message": "Tidak ada perangkat lain yang terdaftar atau sesi perangkat tidak cocok.",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": fmt.Sprintf("Berhasil mengeluarkan %d perangkat lain.", len(deletedRows)),
+	})
 }
 
 func throttleJikanCall() {
@@ -1390,4 +1410,3 @@ func rankingHandler(c *gin.Context) {
 		"source":    source,
 	})
 }
-
