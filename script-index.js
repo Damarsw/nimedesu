@@ -531,12 +531,14 @@ function logoutAniList() {
     sessionStorage.removeItem('anilist_token');
     sessionStorage.removeItem('anilist_user');
     userBookmarksCache = [];
-
+    
     const userWelcomeBanner = document.getElementById('userWelcomeBanner');
     if (userWelcomeBanner) userWelcomeBanner.classList.add('hidden');
-
-    alert("Berhasil logout!");
-    window.location.reload();
+    
+    const resolvedSpecimen = recombineSeedEssence(JACK_SPECIMEN_REF);
+    const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${resolvedSpecimen}&response_type=token`;
+    
+    window.location.href = authUrl;
 }
 
 async function checkAniListAuthStatus() {
