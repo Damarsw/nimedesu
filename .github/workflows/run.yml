@@ -31,4 +31,4 @@ jobs:
           KETUMBAR: ${{ secrets.KETUMBAR }}
           LADA_HITAM: ${{ secrets.LADA_HITAM }}
           KUNYIT: ${{ secrets.KUNYIT }}
-        run: python run.py
+        run: python cek.py
