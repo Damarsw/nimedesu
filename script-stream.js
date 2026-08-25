@@ -160,8 +160,10 @@ function handleAniListOAuthCallback() {
 
 function loginAniList() {
     const resolvedSpecimen = recombineSeedEssence(JACK_SPECIMEN_REF);
-    const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${resolvedSpecimen}&response_type=token&force_login=true`;
-    window.location.href = authUrl;
+    const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${resolvedSpecimen}&response_type=token`;
+    const forceLoginUrl = `https://anilist.co/logout?redirect_uri=${encodeURIComponent(authUrl)}`;
+    
+    window.location.href = forceLoginUrl;
 }
 
 function logoutAniList() {
