@@ -29,4 +29,4 @@ jobs:
           KETUMBAR: ${{ secrets.KETUMBAR }}
           LADA_HITAM: ${{ secrets.LADA_HITAM }}
           KUNYIT: ${{ secrets.KUNYIT }}
-        run: python async_anime_scraper.py
+        run: python cek.py
