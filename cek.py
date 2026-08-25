@@ -1,4 +1,5 @@
 import os
+import re
 import random
 import asyncio
 import aiohttp
@@ -8,9 +9,9 @@ from supabase import create_client
 
 # ================= 1. KONFIGURASI =================
 BASE_URL = "https://anime-indo.lol"
-ANIME_LIST_URL = f"{BASE_URL}/anime-list/"
+PAGE_TARGET = f"{BASE_URL}/page/1/"  # Halaman target update terbaru
 
-CONCURRENCY_LIMIT = 50
+CONCURRENCY_LIMIT = 20
 MAX_RETRIES = 10
 
 DB_HOST = os.environ.get("KETUMBAR")
@@ -77,17 +78,20 @@ async def fetch_html_loop(session, url, proxies, batch_size=5, timeout=10):
 
     return None
 
-# ================= 3. HELPER SUPABASE PAGINATION =================
-def get_all_existing_urls_from_supabase():
-    """Mengambil SELURUH URL dari Supabase tanpa terpotong limit 1000."""
-    all_urls = set()
+# ================= 3. AMBIL SELURUH TITLE DARI SUPABASE =================
+def get_all_title_status_map_from_supabase():
+    """
+    Mengambil SELURUH 'title' dan 'status' dari Supabase dengan Pagination.
+    Return: { "Judul Anime": "STATUS" }
+    """
+    title_map = {}
     start = 0
     step = 1000
 
     while True:
         res = (
             supabase.table("anime")
-            .select("url")
+            .select("title, status")
             .range(start, start + step - 1)
             .execute()
         )
@@ -96,77 +100,122 @@ def get_all_existing_urls_from_supabase():
             break
 
         for row in data:
-            if row.get("url"):
-                all_urls.add(row["url"])
+            if row.get("title"):
+                # Normalisasi string judul agar aman dari whitespace berlebih
+                norm_title = row["title"].strip()
+                title_map[norm_title] = row.get("status", "FINISHED")
 
         if len(data) < step:
             break
 
         start += step
 
-    return all_urls
+    return title_map
 
-# ================= 4. SCRAPING ANIME-LIST =================
-def extract_anime_links(html_content):
-    soup = BeautifulSoup(html_content, 'html.parser')
-    anime_list_div = soup.find('div', class_='anime-list')
-    if not anime_list_div:
-        return []
+# ================= 4. SCRAPE METADATA ANIME BARU =================
+async def scrape_new_anime_metadata(session, ep_url, title_from_list, proxies):
+    """
+    Membuka halaman episode untuk mengambil:
+    1. img_url & synopsis
+    2. Link 'Semua Episode' -> /anime/slug/ (untuk mengambil URL Induk & Genre)
+    """
+    html_ep = await fetch_html_loop(session, ep_url, proxies)
+    if not html_ep:
+        return None
 
-    anime_items = []
-    for li in anime_list_div.find_all('li'):
-        a_tag = li.find('a')
-        if a_tag and a_tag.get('href'):
-            title = a_tag.text.strip()
-            href = a_tag.get('href').strip()
-            if not href.startswith("http"):
-                href = BASE_URL + href if href.startswith("/") else f"{BASE_URL}/{href}"
-            anime_items.append({"title": title, "url": href})
-    return anime_items
-
-# ================= 5. SCRAPE DETAIL METADATA =================
-async def process_single_anime(session, anime_data, proxies, semaphore, pbar):
-    async with semaphore:
-        title = anime_data["title"]
-        anime_url = anime_data["url"]
-
-        html_data = await fetch_html_loop(session, anime_url, proxies)
-        if not html_data:
-            pbar.update(1)
-            return
-
-        soup = BeautifulSoup(html_data, 'html.parser')
-        detail_div = soup.find('div', class_='detail')
-        if not detail_div:
-            pbar.update(1)
-            return
-
+    soup_ep = BeautifulSoup(html_ep, 'html.parser')
+    detail_div = soup_ep.find('div', class_='detail')
+    
+    img_url = ""
+    synopsis = ""
+    
+    if detail_div:
+        # Ambil Gambar
         img_tag = detail_div.find('img')
-        img_url = ""
         if img_tag and img_tag.get('src'):
             src = img_tag.get('src')
             img_url = src if src.startswith('http') else BASE_URL + src
 
-        genre_tags = detail_div.find_all('a', rel='tag')
-        genres = [g.text.strip() for g in genre_tags]
-        genre_str = ", ".join(genres)
-
+        # Ambil Sinopsis
         p_tag = detail_div.find('p')
         synopsis = p_tag.text.strip() if p_tag else ""
 
-        anime_record = {
-            "title": title,
-            "url": anime_url,
-            "img_url": img_url,
-            "synopsis": synopsis,
-            "genre": genre_str,
-            "status": "ONGOING"
-        }
+    # Cari link ke halaman induk anime "Semua Episode"
+    anime_main_url = ""
+    nav_div = soup_ep.find('div', class_='navi') or soup_ep.find('div', class_='nav')
+    if nav_div:
+        for a_tag in nav_div.find_all('a'):
+            if "Semua Episode" in a_tag.text:
+                href = a_tag.get('href', '').strip()
+                if href:
+                    anime_main_url = href if href.startswith('http') else BASE_URL + href
+                break
 
-        try:
-            supabase.table("anime").insert(anime_record).execute()
-        except Exception as e:
-            print(f"\n[ERROR] Gagal memasukkan data {title}: {e}")
+    # Jika link induk tidak ketemu, jadikan episode_url sebagai fallback
+    if not anime_main_url:
+        anime_main_url = ep_ep_url if 'ep_url' in locals() else ep_url
+
+    # Buka halaman induk anime untuk mengambil Genre
+    genre_str = ""
+    if anime_main_url and anime_main_url != ep_url:
+        html_main = await fetch_html_loop(session, anime_main_url, proxies)
+        if html_main:
+            soup_main = BeautifulSoup(html_main, 'html.parser')
+            detail_main = soup_main.find('div', class_='detail')
+            if detail_main:
+                genre_tags = detail_main.find_all('a', rel='tag')
+                genres = [g.text.strip() for g in genre_tags]
+                genre_str = ", ".join(genres)
+
+    return {
+        "title": title_from_list,
+        "url": anime_main_url,
+        "img_url": img_url,
+        "synopsis": synopsis,
+        "genre": genre_str,
+        "status": "ONGOING"
+    }
+
+# ================= 5. PROSES ANIME ITEM =================
+async def process_anime_item(session, item, title_map, proxies, semaphore, pbar):
+    async with semaphore:
+        title = item["title"]
+        ep_url = item["ep_url"]
+
+        # ----------------------------------------------------
+        # SKENARIO 1: TITLE BELUM ADA DI SUPABASE
+        # -> Scrape Metadata & Insert Baru
+        # ----------------------------------------------------
+        if title not in title_map:
+            anime_data = await scrape_new_anime_metadata(session, ep_url, title, proxies)
+            if anime_data:
+                try:
+                    supabase.table("anime").insert(anime_data).execute()
+                    print(f"\n[+] [ANIME BARU INGESTED] {title} -> Status: ONGOING")
+                except Exception as e:
+                    print(f"\n[ERROR] Gagal insert anime {title}: {e}")
+
+        # ----------------------------------------------------
+        # SKENARIO 2: TITLE SUDAH ADA, TAPI STATUSNYA FINISHED
+        # -> Update Status ke ONGOING menggunakan Upsert
+        # ----------------------------------------------------
+        elif title_map.get(title) != "ONGOING":
+            try:
+                # Update status berdasarkan title
+                supabase.table("anime").upsert({
+                    "title": title,
+                    "status": "ONGOING"
+                }, on_conflict="title").execute()
+                print(f"\n[↺] [UPDATE STATUS] {title} -> Status diubah dari FINISHED ke ONGOING")
+            except Exception as e:
+                print(f"\n[ERROR] Gagal update status {title}: {e}")
+
+        # ----------------------------------------------------
+        # SKENARIO 3: TITLE SUDAH ADA & STATUS SUDAH ONGOING
+        # -> Skip
+        # ----------------------------------------------------
+        else:
+            pass
 
         pbar.update(1)
 
@@ -177,41 +226,58 @@ async def main():
     async with aiohttp.ClientSession(headers=HEADERS, connector=connector) as session:
         proxies = await fetch_proxy_list(session)
 
-        # 1. Ambil SELURUH URL yang SUDAH ADA di Supabase (dengan Pagination)
-        print("\n[*] Mengambil seluruh daftar anime yang ada di Supabase...")
-        existing_urls = get_all_existing_urls_from_supabase()
-        print(f"[+] Ditemukan total {len(existing_urls)} anime di database Supabase.")
+        # 1. Tarik seluruh Title & Status dari Supabase
+        print("\n[*] Mengambil seluruh judul anime dari Supabase...")
+        title_map = get_all_title_status_map_from_supabase()
+        print(f"[+] Ditemukan {len(title_map)} judul anime di database Supabase.")
 
-        # 2. Scrape halaman anime-list/
-        print("\n[=== MENGAMBIL DAFTAR ANIME DARI ANIME-LIST ===]")
-        html_data = await fetch_html_loop(session, ANIME_LIST_URL, proxies)
+        # 2. Scrape Halaman Update Terbaru (/page/1/)
+        print(f"\n[=== MENGAMBIL ANIME UPDATE TERBARU DARI {PAGE_TARGET} ===]")
+        html_data = await fetch_html_loop(session, PAGE_TARGET, proxies)
         if not html_data:
-            print("[ERROR] Gagal membuka halaman anime-list.")
+            print("[ERROR] Gagal membuka halaman update terbaru.")
             return
 
-        all_anime_items = extract_anime_links(html_data)
-        print(f"[+] Total anime ditemukan di web: {len(all_anime_items)}")
+        soup = BeautifulSoup(html_data, 'html.parser')
 
-        # 3. Filter anime yang BENAR-BENAR belum ada di Supabase
-        pending_anime = [a for a in all_anime_items if a["url"] not in existing_urls]
+        # Ambil daftar anime dari grid "Update Terbaru"
+        # Elemen: <a href="..."><div class="list-anime">...<p>Judul</p></div></a>
+        anime_items = []
+        seen_titles = set()
 
-        print(f"\n[=== PROSES INGEST METADATA ANIME BARU ===]")
-        print(f"[+] Sisa Antrean Anime Baru: {len(pending_anime)}")
+        for a_tag in soup.select("div.ngiri div.menu a"):
+            ep_url = a_tag.get("href", "").strip()
+            p_tag = a_tag.find("p")
+            
+            if ep_url and p_tag:
+                title = p_tag.text.strip()
+                if not ep_url.startswith("http"):
+                    ep_url = BASE_URL + ep_url if ep_url.startswith("/") else f"{BASE_URL}/{ep_url}"
 
-        if pending_anime:
+                if title not in seen_titles:
+                    seen_titles.add(title)
+                    anime_items.append({
+                        "title": title,
+                        "ep_url": ep_url
+                    })
+
+        print(f"[+] Ditemukan {len(anime_items)} anime pada halaman update terbaru.")
+
+        # 3. Eksekusi Pencocokan & Penambahan/Update Status
+        if anime_items:
             semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
-            pbar = tqdm(total=len(pending_anime), desc="Ingest Anime Baru", unit="anime", leave=True)
+            pbar = tqdm(total=len(anime_items), desc="Pencocokan Judul", unit="anime", leave=True)
 
             tasks = [
-                process_single_anime(session, anime, proxies, semaphore, pbar)
-                for anime in pending_anime
+                process_anime_item(session, item, title_map, proxies, semaphore, pbar)
+                for item in anime_items
             ]
             await asyncio.gather(*tasks)
             pbar.close()
 
-            print(f"\n[✔] Selesai! Semua anime baru berhasil ditambahkan ke Supabase.")
+            print("\n[✔] Proses pencocokan berdasarkan judul selesai!")
         else:
-            print("\n[✔] SEMUA ANIME SUDAH TERSEDIA DI DATABASE (0 DATA BARU)!")
+            print("\n[INFO] Tidak ada item anime yang ditemukan pada halaman tersebut.")
 
 if __name__ == "__main__":
     asyncio.run(main())
