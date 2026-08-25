@@ -109,6 +109,7 @@ func main() {
 	appEngine.GET("/api/user-data", processUserDataBotanical)
 	appEngine.POST("/api/user-update", processUserUpdateBotanical)
 	appEngine.POST("/api/user-logout-others", processUserLogoutOthersBotanical)
+	appEngine.POST("/api/user-logout", processUserLogoutBotanical)
 
 	appEngine.GET("/api/clear-cache", func(c *gin.Context) {
 		localCache.Lock()
