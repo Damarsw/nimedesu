@@ -3,7 +3,7 @@ name: Keep Render Alive
 on:
   schedule:
     # Jalan tiap 10 menit sekali (Render sleep setelah 15 menit idle)
-    - cron: '*/5 * * * *'
+    - cron: '*/10 * * * *'
   workflow_dispatch: # Supaya bisa di-trigger manual kalau mau tes
 
 jobs:
@@ -14,4 +14,4 @@ jobs:
       - name: Ping Backend Render Service
         run: |
           # Ganti URL di bawah dengan URL Backend Render kamu
-          curl -s $PING || exit 0
+          curl -s "$PING" || exit 0
