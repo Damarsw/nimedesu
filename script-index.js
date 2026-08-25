@@ -171,7 +171,7 @@ function isAnimeBookmarked(anime) {
 
 function getUserCotyledonIdentifier(user) {
     if (!user) return null;
-    return String(user.id);
+    return user.name || String(user.id);
 }
 
 async function syncUserWithSupabase(user) {
@@ -291,9 +291,7 @@ async function logoutOtherDevices() {
 
         const result = await res.json();
         if (result && result.status === "success") {
-            alert(result.message || "Berhasil keluar dari semua perangkat lain!");
-        } else if (result && result.status === "warning") {
-            alert(result.message);
+            alert("Berhasil keluar dari semua perangkat lain!");
         } else {
             alert("Gagal memproses logout perangkat lain.");
         }
@@ -527,7 +525,7 @@ function loginAniList() {
     window.location.href = authUrl;
 }
 
-function logoutAniList(showAlert = true) {
+function logoutAniList() {
     localStorage.removeItem('anilist_token');
     localStorage.removeItem('anilist_user');
     localStorage.removeItem('nimedesu_scores_cache');
@@ -536,9 +534,7 @@ function logoutAniList(showAlert = true) {
     userBookmarksCache = [];
     currentData = [];
 
-    if (showAlert) {
-        alert("Berhasil logout!");
-    }
+    alert("Berhasil logout! Silakan login kembali.");
     window.location.href = window.location.pathname;
 }
 
@@ -582,7 +578,7 @@ async function checkAniListAuthStatus() {
 
             if (sidebarAuthBtn) {
                 sidebarAuthBtn.innerHTML = `
-                    <button onclick="logoutAniList(true)" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-500/20 text-red-500 transition text-left">
+                    <button onclick="logoutAniList()" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-500/20 text-red-500 transition text-left">
                         <i class="fa-solid fa-right-from-bracket w-5 text-center"></i> Logout (${user.name})
                     </button>
                 `;
@@ -596,7 +592,6 @@ async function checkAniListAuthStatus() {
                 userWelcomeBanner.classList.remove('hidden');
             }
 
-            // Sync/Daftarkan sesi ke Supabase terlebih dahulu
             await syncUserWithSupabase(user);
             renderHistory();
         }
