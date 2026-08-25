@@ -303,7 +303,6 @@ async function logoutOtherDevices() {
 async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
     const user = getLoggedInUser();
     if (!user) {
-        alert("Silakan login dengan akun AniList terlebih dahulu untuk menyimpan bookmark!");
         loginAniList();
         return;
     }
@@ -342,14 +341,12 @@ async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
 
         if (existsIndex > -1) {
             bookmarks.splice(existsIndex, 1);
-            alert(`"${bookmarkItem.title}" dihapus dari Bookmark!`);
             if (buttonEl) {
                 const icon = buttonEl.querySelector('i');
                 if (icon) icon.className = 'fa-regular fa-bookmark text-xs text-zinc-300';
             }
         } else {
             bookmarks.unshift(bookmarkItem);
-            alert(`"${bookmarkItem.title}" berhasil disimpan ke Bookmark!`);
             if (buttonEl) {
                 const icon = buttonEl.querySelector('i');
                 if (icon) icon.className = 'fa-solid fa-bookmark text-xs text-neon-yellow';
@@ -365,7 +362,6 @@ async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
 
     } catch (err) {
         console.error("Gagal toggle bookmark:", err);
-        alert("Terjadi kesalahan saat memproses bookmark.");
     }
 }
 
@@ -534,8 +530,7 @@ function logoutAniList() {
     userBookmarksCache = [];
     currentData = [];
 
-    alert("Berhasil logout! Silakan login kembali.");
-    window.location.href = window.location.pathname;
+    loginAniList();
 }
 
 async function checkAniListAuthStatus() {
@@ -562,6 +557,12 @@ async function checkAniListAuthStatus() {
             },
             body: JSON.stringify({ query: query })
         });
+
+        if (!response.ok) {
+            logoutAniList();
+            return;
+        }
+
         const result = await response.json();
         const user = result?.data?.Viewer;
 
@@ -594,6 +595,8 @@ async function checkAniListAuthStatus() {
 
             await syncUserWithSupabase(user);
             renderHistory();
+        } else {
+            logoutAniList();
         }
     } catch (err) {
         console.error("Auth check failed:", err);
