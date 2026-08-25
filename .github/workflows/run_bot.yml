@@ -1,17 +1,16 @@
-name: Run Anime Scraper Bot
+name: Run Scraper Worker
 
 on:
   schedule:
-    - cron: '0 2,14 * * *'
-  
+    - cron: '0 2,14 * * *'  # Jalan otomatis jam 09:00 WIB dan 21:00 WIB
   workflow_dispatch:
 
 jobs:
-  run-python-script:
+  run-script:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Repository
+    - name: Checkout Code
       uses: actions/checkout@v4
 
     - name: Set up Python
@@ -24,6 +23,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install requests beautifulsoup4 supabase urllib3
 
-    - name: Run Bot Script
-      run: |
-        python ongoing.py
+    - name: Run Script
+      env:
+        KETUMBAR: ${{ secrets.KETUMBAR }}
+        LADA_HITAM: ${{ secrets.LADA_HITAM }}
+        KAYU_MANIS: ${{ secrets.KUNYIT }}
+      run: python ongoing.py
