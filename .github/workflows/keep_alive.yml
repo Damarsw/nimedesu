@@ -1,4 +1,4 @@
-name: Keep Render & Web Alive
+name: Keep Web Alive
 
 on:
   schedule:
