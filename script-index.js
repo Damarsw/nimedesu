@@ -521,11 +521,12 @@ function handleAniListOAuthCallback() {
 }
 
 function loginAniList() {
+    currentAuthToken = null;
+    currentAuthUser = null;
     const resolvedSpecimen = recombineSeedEssence(JACK_SPECIMEN_REF);
     const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${resolvedSpecimen}&response_type=token`;
-    const forceLoginUrl = `https://anilist.co/logout?redirect_uri=${encodeURIComponent(authUrl)}`;
     
-    window.location.href = forceLoginUrl;
+    window.location.href = authUrl;
 }
 
 function logoutAniList() {
