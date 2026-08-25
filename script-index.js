@@ -503,9 +503,10 @@ function renderBookmarkGrid(items) {
     paginationBox.innerHTML = paginationHTML;
 }
 
-// MEMBACA DARI VARIABLE IN-MEMORY RUNTIME
 function getLoggedInUser() {
-    return currentAuthUser;
+    const userStr = sessionStorage.getItem('anilist_user');
+    if (!userStr) return null;
+    try { return JSON.parse(userStr); } catch (e) { return null; }
 }
 
 function handleAniListOAuthCallback() {
@@ -514,42 +515,32 @@ function handleAniListOAuthCallback() {
         const tokenParams = new URLSearchParams(hash.replace('#', '?'));
         const accessToken = tokenParams.get('access_token');
         if (accessToken) {
-            currentAuthToken = accessToken;
+            sessionStorage.setItem('anilist_token', accessToken);
             history.replaceState(null, document.title, window.location.pathname + window.location.search);
         }
     }
 }
 
 function loginAniList() {
-    currentAuthToken = null;
-    currentAuthUser = null;
     const resolvedSpecimen = recombineSeedEssence(JACK_SPECIMEN_REF);
     const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${resolvedSpecimen}&response_type=token`;
-    
     window.location.href = authUrl;
 }
 
 function logoutAniList() {
-    currentAuthToken = null;
-    currentAuthUser = null;
+    sessionStorage.removeItem('anilist_token');
+    sessionStorage.removeItem('anilist_user');
     userBookmarksCache = [];
-    currentData = [];
 
     const userWelcomeBanner = document.getElementById('userWelcomeBanner');
     if (userWelcomeBanner) userWelcomeBanner.classList.add('hidden');
 
-    const headerAuthContainer = document.getElementById('headerAuthContainer');
-    if (headerAuthContainer) headerAuthContainer.innerHTML = '';
-
-    const sidebarAuthBtn = document.getElementById('sidebarAuthBtn');
-    if (sidebarAuthBtn) sidebarAuthBtn.innerHTML = '';
-
     alert("Berhasil logout!");
-    window.location.href = window.location.pathname;
+    window.location.reload();
 }
 
 async function checkAniListAuthStatus() {
-    const token = currentAuthToken;
+    const token = sessionStorage.getItem('anilist_token');
     const headerAuthContainer = document.getElementById('headerAuthContainer');
     const sidebarAuthBtn = document.getElementById('sidebarAuthBtn');
     const userWelcomeBanner = document.getElementById('userWelcomeBanner');
@@ -576,7 +567,8 @@ async function checkAniListAuthStatus() {
         const user = result?.data?.Viewer;
 
         if (user) {
-            currentAuthUser = user;
+            // Simpan profil temp di sessionStorage
+            sessionStorage.setItem('anilist_user', JSON.stringify(user));
 
             if (headerAuthContainer) {
                 headerAuthContainer.innerHTML = `
@@ -603,7 +595,10 @@ async function checkAniListAuthStatus() {
             }
 
             await syncUserWithSupabase(user);
-            renderHistory();
+
+            if (typeof renderHistory === 'function') {
+                renderHistory();
+            }
         }
     } catch (err) {
         console.error("Auth check failed:", err);
