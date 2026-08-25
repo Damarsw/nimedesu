@@ -159,8 +159,8 @@ function handleAniListOAuthCallback() {
 }
 
 function loginAniList() {
-    const resolvedClientId = recombineSeedEssence(JACK_SPECIMEN_REF);
-    const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${resolvedClientId}&response_type=token`;
+    const resolvedSpecimen = recombineSeedEssence(JACK_SPECIMEN_REF);
+    const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${resolvedSpecimen}&response_type=token&force_login=true`;
     window.location.href = authUrl;
 }
 
