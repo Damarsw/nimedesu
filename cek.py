@@ -21,7 +21,7 @@ URL_PROXY_LIST = os.environ.get("KUNYIT")
 if not DB_HOST or not DB_SECRET:
     raise ValueError("[ERROR] Konfigurasi 'KETUMBAR' atau 'LADA_HITAM' belum diset!")
 
-supabase = create_client(DB_HOST, DB_SECRET)
+db = create_client(DB_HOST, DB_SECRET)
 
 HEADERS = {
     "User-Agent": (
@@ -78,10 +78,10 @@ async def fetch_html_loop(session, url, proxies, batch_size=5, timeout=10):
 
     return None
 
-# ================= 3. AMBIL SELURUH TITLE DARI SUPABASE =================
-def get_all_title_status_map_from_supabase():
+# ================= 3. AMBIL SELURUH TITLE DARI DB =================
+def get_all_title_status_map_from_db():
     """
-    Mengambil SELURUH 'title' dan 'status' dari Supabase dengan Pagination.
+    Mengambil SELURUH 'title' dan 'status' dari DB dengan Pagination.
     Return: { "Judul Anime": "STATUS" }
     """
     title_map = {}
@@ -90,7 +90,7 @@ def get_all_title_status_map_from_supabase():
 
     while True:
         res = (
-            supabase.table("anime")
+            db.table("anime")
             .select("title, status")
             .range(start, start + step - 1)
             .execute()
@@ -176,12 +176,12 @@ async def process_anime_item(session, item, title_map, proxies, semaphore, pbar)
         title = item["title"]
         ep_url = item["ep_url"]
 
-        # SKENARIO 1: TITLE BELUM ADA DI SUPABASE -> Scrape & Insert Baru
+        # SKENARIO 1: TITLE BELUM ADA DI DB -> Scrape & Insert Baru
         if title not in title_map:
             anime_data = await scrape_new_anime_metadata(session, ep_url, title, proxies)
             if anime_data:
                 try:
-                    supabase.table("anime").insert(anime_data).execute()
+                    db.table("anime").insert(anime_data).execute()
                     print(f"\n[+] [ANIME BARU] {title} -> Status: ONGOING")
                 except Exception as e:
                     print(f"\n[ERROR] Gagal insert anime {title}: {e}")
@@ -189,7 +189,7 @@ async def process_anime_item(session, item, title_map, proxies, semaphore, pbar)
         # SKENARIO 2: TITLE SUDAH ADA TAPI FINISHED -> Update Status ke ONGOING
         elif title_map.get(title) != "ONGOING":
             try:
-                supabase.table("anime").upsert({
+                db.table("anime").upsert({
                     "title": title,
                     "status": "ONGOING"
                 }, on_conflict="title").execute()
@@ -210,10 +210,10 @@ async def main():
     async with aiohttp.ClientSession(headers=HEADERS, connector=connector) as session:
         proxies = await fetch_proxy_list(session)
 
-        # 1. Tarik seluruh Title & Status dari Supabase
-        print("\n[*] Mengambil seluruh judul anime dari Supabase...")
-        title_map = get_all_title_status_map_from_supabase()
-        print(f"[+] Ditemukan {len(title_map)} judul anime di database Supabase.")
+        # 1. Tarik seluruh Title & Status dari DB
+        print("\n[*] Mengambil seluruh judul anime dari DB...")
+        title_map = get_all_title_status_map_from_db()
+        print(f"[+] Ditemukan {len(title_map)} judul anime di database...")
 
         # 2. Scrape Halaman Update Terbaru (Page 1 sampai Page 10)
         print(f"\n[=== MENGAMBIL ANIME UPDATE TERBARU (PAGE {PAGE_START} - {PAGE_END}) ===]")
@@ -264,17 +264,17 @@ async def main():
             pbar.close()
 
         # 4. FITUR BARU: UBAH ANIME ONGOING YANG SUDAH HILANG DARI PAGE 1-10 MENJADI FINISHED
-        print("\n[*] Memeriksa anime ONGOING di Supabase yang sudah tamat...")
+        print("\n[*] Memeriksa anime ONGOING di Database yang sudah tamat...")
         
-        # Ambil daftar anime di Supabase yang statusnya ONGOING
-        supabase_ongoing_titles = [title for title, status in title_map.items() if status == "ONGOING"]
+        # Ambil daftar anime di DB yang statusnya ONGOING
+        db_ongoing_titles = [title for title, status in title_map.items() if status == "ONGOING"]
         
         finished_count = 0
-        for title in supabase_ongoing_titles:
+        for title in db_ongoing_titles:
             # Jika judul anime ONGOING di database TIDAK ADA di hasil scan page 1-10 web
             if title not in seen_titles:
                 try:
-                    supabase.table("anime").upsert({
+                    db.table("anime").upsert({
                         "title": title,
                         "status": "FINISHED"
                     }, on_conflict="title").execute()
