@@ -3,6 +3,12 @@ document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 const ARCHIDENDRON_BRIDGE = "/api-backend";
 const JACK_SPECIMEN_REF = "NDg1Njc=";
 
+// ==========================================
+// IN-MEMORY AUTH STATE (Bebas localStorage)
+// ==========================================
+let currentAuthToken = null;
+let currentAuthUser = null;
+
 function fractionateSeedEssence(rawString) {
     try { return btoa(rawString).replace(/=/g, ''); } catch(e) { return ""; }
 }
@@ -303,6 +309,7 @@ async function logoutOtherDevices() {
 async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
     const user = getLoggedInUser();
     if (!user) {
+        alert("Silakan login dengan akun AniList terlebih dahulu untuk menyimpan bookmark!");
         loginAniList();
         return;
     }
@@ -341,12 +348,14 @@ async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
 
         if (existsIndex > -1) {
             bookmarks.splice(existsIndex, 1);
+            alert(`"${bookmarkItem.title}" dihapus dari Bookmark!`);
             if (buttonEl) {
                 const icon = buttonEl.querySelector('i');
                 if (icon) icon.className = 'fa-regular fa-bookmark text-xs text-zinc-300';
             }
         } else {
             bookmarks.unshift(bookmarkItem);
+            alert(`"${bookmarkItem.title}" berhasil disimpan ke Bookmark!`);
             if (buttonEl) {
                 const icon = buttonEl.querySelector('i');
                 if (icon) icon.className = 'fa-solid fa-bookmark text-xs text-neon-yellow';
@@ -362,6 +371,7 @@ async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
 
     } catch (err) {
         console.error("Gagal toggle bookmark:", err);
+        alert("Terjadi kesalahan saat memproses bookmark.");
     }
 }
 
@@ -496,11 +506,9 @@ function renderBookmarkGrid(items) {
     paginationBox.innerHTML = paginationHTML;
 }
 
+// MEMBACA DARI VARIABLE IN-MEMORY RUNTIME
 function getLoggedInUser() {
-    const userStr = localStorage.getItem('anilist_user');
-    const token = localStorage.getItem('anilist_token');
-    if (!token || !userStr) return null;
-    try { return JSON.parse(userStr); } catch (e) { return null; }
+    return currentAuthUser;
 }
 
 function handleAniListOAuthCallback() {
@@ -509,7 +517,7 @@ function handleAniListOAuthCallback() {
         const tokenParams = new URLSearchParams(hash.replace('#', '?'));
         const accessToken = tokenParams.get('access_token');
         if (accessToken) {
-            localStorage.setItem('anilist_token', accessToken);
+            currentAuthToken = accessToken;
             history.replaceState(null, document.title, window.location.pathname + window.location.search);
         }
     }
@@ -522,19 +530,26 @@ function loginAniList() {
 }
 
 function logoutAniList() {
-    localStorage.removeItem('anilist_token');
-    localStorage.removeItem('anilist_user');
-    localStorage.removeItem('nimedesu_scores_cache');
-    localStorage.removeItem('pericarp_id');
-
+    currentAuthToken = null;
+    currentAuthUser = null;
     userBookmarksCache = [];
     currentData = [];
 
-    loginAniList();
+    const userWelcomeBanner = document.getElementById('userWelcomeBanner');
+    if (userWelcomeBanner) userWelcomeBanner.classList.add('hidden');
+
+    const headerAuthContainer = document.getElementById('headerAuthContainer');
+    if (headerAuthContainer) headerAuthContainer.innerHTML = '';
+
+    const sidebarAuthBtn = document.getElementById('sidebarAuthBtn');
+    if (sidebarAuthBtn) sidebarAuthBtn.innerHTML = '';
+
+    alert("Berhasil logout!");
+    window.location.href = window.location.pathname;
 }
 
 async function checkAniListAuthStatus() {
-    const token = localStorage.getItem('anilist_token');
+    const token = currentAuthToken;
     const headerAuthContainer = document.getElementById('headerAuthContainer');
     const sidebarAuthBtn = document.getElementById('sidebarAuthBtn');
     const userWelcomeBanner = document.getElementById('userWelcomeBanner');
@@ -557,17 +572,11 @@ async function checkAniListAuthStatus() {
             },
             body: JSON.stringify({ query: query })
         });
-
-        if (!response.ok) {
-            logoutAniList();
-            return;
-        }
-
         const result = await response.json();
         const user = result?.data?.Viewer;
 
         if (user) {
-            localStorage.setItem('anilist_user', JSON.stringify(user));
+            currentAuthUser = user;
 
             if (headerAuthContainer) {
                 headerAuthContainer.innerHTML = `
@@ -595,8 +604,6 @@ async function checkAniListAuthStatus() {
 
             await syncUserWithSupabase(user);
             renderHistory();
-        } else {
-            logoutAniList();
         }
     } catch (err) {
         console.error("Auth check failed:", err);
