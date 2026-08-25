@@ -15,7 +15,7 @@ jobs:
         env:
           PING: ${{ secrets.PING }}
           JATI: ${{ secrets.KETUMBAR }}
-          MAHONI: ${{ secrets.LADA_HITAM }}
+          MAHONI: ${{ secrets.KUNYIT }}
         run: |
           echo "Checking Node Beringin..."
           curl -s "$PING" || exit 0
