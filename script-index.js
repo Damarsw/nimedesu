@@ -527,36 +527,7 @@ function loginAniList() {
     window.location.href = authUrl;
 }
 
-async function markSessionOffline() {
-    const user = getLoggedInUser();
-    if (!user) return;
-
-    const identifier = getUserCotyledonIdentifier(user);
-    const sessionID = getOrCreatePhytoSessionID();
-
-    try {
-        const sec = generateBubalinumHeaderSignature();
-        await fetch(`${ARCHIDENDRON_BRIDGE}/user-logout`, {
-            method: "POST",
-            keepalive: true, // penting agar request tetap terkirim walau tab ditutup
-            headers: {
-                "Content-Type": "application/json",
-                "X-Bubalinum-Seed": sec.seed,
-                "X-Bubalinum-Chrono": sec.chrono
-            },
-            body: JSON.stringify({
-                cotyledon_id: identifier,
-                current_pericarp_id: sessionID
-            })
-        });
-    } catch (err) {
-        console.error("Gagal menandai sesi offline:", err);
-    }
-}
-
 function logoutAniList() {
-    markSessionOffline();
-
     sessionStorage.removeItem('anilist_token');
     sessionStorage.removeItem('anilist_user');
     userBookmarksCache = [];
@@ -567,12 +538,6 @@ function logoutAniList() {
     alert("Berhasil logout!");
     window.location.reload();
 }
-
-// Fallback: kalau user menutup tab/browser tanpa klik tombol logout,
-// tandai sesi offline juga (best-effort, tidak selalu 100% terkirim di semua browser).
-window.addEventListener("pagehide", () => {
-    if (getLoggedInUser()) markSessionOffline();
-});
 
 async function checkAniListAuthStatus() {
     const token = sessionStorage.getItem('anilist_token');
