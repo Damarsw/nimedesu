@@ -77,7 +77,36 @@ async def fetch_html_loop(session, url, proxies, batch_size=5, timeout=10):
 
     return None
 
-# ================= 3. SCRAPING ANIME-LIST =================
+# ================= 3. HELPER SUPABASE PAGINATION =================
+def get_all_existing_urls_from_supabase():
+    """Mengambil SELURUH URL dari Supabase tanpa terpotong limit 1000."""
+    all_urls = set()
+    start = 0
+    step = 1000
+
+    while True:
+        res = (
+            supabase.table("anime")
+            .select("url")
+            .range(start, start + step - 1)
+            .execute()
+        )
+        data = res.data or []
+        if not data:
+            break
+
+        for row in data:
+            if row.get("url"):
+                all_urls.add(row["url"])
+
+        if len(data) < step:
+            break
+
+        start += step
+
+    return all_urls
+
+# ================= 4. SCRAPING ANIME-LIST =================
 def extract_anime_links(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
     anime_list_div = soup.find('div', class_='anime-list')
@@ -95,12 +124,8 @@ def extract_anime_links(html_content):
             anime_items.append({"title": title, "url": href})
     return anime_items
 
-# ================= 4. SCRAPE DETAIL METADATA =================
+# ================= 5. SCRAPE DETAIL METADATA =================
 async def process_single_anime(session, anime_data, proxies, semaphore, pbar):
-    """
-    Mengambil metadata (Image, Genre, Synopsis) lalu menyimpannya ke Supabase
-    dengan status = ONGOING.
-    """
     async with semaphore:
         title = anime_data["title"]
         anime_url = anime_data["url"]
@@ -116,23 +141,19 @@ async def process_single_anime(session, anime_data, proxies, semaphore, pbar):
             pbar.update(1)
             return
 
-        # 1. Image URL
         img_tag = detail_div.find('img')
         img_url = ""
         if img_tag and img_tag.get('src'):
             src = img_tag.get('src')
             img_url = src if src.startswith('http') else BASE_URL + src
 
-        # 2. Genre
         genre_tags = detail_div.find_all('a', rel='tag')
         genres = [g.text.strip() for g in genre_tags]
         genre_str = ", ".join(genres)
 
-        # 3. Synopsis
         p_tag = detail_div.find('p')
         synopsis = p_tag.text.strip() if p_tag else ""
 
-        # 4. Record Data
         anime_record = {
             "title": title,
             "url": anime_url,
@@ -149,18 +170,17 @@ async def process_single_anime(session, anime_data, proxies, semaphore, pbar):
 
         pbar.update(1)
 
-# ================= 5. MAIN EXECUTION =================
+# ================= 6. MAIN EXECUTION =================
 async def main():
     connector = aiohttp.TCPConnector(limit=1000)
 
     async with aiohttp.ClientSession(headers=HEADERS, connector=connector) as session:
         proxies = await fetch_proxy_list(session)
 
-        # 1. Ambil seluruh URL yang SUDAH ADA di Supabase
-        print("\n[*] Mengambil daftar anime yang ada di Supabase...")
-        existing_res = supabase.table("anime").select("url").execute()
-        existing_urls = {row["url"] for row in existing_res.data}
-        print(f"[+] Ditemukan {len(existing_urls)} anime di database Supabase.")
+        # 1. Ambil SELURUH URL yang SUDAH ADA di Supabase (dengan Pagination)
+        print("\n[*] Mengambil seluruh daftar anime yang ada di Supabase...")
+        existing_urls = get_all_existing_urls_from_supabase()
+        print(f"[+] Ditemukan total {len(existing_urls)} anime di database Supabase.")
 
         # 2. Scrape halaman anime-list/
         print("\n[=== MENGAMBIL DAFTAR ANIME DARI ANIME-LIST ===]")
@@ -172,11 +192,11 @@ async def main():
         all_anime_items = extract_anime_links(html_data)
         print(f"[+] Total anime ditemukan di web: {len(all_anime_items)}")
 
-        # 3. Langsung bandingkan & filter anime BARU di RAM
+        # 3. Filter anime yang BENAR-BENAR belum ada di Supabase
         pending_anime = [a for a in all_anime_items if a["url"] not in existing_urls]
 
         print(f"\n[=== PROSES INGEST METADATA ANIME BARU ===]")
-        print(f"[+] Sisa Antrean Anime Baru yang Belum Ada di Supabase: {len(pending_anime)}")
+        print(f"[+] Sisa Antrean Anime Baru: {len(pending_anime)}")
 
         if pending_anime:
             semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
@@ -189,9 +209,9 @@ async def main():
             await asyncio.gather(*tasks)
             pbar.close()
 
-            print(f"\n[✔] Selesai! Semua anime baru berhasil ditambahkan ke Supabase dengan status ONGOING.")
+            print(f"\n[✔] Selesai! Semua anime baru berhasil ditambahkan ke Supabase.")
         else:
-            print("\n[✔] SEMUA ANIME SUDAH TERSEDIA DI DATABASE (TIDAK ADA DATA BARU)!")
+            print("\n[✔] SEMUA ANIME SUDAH TERSEDIA DI DATABASE (0 DATA BARU)!")
 
 if __name__ == "__main__":
     asyncio.run(main())
