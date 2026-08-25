@@ -2,10 +2,8 @@ name: Run Anime Scraper Bot
 
 on:
   schedule:
-    # Jadwal otomatis jam 09:00 pagi & 09:00 malam WIB (UTC 02:00 & 14:00)
     - cron: '0 2,14 * * *'
   
-  # Tombol manual untuk tes jalankan bot kapan saja dari tab Actions
   workflow_dispatch:
 
 jobs:
