@@ -1,26 +1,28 @@
-name: Keep Web Alive
+name: Keep All Services Alive
 
 on:
   schedule:
     # Jalan tiap 10 menit sekali
     - cron: '*/10 * * * *'
-  workflow_dispatch: # Pemicu manual kalau mau tes
+  workflow_dispatch:
 
 jobs:
-  ping-services:
+  ping-all-services:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Ping Render Backend & Main Website
+      - name: Process Tree Nodes
         env:
           PING: ${{ secrets.PING }}
-          WEB_URL: ${{ secrets.KETUMBAR }}
+          JATI: ${{ secrets.KETUMBAR }}
+          MAHONI: ${{ secrets.LADA_HITAM }}
         run: |
-          echo "Pinging Backend Render..."
+          echo "Checking Node Beringin..."
           curl -s "$PING" || exit 0
 
-          echo "Pinging Main Website..."
+          echo "Checking Node Cemara..."
           curl -s "https://nimedesu.vercel.app" || exit 0
 
-          echo "Pinging..."
-          curl -s "$KETUMBAR" || exit 0
+          echo "Checking Node Jati..."
+          curl -s "$JATI/rest/v1/" \
+            -H "Authorization: Bearer $MAHONI" || exit 0
