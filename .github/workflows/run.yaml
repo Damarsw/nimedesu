@@ -1,0 +1,42 @@
+name: Anime Scraper Automation
+
+on:
+  schedule:
+    # Berjalan setiap 12 jam sekali (jam 00:00 dan 12:00 UTC)
+    - cron: '0 0,12 * * *'
+  
+  # Izinkan pemicuan manual dari dashboard GitHub Actions
+  workflow_dispatch:
+
+jobs:
+  run-scrapers:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; else pip install requests beautifulsoup4 supabase; fi
+
+      - name: Run Scraper 1 (Anime Ongoing & Episode Baru)
+        env:
+          KETUMBAR: ${{ secrets.KETUMBAR }}
+          LADA_HITAM: ${{ secrets.LADA_HITAM }}
+          KUNYIT: ${{ secrets.KUNYIT }}
+        run: python ongoing.py
+
+      - name: Run Scraper 2 (Anime List & Judul Baru)
+        env:
+          KETUMBAR: ${{ secrets.KETUMBAR }}
+          LADA_HITAM: ${{ secrets.LADA_HITAM }}
+          KUNYIT: ${{ secrets.KUNYIT }}
+        run: python scraper_new_anime.py
