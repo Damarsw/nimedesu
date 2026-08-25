@@ -226,9 +226,6 @@ async function getSupabaseUserData(user) {
             }
         });
         const result = await res.json();
-        if (!result || result.testa_payload === null) {
-            return null;
-        }
         const userData = result.testa_payload || { history: [], bookmarks: [] };
         userBookmarksCache = Array.isArray(userData.bookmarks) ? userData.bookmarks : [];
         return userData;
@@ -324,12 +321,6 @@ async function toggleBookmarkAnime(animeObjOrId, buttonEl) {
 
     try {
         const userData = await getSupabaseUserData(user);
-        if (!userData) {
-            alert("Sesi Anda telah diakhiri dari perangkat lain.");
-            logoutAniList();
-            return;
-        }
-
         let bookmarks = userData.bookmarks || [];
 
         const bookmarkItem = {
@@ -408,12 +399,6 @@ async function loadBookmarkTab(page = 1) {
     `;
 
     const userData = await getSupabaseUserData(user);
-    if (!userData) {
-        alert("Sesi Anda telah diakhiri dari perangkat lain.");
-        logoutAniList();
-        return;
-    }
-
     const bookmarks = userData.bookmarks || [];
 
     if (bookmarks.length === 0) {
@@ -542,7 +527,7 @@ function loginAniList() {
     window.location.href = authUrl;
 }
 
-function logoutAniList() {
+function logoutAniList(showAlert = true) {
     localStorage.removeItem('anilist_token');
     localStorage.removeItem('anilist_user');
     localStorage.removeItem('nimedesu_scores_cache');
@@ -551,7 +536,9 @@ function logoutAniList() {
     userBookmarksCache = [];
     currentData = [];
 
-    alert("Berhasil logout!");
+    if (showAlert) {
+        alert("Berhasil logout!");
+    }
     window.location.href = window.location.pathname;
 }
 
@@ -595,7 +582,7 @@ async function checkAniListAuthStatus() {
 
             if (sidebarAuthBtn) {
                 sidebarAuthBtn.innerHTML = `
-                    <button onclick="logoutAniList()" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-500/20 text-red-500 transition text-left">
+                    <button onclick="logoutAniList(true)" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-500/20 text-red-500 transition text-left">
                         <i class="fa-solid fa-right-from-bracket w-5 text-center"></i> Logout (${user.name})
                     </button>
                 `;
@@ -609,14 +596,7 @@ async function checkAniListAuthStatus() {
                 userWelcomeBanner.classList.remove('hidden');
             }
 
-            // Validasi apakah sesi HP ini masih ada di Supabase
-            const dbData = await getSupabaseUserData(user);
-            if (!dbData) {
-                alert("Sesi Anda telah diakhiri dari perangkat lain.");
-                logoutAniList();
-                return;
-            }
-
+            // Sync/Daftarkan sesi ke Supabase terlebih dahulu
             await syncUserWithSupabase(user);
             renderHistory();
         }
@@ -637,8 +617,6 @@ async function renderHistory() {
 
     try {
         const userData = await getSupabaseUserData(user);
-        if (!userData) return;
-        
         const history = userData.history || [];
 
         if (history.length === 0) {
@@ -709,12 +687,6 @@ async function clearHistory() {
 
     try {
         const userData = await getSupabaseUserData(user);
-        if (!userData) {
-            alert("Sesi Anda telah diakhiri dari perangkat lain.");
-            logoutAniList();
-            return;
-        }
-
         userData.history = [];
         await saveSupabaseUserData(user, userData);
         document.getElementById('historySection').classList.add('hidden');
