@@ -26,13 +26,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests beautifulsoup4 supabase
 
-      - name: Run Scraper 1 (Anime Ongoing & Episode Baru)
-        env:
-          KETUMBAR: ${{ secrets.KETUMBAR }}
-          LADA_HITAM: ${{ secrets.LADA_HITAM }}
-          KUNYIT: ${{ secrets.KUNYIT }}
-        run: python ongoing.py
-
       - name: Run Scraper 2 (Anime List & Judul Baru)
         env:
           KETUMBAR: ${{ secrets.KETUMBAR }}
