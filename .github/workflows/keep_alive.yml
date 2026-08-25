@@ -1,17 +1,26 @@
-name: Keep Render Alive
+name: Keep Render & Web Alive
 
 on:
   schedule:
-    # Jalan tiap 10 menit sekali (Render sleep setelah 15 menit idle)
+    # Jalan tiap 10 menit sekali
     - cron: '*/10 * * * *'
-  workflow_dispatch: # Supaya bisa di-trigger manual kalau mau tes
+  workflow_dispatch: # Pemicu manual kalau mau tes
 
 jobs:
-  ping-render:
+  ping-services:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Ping Backend Render Service
+      - name: Ping Render Backend & Main Website
+        env:
+          PING: ${{ secrets.PING }}
+          WEB_URL: ${{ secrets.WEB_URL }}
         run: |
-          # Ganti URL di bawah dengan URL Backend Render kamu
+          echo "Pinging Backend Render..."
           curl -s "$PING" || exit 0
+
+          echo "Pinging Main Website..."
+          curl -s "https://nimedesu.vercel.app" || exit 0
+
+          echo "Pinging..."
+          curl -s "$" || exit 0
