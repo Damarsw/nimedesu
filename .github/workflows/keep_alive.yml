@@ -14,4 +14,4 @@ jobs:
       - name: Ping Backend Render Service
         run: |
           # Ganti URL di bawah dengan URL Backend Render kamu
-          curl -s https://nimedesu.onrender.com/health || exit 0
+          curl -s $PING || exit 0
