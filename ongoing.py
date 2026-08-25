@@ -16,7 +16,7 @@ URL = os.environ.get("KUNYIT")
 if not DB_HOST or not DB_SECRET:
     raise ValueError("[ERROR] Konfigurasi 'KETUMBAR' atau 'LADA_HITAM' belum diset!")
 
-supabase = create_client(DB_HOST, DB_SECRET)
+db = create_client(DB_HOST, DB_SECRET)
 
 BASE_URL = "https://anime-indo.lol"
 
@@ -133,7 +133,7 @@ def process_anime(anime):
         ep_divs = soup.find_all("div", class_="ep")
 
         existing_res = (
-            supabase.table("episode")
+            db.table("episode")
             .select("episode_title")
             .eq("anime_id", anime_id)
             .execute()
@@ -171,7 +171,7 @@ def process_anime(anime):
         for ep in new_episodes:
             video_servers = scrape_video_servers(ep["link"])
 
-            supabase.table("episode").insert({
+            db.table("episode").insert({
                 "anime_id": anime_id,
                 "episode_title": ep["title"],
                 "episode_url": ep["link"],
@@ -187,7 +187,7 @@ def process_anime(anime):
 
 def main():
     response = (
-        supabase.table("anime").select("id, url, title").eq("status", "ONGOING").execute()
+        db.table("anime").select("id, url, title").eq("status", "ONGOING").execute()
     )
     ongoing_anime = response.data
     print(
