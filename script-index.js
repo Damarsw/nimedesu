@@ -186,7 +186,6 @@ async function syncUserWithSupabase(user) {
         const sec = generateBubalinumHeaderSignature();
         const res = await fetch(`${ARCHIDENDRON_BRIDGE}/user-sync`, {
             method: "POST",
-            credentials: "include", // <-- TAMBAHKAN BARIS INI
             headers: {
                 "Content-Type": "application/json",
                 "X-Bubalinum-Seed": sec.seed,
@@ -224,8 +223,6 @@ async function getSupabaseUserData(user) {
     try {
         const sec = generateBubalinumHeaderSignature();
         const res = await fetch(`${ARCHIDENDRON_BRIDGE}/user-data?cotyledon=${encodeURIComponent(identifier)}&pericarp=${encodeURIComponent(sessionID)}`, {
-            method: "GET",
-            credentials: "include", // <-- TAMBAHKAN BARIS INI
             headers: {
                 "X-Bubalinum-Seed": sec.seed,
                 "X-Bubalinum-Chrono": sec.chrono
@@ -250,7 +247,6 @@ async function saveSupabaseUserData(user, payloadData) {
         const sec = generateBubalinumHeaderSignature();
         const res = await fetch(`${ARCHIDENDRON_BRIDGE}/user-update`, {
             method: "POST",
-            credentials: "include", // <-- TAMBAHKAN BARIS INI
             headers: {
                 "Content-Type": "application/json",
                 "X-Bubalinum-Seed": sec.seed,
@@ -507,10 +503,9 @@ function renderBookmarkGrid(items) {
     paginationBox.innerHTML = paginationHTML;
 }
 
+// MEMBACA DARI VARIABLE IN-MEMORY RUNTIME
 function getLoggedInUser() {
-    const userStr = sessionStorage.getItem('anilist_user');
-    if (!userStr) return null;
-    try { return JSON.parse(userStr); } catch (e) { return null; }
+    return currentAuthUser;
 }
 
 function handleAniListOAuthCallback() {
@@ -519,46 +514,42 @@ function handleAniListOAuthCallback() {
         const tokenParams = new URLSearchParams(hash.replace('#', '?'));
         const accessToken = tokenParams.get('access_token');
         if (accessToken) {
-            sessionStorage.setItem('anilist_token', accessToken);
+            currentAuthToken = accessToken;
             history.replaceState(null, document.title, window.location.pathname + window.location.search);
         }
     }
 }
 
 function loginAniList() {
+    currentAuthToken = null;
+    currentAuthUser = null;
     const resolvedSpecimen = recombineSeedEssence(JACK_SPECIMEN_REF);
     const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${resolvedSpecimen}&response_type=token`;
+    
     window.location.href = authUrl;
 }
 
-async function logoutAniList() {
-    try {
-        const sec = generateBubalinumHeaderSignature();
-        await fetch(`${ARCHIDENDRON_BRIDGE}/user-logout`, {
-            method: "POST",
-            credentials: "include",
-            headers: {
-                "X-Bubalinum-Seed": sec.seed,
-                "X-Bubalinum-Chrono": sec.chrono
-            }
-        });
-    } catch (e) {
-        console.error("Gagal logout server:", e);
-    }
-
-    sessionStorage.removeItem('anilist_token');
-    sessionStorage.removeItem('anilist_user');
+function logoutAniList() {
+    currentAuthToken = null;
+    currentAuthUser = null;
     userBookmarksCache = [];
+    currentData = [];
 
     const userWelcomeBanner = document.getElementById('userWelcomeBanner');
     if (userWelcomeBanner) userWelcomeBanner.classList.add('hidden');
 
+    const headerAuthContainer = document.getElementById('headerAuthContainer');
+    if (headerAuthContainer) headerAuthContainer.innerHTML = '';
+
+    const sidebarAuthBtn = document.getElementById('sidebarAuthBtn');
+    if (sidebarAuthBtn) sidebarAuthBtn.innerHTML = '';
+
     alert("Berhasil logout!");
-    window.location.reload();
+    window.location.href = window.location.pathname;
 }
 
 async function checkAniListAuthStatus() {
-    const token = sessionStorage.getItem('anilist_token');
+    const token = currentAuthToken;
     const headerAuthContainer = document.getElementById('headerAuthContainer');
     const sidebarAuthBtn = document.getElementById('sidebarAuthBtn');
     const userWelcomeBanner = document.getElementById('userWelcomeBanner');
@@ -585,8 +576,7 @@ async function checkAniListAuthStatus() {
         const user = result?.data?.Viewer;
 
         if (user) {
-            // Simpan profil temp di sessionStorage
-            sessionStorage.setItem('anilist_user', JSON.stringify(user));
+            currentAuthUser = user;
 
             if (headerAuthContainer) {
                 headerAuthContainer.innerHTML = `
@@ -613,10 +603,7 @@ async function checkAniListAuthStatus() {
             }
 
             await syncUserWithSupabase(user);
-
-            if (typeof renderHistory === 'function') {
-                renderHistory();
-            }
+            renderHistory();
         }
     } catch (err) {
         console.error("Auth check failed:", err);
