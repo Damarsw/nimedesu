@@ -176,54 +176,10 @@ function logoutAniList() {
     window.location.reload();
 }
 
-function getLoggedInUser() {
-    const userStr = sessionStorage.getItem('anilist_user');
-    if (!userStr) return null;
-    try { return JSON.parse(userStr); } catch (e) { return null; }
-}
-
-function handleAniListOAuthCallback() {
-    const hash = window.location.hash;
-    if (hash && hash.includes('access_token=')) {
-        const tokenParams = new URLSearchParams(hash.replace('#', '?'));
-        const accessToken = tokenParams.get('access_token');
-        if (accessToken) {
-            sessionStorage.setItem('anilist_token', accessToken);
-            history.replaceState(null, document.title, window.location.pathname + window.location.search);
-        }
-    }
-}
-
-function loginAniList() {
-    const resolvedSpecimen = recombineSeedEssence(JACK_SPECIMEN_REF);
-    const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${resolvedSpecimen}&response_type=token`;
-    window.location.href = authUrl;
-}
-
-function logoutAniList() {
-    sessionStorage.removeItem('anilist_token');
-    sessionStorage.removeItem('anilist_user');
-    userBookmarksCache = [];
-
-    const userWelcomeBanner = document.getElementById('userWelcomeBanner');
-    if (userWelcomeBanner) userWelcomeBanner.classList.add('hidden');
-
-    alert("Berhasil logout!");
-    window.location.reload();
-}
-
 async function checkAniListAuthStatus() {
-    const token = sessionStorage.getItem('anilist_token');
+    const token = localStorage.getItem('anilist_token');
     const headerAuthContainer = document.getElementById('headerAuthContainer');
-    const sidebarAuthBtn = document.getElementById('sidebarAuthBtn');
-    const userWelcomeBanner = document.getElementById('userWelcomeBanner');
-    const userWelcomeName = document.getElementById('userWelcomeName');
-    const userWelcomeAvatarContainer = document.getElementById('userWelcomeAvatarContainer');
-
-    if (!token) {
-        if (userWelcomeBanner) userWelcomeBanner.classList.add('hidden');
-        return;
-    }
+    if (!token) return;
 
     const query = `query { Viewer { id name avatar { medium } } }`;
     try {
@@ -240,8 +196,7 @@ async function checkAniListAuthStatus() {
         const user = result?.data?.Viewer;
 
         if (user) {
-            sessionStorage.setItem('anilist_user', JSON.stringify(user));
-
+            localStorage.setItem('anilist_user', JSON.stringify(user));
             if (headerAuthContainer) {
                 headerAuthContainer.innerHTML = `
                     <div class="flex items-center bg-white dark:bg-zinc-800/90 p-0.5 rounded-full border border-neon-yellow shadow-xs">
@@ -249,33 +204,13 @@ async function checkAniListAuthStatus() {
                     </div>
                 `;
             }
-
-            if (sidebarAuthBtn) {
-                sidebarAuthBtn.innerHTML = `
-                    <button onclick="logoutAniList()" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-500/20 text-red-500 transition text-left">
-                        <i class="fa-solid fa-right-from-bracket w-5 text-center"></i> Logout (${user.name})
-                    </button>
-                `;
-            }
-
-            if (userWelcomeBanner && userWelcomeName) {
-                userWelcomeName.innerText = user.name;
-                if (userWelcomeAvatarContainer) {
-                    userWelcomeAvatarContainer.innerHTML = `<img src="${user.avatar.medium}" class="w-10 h-10 rounded-full border border-neon-yellow object-cover shadow-sm">`;
-                }
-                userWelcomeBanner.classList.remove('hidden');
-            }
-
             await syncUserWithSupabase(user);
-
-            if (typeof renderHistory === 'function') {
-                renderHistory();
-            }
         }
     } catch (err) {
         console.error("Auth check failed:", err);
     }
 }
+
 async function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIndex, thumbnailImg) {
     const user = getLoggedInUser();
     if (!user) return;
