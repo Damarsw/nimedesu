@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -33,12 +34,82 @@ func getBotanicalEnv(key, fallbackValue string) string {
 	return val
 }
 
+func embeddedPlayerHandler(c *gin.Context) {
+	referer := c.GetHeader("Referer")
+	isLocal := strings.Contains(referer, "localhost") || strings.Contains(referer, "127.0.0.1")
+	isDomainValid := strings.Contains(referer, bubalinumDomain)
+
+	if referer == "" || (!isDomainValid && !isLocal) {
+		c.String(http.StatusForbidden, "Access Denied: Direct Access Not Allowed")
+		return
+	}
+
+	targetParam := c.Query("v")
+	if targetParam == "" {
+		c.String(http.StatusBadRequest, "Invalid Video Token")
+		return
+	}
+
+	unescapedTarget, _ := url.QueryUnescape(targetParam)
+	decodedBytes, err := base64.StdEncoding.DecodeString(unescapedTarget)
+	if err != nil {
+		c.String(http.StatusBadRequest, "Invalid Payload Token")
+		return
+	}
+	rawVideoURL := string(decodedBytes)
+
+	encodedTarget := base64.StdEncoding.EncodeToString([]byte(rawVideoURL))
+	proxiedURL := fmt.Sprintf("/api/proxy-stream?target=%s", url.QueryEscape(encodedTarget))
+
+	htmlTemplate := fmt.Sprintf(`<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player</title>
+    <style>
+        html, body { margin: 0; padding: 0; width: 100%%; height: 100%%; background-color: #000; overflow: hidden; }
+        video { width: 100%%; height: 100%%; object-fit: contain; }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+    <video id="internalPlayer" controls controlsList="nodownload" disablePictureInPicture playsinline autoplay></video>
+    <script>
+        (function(){
+            var token = "%s";
+            var v = document.getElementById('internalPlayer');
+            
+            // Ambil stream via fetch lalu ubah menjadi Blob URL di JS
+            fetch(token)
+                .then(function(res){ 
+                    if (!res.ok) throw new Error("Stream Failed");
+                    return res.blob(); 
+                })
+                .then(function(blob){
+                    var blobUrl = URL.createObjectURL(blob);
+                    v.src = blobUrl;
+                })
+                .catch(function(){
+                    v.src = token;
+                });
+        })();
+    </script>
+</body>
+</html>`, proxiedURL)
+
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	c.Header("X-Frame-Options", "SAMEORIGIN")
+	c.String(http.StatusOK, htmlTemplate)
+}
+
 func botanicalSecurityMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		reqPath := c.Request.URL.Path
 
-		// Bypass pemeriksaan untuk path umum
-		if reqPath == "/" || reqPath == "/health" || reqPath == "/sitemap.xml" || reqPath == "/robots.txt" || reqPath == "/api/clear-cache" || reqPath == "/api/test-apis" || strings.HasPrefix(reqPath, "/api/proxy-stream") || strings.HasPrefix(reqPath, "/proxy-stream") {
+		if reqPath == "/" || reqPath == "/health" || reqPath == "/sitemap.xml" || reqPath == "/robots.txt" || 
+		   reqPath == "/api/clear-cache" || reqPath == "/api/test-apis" || 
+		   reqPath == "/player" || strings.HasPrefix(reqPath, "/api/player") ||
+		   strings.HasPrefix(reqPath, "/api/proxy-stream") || strings.HasPrefix(reqPath, "/proxy-stream") {
 			c.Next()
 			return
 		}
@@ -47,20 +118,17 @@ func botanicalSecurityMiddleware() gin.HandlerFunc {
 			clientTimeStr := c.GetHeader("X-Bubalinum-Chrono")
 			clientPass := c.GetHeader("X-Bubalinum-Seed")
 
-			// Jika header signature tidak dikirim sama sekali
 			if clientTimeStr == "" || clientPass == "" {
 				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Access Denied: Missing Security Signature"})
 				return
 			}
 
 			reqTime, err := strconv.ParseInt(clientTimeStr, 10, 64)
-			// Toleransi selisih waktu diperlebar hingga 15 menit (900 detik) untuk mengatasi perbedaan jam server & lokal
 			if err != nil || math.Abs(float64(time.Now().Unix()-reqTime)) > 900 {
 				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Access Denied: Signature Expired"})
 				return
 			}
 
-			// Penyesuaian matching token Base64 dari JS (fractionateSeedEssence)
 			expectedRaw := fmt.Sprintf("%d_bubalinum_extract", reqTime)
 			expectedPass := strings.TrimRight(base64.StdEncoding.EncodeToString([]byte(expectedRaw)), "=")
 
@@ -97,6 +165,10 @@ func main() {
 
 	appEngine.GET("/", botanicalHealthHandler)
 	appEngine.GET("/health", botanicalHealthHandler)
+	
+	appEngine.GET("/player", embeddedPlayerHandler)
+	appEngine.GET("/api/player", embeddedPlayerHandler)
+
 	appEngine.GET("/api/proxy-stream", proxyStreamHandler)
 	appEngine.GET("/proxy-stream", proxyStreamHandler)
 
