@@ -159,7 +159,6 @@ function handleAniListOAuthCallback() {
 }
 
 function loginAniList() {
-
     currentAuthToken = null;
     currentAuthUser = null;
     const resolvedSpecimen = recombineSeedEssence(JACK_SPECIMEN_REF);
@@ -649,7 +648,11 @@ function selectServer(element, resolution, serverNum, videoUrl) {
 
     iframe.src = "about:blank";
     requestAnimationFrame(() => {
-        iframe.src = formatEmbedUrl(videoUrl);
+        const rawVideoUrl = formatEmbedUrl(videoUrl);
+        const base64Token = btoa(rawVideoUrl);
+        const securePlayerUrl = `${ARCHIDENDRON_BRIDGE}/player?v=${encodeURIComponent(base64Token)}`;
+        
+        iframe.src = securePlayerUrl;
     });
 }
 
