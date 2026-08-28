@@ -650,7 +650,8 @@ function selectServer(element, resolution, serverNum, videoUrl) {
     requestAnimationFrame(() => {
         const rawVideoUrl = formatEmbedUrl(videoUrl);
         const base64Token = btoa(rawVideoUrl);
-        const securePlayerUrl = `${ARCHIDENDRON_BRIDGE}/player?v=${encodeURIComponent(base64Token)}`;
+        
+        const securePlayerUrl = `/api/player?v=${encodeURIComponent(base64Token)}`;
         
         iframe.src = securePlayerUrl;
     });
