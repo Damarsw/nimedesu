@@ -58,7 +58,6 @@ func embeddedPlayerHandler(c *gin.Context) {
 	}
 	rawVideoURL := string(decodedBytes)
 
-	// Jika URL asli ternyata berupa Iframe Embed (Blogger/Doodstream/dll), langsung render iframe tersembunyi
 	if strings.Contains(rawVideoURL, "iframe") || strings.Contains(rawVideoURL, "embed") || !strings.HasSuffix(rawVideoURL, ".mp4") {
 		htmlEmbed := fmt.Sprintf(`<!DOCTYPE html>
 <html>
@@ -76,7 +75,6 @@ func embeddedPlayerHandler(c *gin.Context) {
 		return
 	}
 
-	// Jika Direct File MP4, gunakan proxy-stream internal
 	encodedTarget := base64.StdEncoding.EncodeToString([]byte(rawVideoURL))
 	proxiedURL := fmt.Sprintf("/api/proxy-stream?target=%s", url.QueryEscape(encodedTarget))
 
@@ -166,6 +164,7 @@ func main() {
 	
 	appEngine.GET("/player", embeddedPlayerHandler)
 	appEngine.GET("/api/player", embeddedPlayerHandler)
+	appEngine.GET("/api-backend/player", embeddedPlayerHandler)
 
 	appEngine.GET("/api/proxy-stream", proxyStreamHandler)
 	appEngine.GET("/proxy-stream", proxyStreamHandler)
