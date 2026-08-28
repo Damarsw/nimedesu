@@ -58,6 +58,25 @@ func embeddedPlayerHandler(c *gin.Context) {
 	}
 	rawVideoURL := string(decodedBytes)
 
+	// Jika URL asli ternyata berupa Iframe Embed (Blogger/Doodstream/dll), langsung render iframe tersembunyi
+	if strings.Contains(rawVideoURL, "iframe") || strings.Contains(rawVideoURL, "embed") || !strings.HasSuffix(rawVideoURL, ".mp4") {
+		htmlEmbed := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+    <style>html,body{margin:0;padding:0;width:100%%;height:100%%;background:#000;overflow:hidden;}iframe{width:100%%;height:100%%;border:none;}</style>
+</head>
+<body oncontextmenu="return false;">
+    <iframe src="%s" allowfullscreen allow="autoplay; encrypted-media"></iframe>
+</body>
+</html>`, rawVideoURL)
+
+		c.Header("Content-Type", "text/html; charset=utf-8")
+		c.Header("X-Frame-Options", "SAMEORIGIN")
+		c.String(http.StatusOK, htmlEmbed)
+		return
+	}
+
+	// Jika Direct File MP4, gunakan proxy-stream internal
 	encodedTarget := base64.StdEncoding.EncodeToString([]byte(rawVideoURL))
 	proxiedURL := fmt.Sprintf("/api/proxy-stream?target=%s", url.QueryEscape(encodedTarget))
 
@@ -66,34 +85,13 @@ func embeddedPlayerHandler(c *gin.Context) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Player</title>
     <style>
         html, body { margin: 0; padding: 0; width: 100%%; height: 100%%; background-color: #000; overflow: hidden; }
         video { width: 100%%; height: 100%%; object-fit: contain; }
     </style>
 </head>
 <body oncontextmenu="return false;">
-    <video id="internalPlayer" controls controlsList="nodownload" disablePictureInPicture playsinline autoplay></video>
-    <script>
-        (function(){
-            var token = "%s";
-            var v = document.getElementById('internalPlayer');
-            
-            // Ambil stream via fetch lalu ubah menjadi Blob URL di JS
-            fetch(token)
-                .then(function(res){ 
-                    if (!res.ok) throw new Error("Stream Failed");
-                    return res.blob(); 
-                })
-                .then(function(blob){
-                    var blobUrl = URL.createObjectURL(blob);
-                    v.src = blobUrl;
-                })
-                .catch(function(){
-                    v.src = token;
-                });
-        })();
-    </script>
+    <video id="internalPlayer" controls controlsList="nodownload" disablePictureInPicture playsinline autoplay src="%s"></video>
 </body>
 </html>`, proxiedURL)
 
