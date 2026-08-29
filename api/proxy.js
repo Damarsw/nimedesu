@@ -2,7 +2,7 @@ export default async function handler(req, res) {
   const backendUrl = process.env.FABALES_BACKEND_URL;
 
   if (!backendUrl) {
-    return res.status(500).json({ error: "Missing" });
+    return res.status(500).json({ error: "Missing FABALES_BACKEND_URL environment variable" });
   }
 
   const { path } = req.query;
@@ -13,15 +13,25 @@ export default async function handler(req, res) {
   const targetUrl = `${cleanBackendUrl}/api/${pathString}${queryString}`;
 
   try {
+    // Ambil referer/origin dari request masuk, gunakan fallback jika kosong
+    const incomingReferer = req.headers['referer'] || req.headers['referrer'] || 'https://nimedesu.vercel.app/';
+    const incomingOrigin = req.headers['origin'] || 'https://nimedesu.vercel.app';
+
     const headers = {
       'Content-Type': req.headers['content-type'] || 'application/json',
       'X-Bubalinum-Seed': req.headers['x-bubalinum-seed'] || '',
       'X-Bubalinum-Chrono': req.headers['x-bubalinum-chrono'] || '',
       'X-Turnstile-Token': req.headers['x-turnstile-token'] || '',
-      'Origin': 'https://nimedesu.vercel.app',
-      'Referer': 'https://nimedesu.vercel.app/',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+      'Origin': incomingOrigin,
+      'Referer': incomingReferer,
+      'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
     };
+
+    // Jika endpoint yang dipanggil adalah player / media stream, hapus Referer agar tidak diblokir Google
+    if (pathString.includes('player') || pathString.includes('proxy-stream')) {
+      delete headers['Referer'];
+      delete headers['Origin'];
+    }
 
     const fetchOptions = {
       method: req.method,
@@ -34,6 +44,7 @@ export default async function handler(req, res) {
 
     const response = await fetch(targetUrl, fetchOptions);
     const contentType = response.headers.get('content-type') || '';
+    res.setHeader('Content-Type', contentType);
 
     if (contentType.includes('application/json')) {
       const data = await response.json();
