@@ -10,6 +10,7 @@ let currentAnimeThumbnail = "";
 let currentAnimeGenres = []; 
 let currentAnimeId = null;
 let searchDebounceTimer = null;
+let currentBlobUrl = null;
 
 function fractionateSeedEssence(rawString) {
     try { return btoa(rawString).replace(/=/g, ''); } catch(e) { return ""; }
@@ -236,6 +237,9 @@ async function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIn
     }
 }
 
+// ==========================================
+// SEARCH CONTROL & NAVIGATION
+// ==========================================
 function toggleSearchInput(event) {
     if(event) event.stopPropagation();
     const container = document.getElementById('searchContainer');
@@ -657,8 +661,8 @@ async function selectServer(element, resolution, serverNum, videoUrl) {
         const tokenData = await tokenRes.json();
         if (!tokenData.token) throw new Error("Token payload empty");
         
-        // Langsung arahkan src iframe ke backend tanpa Blob() agar pembungkus ganda terhapus
-        iframe.src = `${ARCHIDENDRON_BRIDGE}/player?${tokenData.token}`;
+        const securePlayerUrl = `${ARCHIDENDRON_BRIDGE}/player?${tokenData.token}`;
+        iframe.src = securePlayerUrl;
 
     } catch (err) {
         console.error("Gagal memuat secure player:", err);
