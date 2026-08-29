@@ -127,6 +127,7 @@ func embeddedPlayerHandler(c *gin.Context) {
 	}
 	encryptedData := strings.Join(byteArray, ",")
 
+	// MENGHAPUS IFRAME BERSARANG (NO DOUBLE BLOB IFRAME)
 	htmlTemplate := fmt.Sprintf(`<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -152,9 +153,9 @@ func embeddedPlayerHandler(c *gin.Context) {
         iframe, video { 
             width: 100%% !important; 
             height: 100%% !important; 
-            border: 0; 
+            border: 0 !important; 
             outline: none;
-            object-fit: contain;
+            display: block;
         }
     </style>
 </head>
@@ -172,38 +173,16 @@ func embeddedPlayerHandler(c *gin.Context) {
                 
                 var container = document.getElementById('v-app');
 
-                if (res.includes('drive.google.com') && (res.includes('export=download') || res.endsWith('.mp4'))) {
-                    // MEMAKAI COOKIE / CREDENTIALS STREAM
-                    var video = document.createElement('video');
-                    video.controls = true;
-                    video.autoplay = true;
-                    video.playsInline = true;
-                    video.crossOrigin = "use-credentials"; // Sertakan cookie autentikasi
-
-                    // Mengambil Cookie gdrive_auth jika ada
-                    var authCookie = document.cookie.split('; ').find(row => row.startsWith('gdrive_auth='));
-                    var token = authCookie ? authCookie.split('=')[1] : '';
-
-                    fetch(res, {
-                        method: 'GET',
-                        headers: token ? { 'Authorization': 'Bearer ' + token } : {},
-                        credentials: 'include' // Mengirimkan Cookie Browser
-                    })
-                    .then(response => response.blob())
-                    .then(blob => {
-                        var blobUrl = URL.createObjectURL(blob);
-                        video.src = blobUrl;
-                        container.appendChild(video);
-                    })
-                    .catch(err => {
-                        // Fallback ke iframe biasa jika cookie/fetch gagal
-                        var f = document.createElement('iframe');
-                        f.allow = "autoplay; encrypted-media; fullscreen";
-                        f.allowFullscreen = true;
-                        f.src = res;
-                        container.appendChild(f);
-                    });
+                if (res.endsWith('.mp4') || res.endsWith('.m3u8')) {
+                    var v = document.createElement('video');
+                    v.controls = true; 
+                    v.autoplay = true; 
+                    v.playsInline = true;
+                    v.controlsList = "nodownload";
+                    v.src = res;
+                    container.appendChild(v);
                 } else {
+                    // LANGSUNG MEMUAT IFRAME TARGET TANPA MENGGUNAKAN BLOB INNERDOC LAGI
                     var f = document.createElement('iframe');
                     f.allow = "autoplay; encrypted-media; fullscreen";
                     f.allowFullscreen = true;
@@ -277,9 +256,9 @@ func main() {
 	appEngine.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
 		AllowMethods:     []string{"GET", "POST", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "X-Bubalinum-Seed", "X-Bubalinum-Chrono", "X-Turnstile-Token", "User-Agent", "Referer", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "X-Bubalinum-Seed", "X-Bubalinum-Chrono", "X-Turnstile-Token", "User-Agent", "Referer"},
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
+		AllowCredentials: false,
 		MaxAge:           12 * time.Hour,
 	}))
 
