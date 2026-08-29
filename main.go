@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"net/http"
@@ -121,19 +122,39 @@ func embeddedPlayerHandler(c *gin.Context) {
 	rawVideoURL := string(decodedBytes)
 
 	// =========================================================================
-	// PERBAIKAN KHUSUS GOOGLE DRIVE:
-	// 1. Tanpa pembungkus HTML kedua (menghilangkan double iframe)
-	// 2. Format URL diubah otomatis ke /preview agar tidak diblokir CSP Google
+	// SOLUSI BYPASS REFERER GOOGLE DRIVE:
+	// Server mengambil HTML /preview lalu menyuntikkan Meta Referrer "no-referrer"
 	// =========================================================================
 	if strings.Contains(rawVideoURL, "drive.google.com") {
 		driveEmbedURL := rawVideoURL
 		driveEmbedURL = strings.ReplaceAll(driveEmbedURL, "/view?usp=drivesdk", "/preview")
 		driveEmbedURL = strings.ReplaceAll(driveEmbedURL, "/view", "/preview")
-		
 		if !strings.Contains(driveEmbedURL, "/preview") {
 			driveEmbedURL = strings.TrimRight(driveEmbedURL, "/") + "/preview"
 		}
 
+		// Fetch isi HTML Google Drive dari Server (Bypass Referer Blocking)
+		req, err := http.NewRequest("GET", driveEmbedURL, nil)
+		if err == nil {
+			req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+			client := &http.Client{Timeout: 10 * time.Second}
+			resp, err := client.Do(req)
+			if err == nil && resp.StatusCode == 200 {
+				defer resp.Body.Close()
+				bodyBytes, err := io.ReadAll(resp.Body)
+				if err == nil {
+					htmlStr := string(bodyBytes)
+					// Suntikkan Meta no-referrer tepat di bawah tag <head>
+					htmlStr = strings.Replace(htmlStr, "<head>", "<head><meta name=\"referrer\" content=\"no-referrer\">", 1)
+					
+					c.Header("Content-Type", "text/html; charset=utf-8")
+					c.String(http.StatusOK, htmlStr)
+					return
+				}
+			}
+		}
+
+		// Fallback jika fetch server gagal
 		c.Redirect(http.StatusFound, driveEmbedURL)
 		return
 	}
@@ -151,6 +172,7 @@ func embeddedPlayerHandler(c *gin.Context) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="referrer" content="no-referrer">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { width: 100%%; height: 100%%; background: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
