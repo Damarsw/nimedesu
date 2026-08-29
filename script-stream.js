@@ -10,6 +10,7 @@ let currentAnimeThumbnail = "";
 let currentAnimeGenres = []; 
 let currentAnimeId = null;
 let searchDebounceTimer = null;
+let currentBlobUrl = null;
 
 function fractionateSeedEssence(rawString) {
     try { return btoa(rawString).replace(/=/g, ''); } catch(e) { return ""; }
@@ -159,11 +160,8 @@ function handleAniListOAuthCallback() {
 }
 
 function loginAniList() {
-    currentAuthToken = null;
-    currentAuthUser = null;
     const resolvedSpecimen = recombineSeedEssence(JACK_SPECIMEN_REF);
     const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${resolvedSpecimen}&response_type=token`;
-    
     window.location.href = authUrl;
 }
 
@@ -239,6 +237,9 @@ async function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIn
     }
 }
 
+// ==========================================
+// SEARCH CONTROL & NAVIGATION
+// ==========================================
 function toggleSearchInput(event) {
     if(event) event.stopPropagation();
     const container = document.getElementById('searchContainer');
@@ -312,7 +313,7 @@ function liveSearchAnime() {
                 const animeUrl = anime.url ? anime.url.trim() : "";
                 const animeId = anime.id || "";
                 const rawGenre = anime.genre || "";
-                const genres = rawGenre ? rawGenre.split(',').map(g => g.trim()).join(', ') : '-';
+                const genres = rawGenre ? (Array.isArray(rawGenre) ? rawGenre.join(', ') : rawGenre.split(',').map(g => g.trim()).join(', ')) : '-';
 
                 return `
                     <div onclick="window.location.href='stream.html?id=${animeId}&url=${encodeURIComponent(animeUrl)}&eps=0'" class="flex items-center gap-3 p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer transition">
@@ -417,7 +418,7 @@ async function initStream() {
 function extractEpisodeNumber(title) {
     if (!title) return 0;
     const match = title.match(/episode\s*(\d+)/i) || title.match(/eps\.?\s*(\d+)/i) || title.match(/(\d+)/);
-    return match ? parseInt(match) : 0;
+    return match ? parseInt(match[1]) : 0;
 }
 
 function scrollSlider(direction) {
@@ -628,7 +629,6 @@ function formatEmbedUrl(url) {
     return finalUrl;
 }
 
-let currentBlobUrl = null;
 
 async function selectServer(element, resolution, serverNum, videoUrl) {
     document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
@@ -654,9 +654,15 @@ async function selectServer(element, resolution, serverNum, videoUrl) {
 
     try {
         const rawVideoUrl = formatEmbedUrl(videoUrl);
-        
-        const tokenRes = await fetch(`${ARCHIDENDRON_BRIDGE}/get-token?url=${encodeURIComponent(rawVideoUrl)}`);
-        
+        const sec = generateBubalinumHeaderSignature();
+
+        const tokenRes = await fetch(`${ARCHIDENDRON_BRIDGE}/get-player-token?url=${encodeURIComponent(rawVideoUrl)}`, {
+            headers: {
+                "X-Bubalinum-Seed": sec.seed,
+                "X-Bubalinum-Chrono": sec.chrono
+            }
+        });
+
         if (!tokenRes.ok) {
             throw new Error(`Token Request Failed with status ${tokenRes.status}`);
         }
@@ -665,10 +671,16 @@ async function selectServer(element, resolution, serverNum, videoUrl) {
         if (!tokenData.token) {
             throw new Error("Invalid token payload returned from server");
         }
-        
+
         const securePlayerUrl = `${ARCHIDENDRON_BRIDGE}/player?${tokenData.token}`;
         
-        const playerRes = await fetch(securePlayerUrl);
+        const playerRes = await fetch(securePlayerUrl, {
+            headers: {
+                "X-Bubalinum-Seed": sec.seed,
+                "X-Bubalinum-Chrono": sec.chrono
+            }
+        });
+
         if (!playerRes.ok) {
             throw new Error(`Player Request Failed with status ${playerRes.status}`);
         }
