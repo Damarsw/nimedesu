@@ -380,7 +380,7 @@ async function initStream() {
         if (data && data.episodes && data.episodes.length > 0) {
             activeEpisodes = data.episodes.filter(ep => ep && (ep.episode_title || ep.video_servers));
             
-            // SORTING MUTLAK BERDASARKAN ANGKA EPISODE DARI KECIL KE BESAR
+            // SORTING BERDASARKAN NOMOR EPISODE YANG DIESTRAK DARI JUDUL (01, 02, DST)
             activeEpisodes.sort((a, b) => {
                 const numA = extractEpisodeNumber(a.episode_title);
                 const numB = extractEpisodeNumber(b.episode_title);
@@ -406,10 +406,14 @@ async function initStream() {
     }
 }
 
+// FUNGSI EKSTRAKSI NOMOR EPISODE YANG SUDAH DIPERKUAT (BISA BACA "01", "Episode 1", DLL)
 function extractEpisodeNumber(title) {
     if (!title) return 0;
-    const match = title.match(/episode\s*(\d+)/i) || title.match(/eps\.?\s*(\d+)/i) || title.match(/(\d+)/);
-    return match ? parseInt(match[1]) : 0;
+    const cleanTitle = String(title);
+    const match = cleanTitle.match(/(?:episode|eps?\.?)\s*(\d+)/i) || 
+                  cleanTitle.match(/^(\d+)/) || 
+                  cleanTitle.match(/(\d+)/);
+    return match ? parseInt(match[1], 10) : 0;
 }
 
 function scrollSlider(direction) {
