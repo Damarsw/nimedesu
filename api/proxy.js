@@ -13,7 +13,6 @@ export default async function handler(req, res) {
   const targetUrl = `${cleanBackendUrl}/api/${pathString}${queryString}`;
 
   try {
-
     const incomingReferer = req.headers['referer'] || req.headers['referrer'] || 'https://nimedesu.vercel.app/';
     const incomingOrigin = req.headers['origin'] || 'https://nimedesu.vercel.app';
 
