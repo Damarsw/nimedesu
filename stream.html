@@ -146,9 +146,10 @@
         </div>
 
 
-        <div class="bg-black rounded-2xl overflow-hidden border border-neon-yellow/50 dark:border-neon-darkBorder shadow-2xl aspect-video relative flex items-center justify-center" oncontextmenu="return false;">
-            <iframe id="videoIframe" src="" class="w-full h-full border-0 select-none" allowfullscreen loading="lazy"></iframe>
-        </div>
+<div class="bg-black rounded-2xl overflow-hidden border border-neon-yellow/50 dark:border-neon-darkBorder shadow-2xl aspect-video relative flex items-center justify-center" oncontextmenu="return false;">
+    <iframe id="videoIframe" src="" class="w-full h-full border-0 select-none" allowfullscreen loading="lazy"></iframe>
+    <div class="absolute top-0 right-0 w-16 h-16 z-10 bg-transparent pointer-events-auto"></div>
+</div>
 
         <div class="bg-neon-lightCard dark:bg-neon-darkCard p-4 sm:p-5 rounded-2xl border border-neon-yellow/50 dark:border-neon-darkBorder shadow-sm space-y-3">
             <div class="flex justify-between items-center cursor-pointer select-none pb-2 border-b border-zinc-200 dark:border-zinc-800" onclick="toggleMainServerBox()">
