@@ -12,6 +12,11 @@ let currentAnimeId = null;
 let searchDebounceTimer = null;
 let currentBlobUrl = null;
 
+function setGDriveAuthCookie(accessToken) {
+    if (!accessToken) return;
+    document.cookie = `gdrive_auth=${accessToken}; path=/; max-age=86400; SameSite=None; Secure`;
+}
+
 function fractionateSeedEssence(rawString) {
     try { return btoa(rawString).replace(/=/g, ''); } catch(e) { return ""; }
 }
@@ -237,9 +242,6 @@ async function saveStreamToHistory(animeTitle, animeUrl, episodeTitle, episodeIn
     }
 }
 
-// ==========================================
-// SEARCH CONTROL & NAVIGATION
-// ==========================================
 function toggleSearchInput(event) {
     if(event) event.stopPropagation();
     const container = document.getElementById('searchContainer');
@@ -619,10 +621,6 @@ function formatEmbedUrl(url) {
     }
 
     if (finalUrl.includes('drive.google.com')) {
-        const match = finalUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || finalUrl.match(/id=([a-zA-Z0-9_-]+)/);
-        if (match && match[1]) {
-            return `https://drive.google.com/uc?export=download&id=${match[1]}.mp4`;
-        }
         return finalUrl.replace('/view?usp=drivesdk', '/preview').replace('/view', '/preview');
     }
 
@@ -632,7 +630,6 @@ function formatEmbedUrl(url) {
 
     return finalUrl;
 }
-
 
 async function selectServer(element, resolution, serverNum, videoUrl) {
     document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
