@@ -122,8 +122,7 @@ func embeddedPlayerHandler(c *gin.Context) {
 	rawVideoURL := string(decodedBytes)
 
 	// =========================================================================
-	// SOLUSI BYPASS REFERER GOOGLE DRIVE:
-	// Server mengambil HTML /preview lalu menyuntikkan Meta Referrer "no-referrer"
+	// TANGANI GDRIVE DENGAN CLEAN STREAM HTML (MEMBERSIHKAN LOCK REFERER & DOUBLE IFRAME)
 	// =========================================================================
 	if strings.Contains(rawVideoURL, "drive.google.com") {
 		driveEmbedURL := rawVideoURL
@@ -133,10 +132,11 @@ func embeddedPlayerHandler(c *gin.Context) {
 			driveEmbedURL = strings.TrimRight(driveEmbedURL, "/") + "/preview"
 		}
 
-		// Fetch isi HTML Google Drive dari Server (Bypass Referer Blocking)
+		// Ambil langsung via Server tanpa mengirimkan Referer Vercel ke Google Drive
 		req, err := http.NewRequest("GET", driveEmbedURL, nil)
 		if err == nil {
-			req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+			req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+			
 			client := &http.Client{Timeout: 10 * time.Second}
 			resp, err := client.Do(req)
 			if err == nil && resp.StatusCode == 200 {
@@ -144,9 +144,11 @@ func embeddedPlayerHandler(c *gin.Context) {
 				bodyBytes, err := io.ReadAll(resp.Body)
 				if err == nil {
 					htmlStr := string(bodyBytes)
-					// Suntikkan Meta no-referrer tepat di bawah tag <head>
-					htmlStr = strings.Replace(htmlStr, "<head>", "<head><meta name=\"referrer\" content=\"no-referrer\">", 1)
 					
+					// Inject meta referrer no-referrer & perbaiki viewport responsive untuk HP
+					headInject := `<head><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">`
+					htmlStr = strings.Replace(htmlStr, "<head>", headInject, 1)
+
 					c.Header("Content-Type", "text/html; charset=utf-8")
 					c.String(http.StatusOK, htmlStr)
 					return
@@ -154,12 +156,11 @@ func embeddedPlayerHandler(c *gin.Context) {
 			}
 		}
 
-		// Fallback jika fetch server gagal
 		c.Redirect(http.StatusFound, driveEmbedURL)
 		return
 	}
 
-	// KHUSUS LINK NON-GDRIVE (.mp4, .m3u8, DLL)
+	// UNTUK LINK NON-GDRIVE (.mp4, .m3u8, DLL)
 	xorKey := byte(0x5A)
 	var byteArray []string
 	for i := 0; i < len(rawVideoURL); i++ {
