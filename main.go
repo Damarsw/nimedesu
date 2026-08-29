@@ -73,10 +73,19 @@ func embeddedPlayerHandler(c *gin.Context) {
 	referer := c.GetHeader("Referer")
 	isLocal := strings.Contains(referer, "localhost") || strings.Contains(referer, "127.0.0.1")
 	isDomainValid := strings.Contains(referer, bubalinumDomain)
-
-	if referer == "" || (!isDomainValid && !isLocal) {
-		c.String(http.StatusForbidden, "Access Denied: Direct Access Not Allowed")
-		return
+	tokenParam := c.Query("t")
+	if tokenParam == "" && c.Query("v") != "" {
+	    tokenParam = c.Query("v")
+	}
+	
+	if tokenParam == "" {
+	    c.String(http.StatusBadRequest, "Invalid Security Token")
+	    return
+	}
+	
+	if referer != "" && !isDomainValid && !isLocal {
+	    c.String(http.StatusForbidden, "Access Denied: Invalid Origin")
+	    return
 	}
 
 	tokenParam := c.Query("t")
