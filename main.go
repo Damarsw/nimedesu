@@ -183,11 +183,11 @@ func embeddedPlayerHandler(c *gin.Context) {
 func botanicalSecurityMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		reqPath := c.Request.URL.Path
-
+		
 		if reqPath == "/" || reqPath == "/health" || reqPath == "/sitemap.xml" || reqPath == "/robots.txt" ||
 			reqPath == "/api/clear-cache" || reqPath == "/api/test-apis" ||
-			reqPath == "/player" || strings.HasPrefix(reqPath, "/api/player") ||
-			strings.HasPrefix(reqPath, "/api/get-player-token") ||
+			reqPath == "/player" || strings.HasPrefix(reqPath, "/api/player") || strings.HasPrefix(reqPath, "/api-backend/player") ||
+			strings.HasPrefix(reqPath, "/get-token") || strings.HasPrefix(reqPath, "/api/get-player-token") || strings.HasPrefix(reqPath, "/api-backend/get-token") ||
 			strings.HasPrefix(reqPath, "/api/proxy-stream") || strings.HasPrefix(reqPath, "/proxy-stream") {
 			c.Next()
 			return
