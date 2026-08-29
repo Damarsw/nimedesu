@@ -342,7 +342,7 @@ async function initStream() {
     const urlParams = new URLSearchParams(window.location.search);
     const animeId = urlParams.get('id') || urlParams.get('anime_id');
     const animeUrl = urlParams.get('url');
-    const targetEpsStr = urlParams.get('eps') || ""; // Ambil string persis dari URL (misal "01")
+    const targetEpsStr = urlParams.get('eps') || "";
 
     if (!animeId && !animeUrl) {
         document.getElementById('streamTitle').innerText = "URL Anime Tidak Ditemukan!";
@@ -380,19 +380,18 @@ async function initStream() {
         if (data && data.episodes && data.episodes.length > 0) {
             activeEpisodes = data.episodes;
             
-            // SORTING BERDASARKAN STRING ALFABETIS DARI DB ("01", "02", "03"...)
+            // SORTING STRING SECARA ALFABETIS BERDASARKAN ep.title
             activeEpisodes.sort((a, b) => {
-                let strA = String(a.episode_title || "").trim();
-                let strB = String(b.episode_title || "").trim();
+                let strA = String(a.title || a.episode_title || "").trim();
+                let strB = String(b.title || b.episode_title || "").trim();
                 return strA.localeCompare(strB);
             });
 
-            // COCOKKAN STRING URL DENGAN episode_title DI DB SECARA PERSIS
             if (targetEpsStr !== "") {
-                const foundIndex = activeEpisodes.findIndex(ep => String(ep.episode_title).trim() === targetEpsStr);
+                const foundIndex = activeEpisodes.findIndex(ep => String(ep.title || ep.episode_title || "").trim() === targetEpsStr);
                 activeEpisodeIndex = foundIndex !== -1 ? foundIndex : 0;
             } else {
-                activeEpisodeIndex = 0; // Default ambil data teratas ("01")
+                activeEpisodeIndex = 0;
             }
 
             globalAnimeTitle = data.title;
@@ -498,22 +497,24 @@ function renderDynamicEpisodes() {
     if(label) label.innerText = `Daftar Episode (${activeEpisodes.length})`;
 
     const currentEp = activeEpisodes[activeEpisodeIndex];
-    let epString = currentEp && currentEp.episode_title ? String(currentEp.episode_title).trim() : "01";
-    document.getElementById('streamTitle').innerText = `Nonton ${globalAnimeTitle} (Episode ${epString})`;
+    let epString = currentEp && (currentEp.title || currentEp.episode_title) ? String(currentEp.title || currentEp.episode_title).trim() : "01";
+    document.getElementById('streamTitle').innerText = `Nonton ${globalAnimeTitle} (Eps ${epString})`;
 
     document.getElementById('prevEpBtn').disabled = activeEpisodeIndex <= 0;
     document.getElementById('prevEpBtn').style.opacity = activeEpisodeIndex <= 0 ? '0.5' : '1';
     document.getElementById('nextEpBtn').disabled = activeEpisodeIndex >= activeEpisodes.length - 1;
     document.getElementById('nextEpBtn').style.opacity = activeEpisodeIndex >= activeEpisodes.length - 1 ? '0.5' : '1';
 
-    // RENDER TOMBOL DENGAN NAMA PERSIS DARI DB (Misal: "01", "02", "03")
+    // RENDER TOMBOL MENGGUNAKAN ep.title DARI BACKEND GO
     container.innerHTML = activeEpisodes.map((ep, index) => {
-        const activeClass = index === activeEpisodeIndex ? 'bg-neon-yellow text-black font-bold shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border border-neon-yellow/60 dark:border-neon-darkBorder hover:border-neon-yellow';
+        const activeClass = index === activeEpisodeIndex 
+            ? 'bg-neon-yellow text-black font-bold shadow-glow-yellow' 
+            : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border border-neon-yellow/60 dark:border-neon-darkBorder hover:border-neon-yellow';
         
-        let epVal = String(ep.episode_title || "").trim();
-        let epLabel = epVal; // Tampilkan teks persis dari DB di tombolnya
+        let epVal = String(ep.title || ep.episode_title || "").trim();
+        let epLabel = `Eps ${epVal}`;
 
-        return `<button onclick='selectEpisode(${index}, "${epVal}")' class="episode-btn ${activeClass} px-3.5 py-1.5 rounded-lg text-xs font-semibold transition">${epLabel}</button>`;
+        return `<button onclick='selectEpisode(${index}, "${epVal}")' class="episode-btn ${activeClass} px-3.5 py-1.5 rounded-lg text-xs font-semibold transition shrink-0">${epLabel}</button>`;
     }).join('');
 
     if (currentEp && currentEp.video_servers) {
@@ -537,7 +538,7 @@ function renderDynamicEpisodes() {
     if (currentEp) {
         const urlParams = new URLSearchParams(window.location.search);
         const animeUrl = urlParams.get('url');
-        saveStreamToHistory(globalAnimeTitle, animeUrl, `Episode ${epString}`, activeEpisodeIndex, currentAnimeThumbnail);
+        saveStreamToHistory(globalAnimeTitle, animeUrl, `Eps ${epString}`, activeEpisodeIndex, currentAnimeThumbnail);
     }
 }
 
@@ -554,7 +555,7 @@ function selectEpisode(index, epStr) {
 function changeEpisodeRelative(direction) {
     const newIndex = activeEpisodeIndex + direction;
     if (newIndex >= 0 && newIndex < activeEpisodes.length) {
-        let targetEpStr = String(activeEpisodes[newIndex].episode_title || "").trim();
+        let targetEpStr = String(activeEpisodes[newIndex].title || activeEpisodes[newIndex].episode_title || "").trim();
         selectEpisode(newIndex, targetEpStr);
     }
 }
