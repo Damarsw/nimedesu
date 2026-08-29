@@ -605,7 +605,6 @@ function toggleEpisodeBox() {
     }
 }
 
-// PERBAIKAN FORMAT EMBED URL PENUTUP REFERER BLOCKING
 function formatEmbedUrl(url) {
     if (!url) return "about:blank";
 
@@ -620,7 +619,6 @@ function formatEmbedUrl(url) {
     }
 
     if (finalUrl.includes('drive.google.com')) {
-        // Ambil ID File Google Drive
         let fileId = "";
         const match = finalUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || finalUrl.match(/id=([a-zA-Z0-9_-]+)/);
         if (match && match[1]) {
@@ -628,7 +626,6 @@ function formatEmbedUrl(url) {
         }
         
         if (fileId) {
-            // Gunakan format preview standar tanpa query sdk tambahan agar lolos proteksi origin
             return `https://drive.google.com/file/d/${fileId}/preview`;
         }
         return finalUrl.replace('/view?usp=drivesdk', '/preview').replace('/view', '/preview');
@@ -639,6 +636,53 @@ function formatEmbedUrl(url) {
     }
 
     return finalUrl;
+}
+
+async function selectServer(element, resolution, serverNum, videoUrl) {
+    document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
+    document.querySelectorAll('.server-btn').forEach(btn => {
+        btn.className = "server-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-black dark:text-white border border-neon-yellow/60 dark:border-neon-darkBorder";
+    });
+    if(element) {
+        element.className = "server-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs bg-neon-yellow text-black font-bold shadow-glow-yellow transition flex justify-between items-center";
+    }
+    document.getElementById('mainServerContainer').classList.add('hidden');
+    document.getElementById('mainServerArrow').style.transform = 'rotate(-90deg)';
+
+    const iframe = document.getElementById('videoIframe');
+    if (!videoUrl || videoUrl === 'undefined' || videoUrl === 'null') {
+        iframe.src = "about:blank";
+        return;
+    }
+
+    const rawVideoUrl = formatEmbedUrl(videoUrl);
+
+    if (rawVideoUrl.includes('drive.google.com')) {
+        iframe.src = rawVideoUrl;
+        return;
+    }
+
+    try {
+        const sec = generateBubalinumHeaderSignature();
+        const tokenRes = await fetch(`${ARCHIDENDRON_BRIDGE}/get-player-token?url=${encodeURIComponent(rawVideoUrl)}`, {
+            headers: {
+                "X-Bubalinum-Seed": sec.seed,
+                "X-Bubalinum-Chrono": sec.chrono
+            }
+        });
+
+        if (!tokenRes.ok) throw new Error(`Token failed: ${tokenRes.status}`);
+        const tokenData = await tokenRes.json();
+        if (!tokenData.token) throw new Error("Token payload empty");
+        
+        const securePlayerUrl = `${ARCHIDENDRON_BRIDGE}/player?${tokenData.token}`;
+        iframe.src = securePlayerUrl;
+
+    } catch (err) {
+        console.error("Gagal memuat secure player:", err);
+        const base64Token = btoa(rawVideoUrl);
+        iframe.src = `${ARCHIDENDRON_BRIDGE}/player?v=${encodeURIComponent(base64Token)}`;
+    }
 }
 
 async function selectServer(element, resolution, serverNum, videoUrl) {
