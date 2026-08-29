@@ -628,33 +628,59 @@ function formatEmbedUrl(url) {
     return finalUrl;
 }
 
-let currentIframeBlobUrl = null;
+let currentBlobUrl = null;
 
 async function selectServer(element, resolution, serverNum, videoUrl) {
     document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
+    document.querySelectorAll('.server-btn').forEach(btn => {
+        btn.className = "server-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-black dark:text-white border border-neon-yellow/60 dark:border-neon-darkBorder";
+    });
+    if(element) {
+        element.className = "server-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs bg-neon-yellow text-black font-bold shadow-glow-yellow transition flex justify-between items-center";
+    }
+    document.getElementById('mainServerContainer').classList.add('hidden');
+    document.getElementById('mainServerArrow').style.transform = 'rotate(-90deg)';
 
     const iframe = document.getElementById('videoIframe');
-    if (!videoUrl || videoUrl === 'undefined') {
+    if (!videoUrl || videoUrl === 'undefined' || videoUrl === 'null') {
         iframe.src = "about:blank";
         return;
     }
 
+    if (currentBlobUrl) {
+        URL.revokeObjectURL(currentBlobUrl);
+        currentBlobUrl = null;
+    }
+
     try {
         const rawVideoUrl = formatEmbedUrl(videoUrl);
-
+        
         const tokenRes = await fetch(`${ARCHIDENDRON_BRIDGE}/get-token?url=${encodeURIComponent(rawVideoUrl)}`);
+        
+        if (!tokenRes.ok) {
+            throw new Error(`Token Request Failed with status ${tokenRes.status}`);
+        }
+
         const tokenData = await tokenRes.json();
+        if (!tokenData.token) {
+            throw new Error("Invalid token payload returned from server");
+        }
         
         const securePlayerUrl = `${ARCHIDENDRON_BRIDGE}/player?${tokenData.token}`;
-
-        const res = await fetch(securePlayerUrl);
-        const htmlContent = await res.text();
         
+        const playerRes = await fetch(securePlayerUrl);
+        if (!playerRes.ok) {
+            throw new Error(`Player Request Failed with status ${playerRes.status}`);
+        }
+
+        const htmlContent = await playerRes.text();
         const blob = new Blob([htmlContent], { type: 'text/html' });
-        iframe.src = URL.createObjectURL(blob);
+        currentBlobUrl = URL.createObjectURL(blob);
+        iframe.src = currentBlobUrl;
 
     } catch (err) {
-        console.error("Gagal memuat secure server:", err);
+        console.error("Gagal memuat secure player:", err);
+        iframe.src = "about:blank";
     }
 }
 
