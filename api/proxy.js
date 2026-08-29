@@ -13,6 +13,7 @@ export default async function handler(req, res) {
   const targetUrl = `${cleanBackendUrl}/api/${pathString}${queryString}`;
 
   try {
+
     const incomingReferer = req.headers['referer'] || req.headers['referrer'] || 'https://nimedesu.vercel.app/';
     const incomingOrigin = req.headers['origin'] || 'https://nimedesu.vercel.app';
 
@@ -23,14 +24,8 @@ export default async function handler(req, res) {
       'X-Turnstile-Token': req.headers['x-turnstile-token'] || '',
       'Origin': incomingOrigin,
       'Referer': incomingReferer,
-      'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+      'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     };
-
-    // Jika endpoint yang dipanggil adalah player / media stream, hapus Referer agar tidak diblokir Google
-    if (pathString.includes('player') || pathString.includes('proxy-stream')) {
-      delete headers['Referer'];
-      delete headers['Origin'];
-    }
 
     const fetchOptions = {
       method: req.method,
@@ -43,6 +38,7 @@ export default async function handler(req, res) {
 
     const response = await fetch(targetUrl, fetchOptions);
     const contentType = response.headers.get('content-type') || '';
+
     res.setHeader('Content-Type', contentType);
 
     if (contentType.includes('application/json')) {
