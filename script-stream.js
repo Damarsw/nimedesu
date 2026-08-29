@@ -377,21 +377,14 @@ async function initStream() {
             }
         }
 
-        if (data && data.episodes && data.episodes.length > 0) {
-            activeEpisodes = data.episodes;
-            
-            // SORTING MUTLAK BERDASARKAN ANGKA DI DATABASE (01, 02, 03...)
-            activeEpisodes.sort((a, b) => {
-                const numA = extractEpisodeNumber(a.episode_title);
-                const numB = extractEpisodeNumber(b.episode_title);
+if (data && data.episodes && data.episodes.length > 0) {
+            activeEpisodes = data.episodes.sort((a, b) => {
+                let numA = parseInt(String(a.episode_title).trim(), 10) || 0;
+                let numB = parseInt(String(b.episode_title).trim(), 10) || 0;
                 return numA - numB;
             });
 
-            if (!isNaN(targetEps) && targetEps >= 0 && targetEps < activeEpisodes.length) {
-                activeEpisodeIndex = targetEps;
-            } else {
-                activeEpisodeIndex = 0; // Selalu mulai dari index 0 (Episode 01)
-            }
+            activeEpisodeIndex = (targetEps >= 0 && targetEps < activeEpisodes.length) ? targetEps : 0;
 
             globalAnimeTitle = data.title;
             if (!globalAnimeTitle && animeUrl) {
@@ -402,15 +395,7 @@ async function initStream() {
             document.getElementById('episodeNavContainer').classList.remove('hidden');
             renderDynamicEpisodes();
             renderMixedGenreRecommendations();
-        } else {
-            document.getElementById('streamTitle').innerText = "Data Episode Tidak Tersedia.";
         }
-    } catch (error) {
-        document.getElementById('streamTitle').innerText = "Gagal memuat server streaming.";
-    }
-}
-
-// KHUSUS FORMAT DB "01", "02", "03", DST
 function extractEpisodeNumber(title) {
     if (!title) return 0;
     const parsed = parseInt(String(title).trim(), 10);
