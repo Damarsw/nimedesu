@@ -127,21 +127,26 @@ func embeddedPlayerHandler(c *gin.Context) {
 	}
 	encryptedData := strings.Join(byteArray, ",")
 
-	// MENGHAPUS IFRAME BERSARANG (NO DOUBLE BLOB IFRAME)
+	// TEMPLATE PLAYER TEROPTIMASI UNTUK HP (RESPONSIF FIT CONTAINER)
 	htmlTemplate := fmt.Sprintf(`<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        * { box-sizing: border-box; }
-        html, body { 
+        * { 
+            box-sizing: border-box; 
             margin: 0; 
             padding: 0; 
+        }
+        html, body { 
             width: 100%%; 
             height: 100%%; 
             background: #000; 
             overflow: hidden; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         #v-app { 
             width: 100%%; 
@@ -149,6 +154,7 @@ func embeddedPlayerHandler(c *gin.Context) {
             display: flex; 
             justify-content: center; 
             align-items: center; 
+            position: relative;
         }
         iframe, video { 
             width: 100%% !important; 
@@ -156,6 +162,7 @@ func embeddedPlayerHandler(c *gin.Context) {
             border: 0 !important; 
             outline: none;
             display: block;
+            object-fit: contain;
         }
     </style>
 </head>
@@ -182,7 +189,6 @@ func embeddedPlayerHandler(c *gin.Context) {
                     v.src = res;
                     container.appendChild(v);
                 } else {
-                    // LANGSUNG MEMUAT IFRAME TARGET TANPA MENGGUNAKAN BLOB INNERDOC LAGI
                     var f = document.createElement('iframe');
                     f.allow = "autoplay; encrypted-media; fullscreen";
                     f.allowFullscreen = true;
