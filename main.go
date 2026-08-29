@@ -127,15 +127,35 @@ func embeddedPlayerHandler(c *gin.Context) {
 	}
 	encryptedData := strings.Join(byteArray, ",")
 
+	// Perbaikan HTML Template: Mengoptimalkan Viewport & Menghindari Double Blob Iframe pada Layar HP
 	htmlTemplate := fmt.Sprintf(`<!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        html, body { margin: 0; padding: 0; width: 100%%; height: 100%%; background: #000; overflow: hidden; }
-        #v-app { width: 100%%; height: 100%%; display: flex; justify-content: center; align-items: center; }
-        iframe, video { width: 100%%; height: 100%%; border: none; object-fit: contain; }
+        html, body { 
+            margin: 0; 
+            padding: 0; 
+            width: 100%%; 
+            height: 100%%; 
+            background: #000; 
+            overflow: hidden; 
+        }
+        #v-app { 
+            width: 100%%; 
+            height: 100%%; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+        }
+        iframe, video { 
+            width: 100%% !important; 
+            height: 100%% !important; 
+            border: none; 
+            outline: none;
+            object-fit: contain; 
+        }
     </style>
 </head>
 <body oncontextmenu="return false;">
@@ -154,7 +174,9 @@ func embeddedPlayerHandler(c *gin.Context) {
 
                 if (res.endsWith('.mp4') || res.endsWith('.m3u8')) {
                     var v = document.createElement('video');
-                    v.controls = true; v.autoplay = true; v.playsInline = true;
+                    v.controls = true; 
+                    v.autoplay = true; 
+                    v.playsInline = true;
                     v.controlsList = "nodownload";
                     v.src = res;
                     container.appendChild(v);
@@ -162,11 +184,8 @@ func embeddedPlayerHandler(c *gin.Context) {
                     var f = document.createElement('iframe');
                     f.allow = "autoplay; encrypted-media; fullscreen";
                     f.allowFullscreen = true;
-                    
-                    var innerDoc = '<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0;width:100%%;height:100%%;overflow:hidden;}iframe{width:100%%;height:100%%;border:none;}</style></head><body><iframe src="' + res + '" allowfullscreen allow="autoplay; encrypted-media"></iframe></body></html>';
-                    var blob = new Blob([innerDoc], {type: 'text/html'});
-                    f.src = URL.createObjectURL(blob);
-                    
+                    // Langsung set URL ke iframe utama agar tidak terjadi pemotongan UI/Double-Iframe di HP
+                    f.src = res;
                     container.appendChild(f);
                 }
             } catch(e) {}
@@ -184,7 +203,6 @@ func botanicalSecurityMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		reqPath := c.Request.URL.Path
 
-		// Whitelist semua variasi rute player dan token agar tidak terblokir middleware
 		if reqPath == "/" || reqPath == "/health" || reqPath == "/sitemap.xml" || reqPath == "/robots.txt" ||
 			reqPath == "/api/clear-cache" || reqPath == "/api/test-apis" ||
 			reqPath == "/player" || strings.HasPrefix(reqPath, "/api/player") || strings.HasPrefix(reqPath, "/api-backend/player") ||
@@ -248,14 +266,12 @@ func main() {
 	appEngine.GET("/", botanicalHealthHandler)
 	appEngine.GET("/health", botanicalHealthHandler)
 
-	// Pendaftaran rute get-token dengan berbagai variasi prefix
 	appEngine.GET("/get-token", generatePlayerTokenHandler)
 	appEngine.GET("/get-player-token", generatePlayerTokenHandler)
 	appEngine.GET("/api/get-player-token", generatePlayerTokenHandler)
 	appEngine.GET("/api-backend/get-token", generatePlayerTokenHandler)
 	appEngine.GET("/api-backend/get-player-token", generatePlayerTokenHandler)
 
-	// Pendaftaran rute player
 	appEngine.GET("/player", embeddedPlayerHandler)
 	appEngine.GET("/api/player", embeddedPlayerHandler)
 	appEngine.GET("/api-backend/player", embeddedPlayerHandler)
