@@ -632,6 +632,7 @@ let currentIframeBlobUrl = null;
 
 function selectServer(element, resolution, serverNum, videoUrl) {
     document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
+    
     document.querySelectorAll('.server-btn').forEach(btn => {
         btn.className = "server-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-black dark:text-white border border-neon-yellow/60 dark:border-neon-darkBorder";
     });
@@ -641,34 +642,33 @@ function selectServer(element, resolution, serverNum, videoUrl) {
     document.getElementById('mainServerContainer').classList.add('hidden');
     document.getElementById('mainServerArrow').style.transform = 'rotate(-90deg)';
 
-    const iframe = document.getElementById('videoIframe');
+    const container = document.getElementById('playerContainer') || document.getElementById('videoIframe').parentElement;
     
     if (!videoUrl || videoUrl === 'undefined' || videoUrl === 'null') {
-        iframe.src = "about:blank";
+        container.innerHTML = '';
         return;
     }
 
-    if (currentIframeBlobUrl) {
-        URL.revokeObjectURL(currentIframeBlobUrl);
-        currentIframeBlobUrl = null;
-    }
+    container.innerHTML = '<div id="shadowHost" class="w-full h-full"></div>';
+
+    const shadowHost = document.getElementById('shadowHost');
+
+    const shadowRoot = shadowHost.attachShadow({ mode: 'closed' });
 
     const rawVideoUrl = formatEmbedUrl(videoUrl);
     const base64Token = btoa(rawVideoUrl);
-    const targetEndpoint = `${ARCHIDENDRON_BRIDGE}/player?v=${encodeURIComponent(base64Token)}`;
+    const securePlayerUrl = `${ARCHIDENDRON_BRIDGE}/player?v=${encodeURIComponent(base64Token)}`;
 
-    fetch(targetEndpoint)
-        .then(res => res.text())
-        .then(htmlContent => {
-            const blob = new Blob([htmlContent], { type: 'text/html' });
-            currentIframeBlobUrl = URL.createObjectURL(blob);
-            iframe.src = currentIframeBlobUrl;
-        })
-        .catch(err => {
-            iframe.src = targetEndpoint;
-        });
+    const iframe = document.createElement('iframe');
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+    iframe.style.border = 'none';
+    iframe.allow = "autoplay; encrypted-media; fullscreen";
+    iframe.allowFullscreen = true;
+    iframe.src = securePlayerUrl;
+
+    shadowRoot.appendChild(iframe);
 }
-
 function toggleTheme() {
     const html = document.documentElement;
     const isDark = html.classList.contains('dark');
