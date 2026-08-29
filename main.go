@@ -46,52 +46,48 @@ func embeddedPlayerHandler(c *gin.Context) {
 
 	targetParam := c.Query("v")
 	if targetParam == "" {
-		c.String(http.StatusBadRequest, "Invalid Video Token")
+		c.String(http.StatusBadRequest, "Invalid Token")
 		return
 	}
-
-	unescapedTarget, _ := url.QueryUnescape(targetParam)
-	decodedBytes, err := base64.StdEncoding.DecodeString(unescapedTarget)
-	if err != nil {
-		c.String(http.StatusBadRequest, "Invalid Payload Token")
-		return
-	}
-	rawVideoURL := string(decodedBytes)
-
-	if strings.Contains(rawVideoURL, "iframe") || strings.Contains(rawVideoURL, "embed") || !strings.HasSuffix(rawVideoURL, ".mp4") {
-		htmlEmbed := fmt.Sprintf(`<!DOCTYPE html>
-<html>
-<head>
-    <style>html,body{margin:0;padding:0;width:100%%;height:100%%;background:#000;overflow:hidden;}iframe{width:100%%;height:100%%;border:none;}</style>
-</head>
-<body oncontextmenu="return false;">
-    <iframe src="%s" allowfullscreen allow="autoplay; encrypted-media"></iframe>
-</body>
-</html>`, rawVideoURL)
-
-		c.Header("Content-Type", "text/html; charset=utf-8")
-		c.Header("X-Frame-Options", "SAMEORIGIN")
-		c.String(http.StatusOK, htmlEmbed)
-		return
-	}
-
-	encodedTarget := base64.StdEncoding.EncodeToString([]byte(rawVideoURL))
-	proxiedURL := fmt.Sprintf("/api/proxy-stream?target=%s", url.QueryEscape(encodedTarget))
 
 	htmlTemplate := fmt.Sprintf(`<!DOCTYPE html>
-<html lang="id">
+<html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        html, body { margin: 0; padding: 0; width: 100%%; height: 100%%; background-color: #000; overflow: hidden; }
-        video { width: 100%%; height: 100%%; object-fit: contain; }
-    </style>
+    <style>html,body{margin:0;padding:0;width:100%%;height:100%%;background:#000;overflow:hidden;}iframe,video{width:100%%;height:100%%;border:none;}</style>
 </head>
 <body oncontextmenu="return false;">
-    <video id="internalPlayer" controls controlsList="nodownload" disablePictureInPicture playsinline autoplay src="%s"></video>
+    <div id="app"></div>
+    <script>
+        (function(){
+            try {
+                // Token Base64 dibaca di runtime saja
+                var rawToken = "%s";
+                var cleanToken = decodeURIComponent(rawToken);
+                var decodedUrl = atob(cleanToken);
+                var app = document.getElementById('app');
+
+                if (decodedUrl.indexOf('.mp4') !== -1 || decodedUrl.indexOf('.m3u8') !== -1) {
+                    var v = document.createElement('video');
+                    v.controls = true;
+                    v.autoplay = true;
+                    v.playsInline = true;
+                    v.controlsList = "nodownload";
+                    v.src = decodedUrl;
+                    app.appendChild(v);
+                } else {
+                    var f = document.createElement('iframe');
+                    f.allow = "autoplay; encrypted-media; fullscreen";
+                    f.allowFullscreen = true;
+                    f.src = decodedUrl;
+                    app.appendChild(f);
+                }
+            } catch(e) {}
+        })();
+    </script>
 </body>
-</html>`, proxiedURL)
+</html>`, targetParam)
 
 	c.Header("Content-Type", "text/html; charset=utf-8")
 	c.Header("X-Frame-Options", "SAMEORIGIN")
