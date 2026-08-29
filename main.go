@@ -1,8 +1,11 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"math"
@@ -34,23 +37,82 @@ func getBotanicalEnv(key, fallbackValue string) string {
 	return val
 }
 
+func generatePlayerTokenHandler(c *gin.Context) {
+	referer := c.GetHeader("Referer")
+	origin := c.GetHeader("Origin")
+	isLocal := strings.Contains(referer, "localhost") || strings.Contains(referer, "127.0.0.1") ||
+		strings.Contains(origin, "localhost") || strings.Contains(origin, "127.0.0.1")
+	isDomainValid := strings.Contains(referer, bubalinumDomain) || strings.Contains(origin, bubalinumDomain)
+
+	if !isDomainValid && !isLocal {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access Denied: Invalid Origin"})
+		return
+	}
+
+	rawUrl := c.Query("url")
+	if rawUrl == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "URL parameter required"})
+		return
+	}
+
+	expires := time.Now().Add(10 * time.Minute).Unix()
+
+	mac := hmac.New(sha256.New, []byte(bubalinumSignature))
+	mac.Write([]byte(fmt.Sprintf("%s:%d", rawUrl, expires)))
+	signature := hex.EncodeToString(mac.Sum(nil))
+
+	encodedTarget := base64.StdEncoding.EncodeToString([]byte(rawUrl))
+
+	c.JSON(http.StatusOK, gin.H{
+		"token": fmt.Sprintf("t=%s&e=%d&s=%s", url.QueryEscape(encodedTarget), expires, signature),
+	})
+}
+
 func embeddedPlayerHandler(c *gin.Context) {
 	referer := c.GetHeader("Referer")
 	isLocal := strings.Contains(referer, "localhost") || strings.Contains(referer, "127.0.0.1")
 	isDomainValid := strings.Contains(referer, bubalinumDomain)
 
 	if referer == "" || (!isDomainValid && !isLocal) {
-		c.String(http.StatusForbidden, "Access Denied")
+		c.String(http.StatusForbidden, "Access Denied: Direct Access Not Allowed")
 		return
 	}
 
-	targetParam := c.Query("v")
-	if targetParam == "" {
-		c.String(http.StatusBadRequest, "Invalid Token")
+	tokenParam := c.Query("t")
+	expiresParam := c.Query("e")
+	sigParam := c.Query("s")
+
+	if tokenParam == "" && c.Query("v") != "" {
+		tokenParam = c.Query("v")
+	}
+
+	if tokenParam == "" {
+		c.String(http.StatusBadRequest, "Invalid Security Token")
 		return
 	}
 
-	unescapedTarget, _ := url.QueryUnescape(targetParam)
+	if expiresParam != "" && sigParam != "" {
+		expTime, err := strconv.ParseInt(expiresParam, 10, 64)
+		if err != nil || time.Now().Unix() > expTime {
+			c.String(http.StatusUnauthorized, "Security Token Expired. Please refresh page.")
+			return
+		}
+
+		decodedTarget, err := base64.StdEncoding.DecodeString(tokenParam)
+		if err == nil {
+			rawVideoURL := string(decodedTarget)
+			mac := hmac.New(sha256.New, []byte(bubalinumSignature))
+			mac.Write([]byte(fmt.Sprintf("%s:%d", rawVideoURL, expTime)))
+			expectedSig := hex.EncodeToString(mac.Sum(nil))
+
+			if !hmac.Equal([]byte(sigParam), []byte(expectedSig)) {
+				c.String(http.StatusForbidden, "Signature Tampering Detected!")
+				return
+			}
+		}
+	}
+
+	unescapedTarget, _ := url.QueryUnescape(tokenParam)
 	decodedBytes, err := base64.StdEncoding.DecodeString(unescapedTarget)
 	if err != nil {
 		c.String(http.StatusBadRequest, "Invalid Payload Token")
@@ -90,7 +152,6 @@ func embeddedPlayerHandler(c *gin.Context) {
                 
                 var container = document.getElementById('v-app');
 
-                // Jika Direct File MP4 / Raw M3U8
                 if (res.endsWith('.mp4') || res.endsWith('.m3u8')) {
                     var v = document.createElement('video');
                     v.controls = true; v.autoplay = true; v.playsInline = true;
@@ -98,8 +159,6 @@ func embeddedPlayerHandler(c *gin.Context) {
                     v.src = res;
                     container.appendChild(v);
                 } else {
-                    // Jika Embed Page (Seperti play.xtwap.top)
-                    // Inject menggunakan Dynamic Blob agar URL target TIDAK MUNCUL di DOM inner!
                     var f = document.createElement('iframe');
                     f.allow = "autoplay; encrypted-media; fullscreen";
                     f.allowFullscreen = true;
@@ -120,15 +179,16 @@ func embeddedPlayerHandler(c *gin.Context) {
 	c.Header("X-Frame-Options", "SAMEORIGIN")
 	c.String(http.StatusOK, htmlTemplate)
 }
-	
+
 func botanicalSecurityMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		reqPath := c.Request.URL.Path
 
-		if reqPath == "/" || reqPath == "/health" || reqPath == "/sitemap.xml" || reqPath == "/robots.txt" || 
-		   reqPath == "/api/clear-cache" || reqPath == "/api/test-apis" || 
-		   reqPath == "/player" || strings.HasPrefix(reqPath, "/api/player") ||
-		   strings.HasPrefix(reqPath, "/api/proxy-stream") || strings.HasPrefix(reqPath, "/proxy-stream") {
+		if reqPath == "/" || reqPath == "/health" || reqPath == "/sitemap.xml" || reqPath == "/robots.txt" ||
+			reqPath == "/api/clear-cache" || reqPath == "/api/test-apis" ||
+			reqPath == "/player" || strings.HasPrefix(reqPath, "/api/player") ||
+			strings.HasPrefix(reqPath, "/api/get-player-token") ||
+			strings.HasPrefix(reqPath, "/api/proxy-stream") || strings.HasPrefix(reqPath, "/proxy-stream") {
 			c.Next()
 			return
 		}
@@ -184,7 +244,9 @@ func main() {
 
 	appEngine.GET("/", botanicalHealthHandler)
 	appEngine.GET("/health", botanicalHealthHandler)
-	
+
+	appEngine.GET("/api/get-player-token", generatePlayerTokenHandler)
+
 	appEngine.GET("/player", embeddedPlayerHandler)
 	appEngine.GET("/api/player", embeddedPlayerHandler)
 	appEngine.GET("/api-backend/player", embeddedPlayerHandler)
