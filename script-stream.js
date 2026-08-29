@@ -668,14 +668,7 @@ async function selectServer(element, resolution, serverNum, videoUrl) {
         if (!tokenData.token) throw new Error("Token payload empty");
         
         const securePlayerUrl = `${ARCHIDENDRON_BRIDGE}/player?${tokenData.token}`;
-        const playerRes = await fetch(securePlayerUrl);
-
-        if (!playerRes.ok) throw new Error(`Player failed: ${playerRes.status}`);
-
-        const htmlContent = await playerRes.text();
-        const blob = new Blob([htmlContent], { type: 'text/html' });
-        currentBlobUrl = URL.createObjectURL(blob);
-        iframe.src = currentBlobUrl;
+        iframe.src = securePlayerUrl;
 
     } catch (err) {
         console.error("Gagal memuat secure player:", err);
