@@ -628,6 +628,8 @@ function formatEmbedUrl(url) {
     return finalUrl;
 }
 
+let currentIframeBlobUrl = null;
+
 function selectServer(element, resolution, serverNum, videoUrl) {
     document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
     document.querySelectorAll('.server-btn').forEach(btn => {
@@ -646,15 +648,25 @@ function selectServer(element, resolution, serverNum, videoUrl) {
         return;
     }
 
-    iframe.src = "about:blank";
-    requestAnimationFrame(() => {
-        const rawVideoUrl = formatEmbedUrl(videoUrl);
-        const base64Token = btoa(rawVideoUrl);
-        
-        const securePlayerUrl = `${ARCHIDENDRON_BRIDGE}/player?v=${encodeURIComponent(base64Token)}`;
-        
-        iframe.src = securePlayerUrl;
-    });
+    if (currentIframeBlobUrl) {
+        URL.revokeObjectURL(currentIframeBlobUrl);
+        currentIframeBlobUrl = null;
+    }
+
+    const rawVideoUrl = formatEmbedUrl(videoUrl);
+    const base64Token = btoa(rawVideoUrl);
+    const targetEndpoint = `${ARCHIDENDRON_BRIDGE}/player?v=${encodeURIComponent(base64Token)}`;
+
+    fetch(targetEndpoint)
+        .then(res => res.text())
+        .then(htmlContent => {
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            currentIframeBlobUrl = URL.createObjectURL(blob);
+            iframe.src = currentIframeBlobUrl;
+        })
+        .catch(err => {
+            iframe.src = targetEndpoint;
+        });
 }
 
 function toggleTheme() {
