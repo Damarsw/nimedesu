@@ -655,7 +655,7 @@ async function selectServer(element, resolution, serverNum, videoUrl) {
     try {
         const rawVideoUrl = formatEmbedUrl(videoUrl);
         const sec = generateBubalinumHeaderSignature();
-
+        
         const tokenRes = await fetch(`${ARCHIDENDRON_BRIDGE}/get-player-token?url=${encodeURIComponent(rawVideoUrl)}`, {
             headers: {
                 "X-Bubalinum-Seed": sec.seed,
@@ -663,27 +663,14 @@ async function selectServer(element, resolution, serverNum, videoUrl) {
             }
         });
 
-        if (!tokenRes.ok) {
-            throw new Error(`Token Request Failed with status ${tokenRes.status}`);
-        }
-
+        if (!tokenRes.ok) throw new Error(`Token failed: ${tokenRes.status}`);
         const tokenData = await tokenRes.json();
-        if (!tokenData.token) {
-            throw new Error("Invalid token payload returned from server");
-        }
-
-        const securePlayerUrl = `${ARCHIDENDRON_BRIDGE}/player?${tokenData.token}`;
+        if (!tokenData.token) throw new Error("Token payload empty");
         
-        const playerRes = await fetch(securePlayerUrl, {
-            headers: {
-                "X-Bubalinum-Seed": sec.seed,
-                "X-Bubalinum-Chrono": sec.chrono
-            }
-        });
+        const securePlayerUrl = `${ARCHIDENDRON_BRIDGE}/player?${tokenData.token}`;
+        const playerRes = await fetch(securePlayerUrl);
 
-        if (!playerRes.ok) {
-            throw new Error(`Player Request Failed with status ${playerRes.status}`);
-        }
+        if (!playerRes.ok) throw new Error(`Player failed: ${playerRes.status}`);
 
         const htmlContent = await playerRes.text();
         const blob = new Blob([htmlContent], { type: 'text/html' });
@@ -692,7 +679,9 @@ async function selectServer(element, resolution, serverNum, videoUrl) {
 
     } catch (err) {
         console.error("Gagal memuat secure player:", err);
-        iframe.src = "about:blank";
+        const rawVideoUrl = formatEmbedUrl(videoUrl);
+        const base64Token = btoa(rawVideoUrl);
+        iframe.src = `${ARCHIDENDRON_BRIDGE}/player?v=${encodeURIComponent(base64Token)}`;
     }
 }
 
