@@ -10,7 +10,6 @@ let currentAnimeThumbnail = "";
 let currentAnimeGenres = []; 
 let currentAnimeId = null;
 let searchDebounceTimer = null;
-let currentBlobUrl = null;
 
 function fractionateSeedEssence(rawString) {
     try { return btoa(rawString).replace(/=/g, ''); } catch(e) { return ""; }
@@ -445,7 +444,7 @@ async function renderMixedGenreRecommendations() {
             }).then(res => res.json()).catch(() => ({ data: [] }))
         );
 
-        const results = me || [];
+        const results = await Promise.all(fetchPromises);
         let recommendedAnimeList = results.flatMap(r => r.data || []);
 
         const uniqueMap = new Map();
@@ -638,6 +637,7 @@ function formatEmbedUrl(url) {
     return finalUrl;
 }
 
+// FUNGSI SINGLE SELECTSERVER (GOOGLE DRIVE EMBED LANGSUNG)
 async function selectServer(element, resolution, serverNum, videoUrl) {
     document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
     document.querySelectorAll('.server-btn').forEach(btn => {
@@ -657,11 +657,13 @@ async function selectServer(element, resolution, serverNum, videoUrl) {
 
     const rawVideoUrl = formatEmbedUrl(videoUrl);
 
+    // GOOGLE DRIVE: LANGSUNG MASUKKAN LINK PREVIEW MURNI KE IFRAME
     if (rawVideoUrl.includes('drive.google.com')) {
         iframe.src = rawVideoUrl;
         return;
     }
 
+    // SERVER LAIN: GUNAKAN TOKEN BACKEND PROXY
     try {
         const sec = generateBubalinumHeaderSignature();
         const tokenRes = await fetch(`${ARCHIDENDRON_BRIDGE}/get-player-token?url=${encodeURIComponent(rawVideoUrl)}`, {
@@ -680,49 +682,6 @@ async function selectServer(element, resolution, serverNum, videoUrl) {
 
     } catch (err) {
         console.error("Gagal memuat secure player:", err);
-        const base64Token = btoa(rawVideoUrl);
-        iframe.src = `${ARCHIDENDRON_BRIDGE}/player?v=${encodeURIComponent(base64Token)}`;
-    }
-}
-
-async function selectServer(element, resolution, serverNum, videoUrl) {
-    document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
-    document.querySelectorAll('.server-btn').forEach(btn => {
-        btn.className = "server-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-black dark:text-white border border-neon-yellow/60 dark:border-neon-darkBorder";
-    });
-    if(element) {
-        element.className = "server-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs bg-neon-yellow text-black font-bold shadow-glow-yellow transition flex justify-between items-center";
-    }
-    document.getElementById('mainServerContainer').classList.add('hidden');
-    document.getElementById('mainServerArrow').style.transform = 'rotate(-90deg)';
-
-    const iframe = document.getElementById('videoIframe');
-    if (!videoUrl || videoUrl === 'undefined' || videoUrl === 'null') {
-        iframe.src = "about:blank";
-        return;
-    }
-
-    try {
-        const rawVideoUrl = formatEmbedUrl(videoUrl);
-        const sec = generateBubalinumHeaderSignature();
-        
-        const tokenRes = await fetch(`${ARCHIDENDRON_BRIDGE}/get-player-token?url=${encodeURIComponent(rawVideoUrl)}`, {
-            headers: {
-                "X-Bubalinum-Seed": sec.seed,
-                "X-Bubalinum-Chrono": sec.chrono
-            }
-        });
-
-        if (!tokenRes.ok) throw new Error(`Token failed: ${tokenRes.status}`);
-        const tokenData = await tokenRes.json();
-        if (!tokenData.token) throw new Error("Token payload empty");
-        
-        const securePlayerUrl = `${ARCHIDENDRON_BRIDGE}/player?${tokenData.token}`;
-        iframe.src = securePlayerUrl;
-
-    } catch (err) {
-        console.error("Gagal memuat secure player:", err);
-        const rawVideoUrl = formatEmbedUrl(videoUrl);
         const base64Token = btoa(rawVideoUrl);
         iframe.src = `${ARCHIDENDRON_BRIDGE}/player?v=${encodeURIComponent(base64Token)}`;
     }
