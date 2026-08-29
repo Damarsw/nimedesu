@@ -120,6 +120,15 @@ func embeddedPlayerHandler(c *gin.Context) {
 	}
 	rawVideoURL := string(decodedBytes)
 
+	// =============================================================
+	// KHUSUS LINK GOOGLE DRIVE: REDIRECT LANGSUNG (TANPA PEMBUNGKUS HTML)
+	// =============================================================
+	if strings.Contains(rawVideoURL, "drive.google.com") {
+		c.Redirect(http.StatusFound, rawVideoURL)
+		return
+	}
+
+	// UNTUK LINK NON-GDRIVE (.mp4, .m3u8, dll): MENGGUNAKAN HTML PLAYER ORDINARIS
 	xorKey := byte(0x5A)
 	var byteArray []string
 	for i := 0; i < len(rawVideoURL); i++ {
@@ -127,43 +136,16 @@ func embeddedPlayerHandler(c *gin.Context) {
 	}
 	encryptedData := strings.Join(byteArray, ",")
 
-	// TEMPLATE PLAYER TEROPTIMASI UNTUK HP (RESPONSIF FIT CONTAINER)
 	htmlTemplate := fmt.Sprintf(`<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        * { 
-            box-sizing: border-box; 
-            margin: 0; 
-            padding: 0; 
-        }
-        html, body { 
-            width: 100%%; 
-            height: 100%%; 
-            background: #000; 
-            overflow: hidden; 
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        #v-app { 
-            width: 100%%; 
-            height: 100%%; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            position: relative;
-        }
-        iframe, video { 
-            width: 100%% !important; 
-            height: 100%% !important; 
-            border: 0 !important; 
-            outline: none;
-            display: block;
-            object-fit: contain;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { width: 100%%; height: 100%%; background: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+        #v-app { width: 100%%; height: 100%%; display: flex; justify-content: center; align-items: center; position: relative; }
+        iframe, video { width: 100%% !important; height: 100%% !important; border: 0 !important; outline: none; display: block; object-fit: contain; }
     </style>
 </head>
 <body oncontextmenu="return false;">
