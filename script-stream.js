@@ -380,14 +380,22 @@ async function initStream() {
         if (data && data.episodes && data.episodes.length > 0) {
             activeEpisodes = data.episodes.filter(ep => ep && (ep.episode_title || ep.video_servers));
             
-            // SORTING BERDASARKAN NOMOR EPISODE YANG DIESTRAK DARI JUDUL (01, 02, DST)
+            // SORTING MUTLAK: URUTKAN DARI NOMOR KECIL KE BESAR BERDASARKAN JUDUL EPISODE
             activeEpisodes.sort((a, b) => {
                 const numA = extractEpisodeNumber(a.episode_title);
                 const numB = extractEpisodeNumber(b.episode_title);
                 return numA - numB;
             });
 
-            activeEpisodeIndex = (targetEps >= 0 && targetEps < activeEpisodes.length) ? targetEps : 0;
+            // PENENTUAN INDEX AWAL YANG AMAN & PRESISI
+            if (!isNaN(targetEps) && targetEps > 0) {
+                const foundIndex = activeEpisodes.findIndex(ep => extractEpisodeNumber(ep.episode_title) === targetEps);
+                activeEpisodeIndex = foundIndex !== -1 ? foundIndex : 0;
+            } else {
+                // Cari index yang benar-benar bernilai angka 1 agar selalu membuka Episode 1 pertama kali
+                const firstEpIndex = activeEpisodes.findIndex(ep => extractEpisodeNumber(ep.episode_title) === 1);
+                activeEpisodeIndex = firstEpIndex !== -1 ? firstEpIndex : 0;
+            }
 
             globalAnimeTitle = data.title;
             if (!globalAnimeTitle && animeUrl) {
@@ -406,7 +414,6 @@ async function initStream() {
     }
 }
 
-// FUNGSI EKSTRAKSI NOMOR EPISODE YANG SUDAH DIPERKUAT (BISA BACA "01", "Episode 1", DLL)
 function extractEpisodeNumber(title) {
     if (!title) return 0;
     const cleanTitle = String(title);
