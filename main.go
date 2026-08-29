@@ -96,10 +96,16 @@ func embeddedPlayerHandler(c *gin.Context) {
                     v.src = res;
                     container.appendChild(v);
                 } else {
+                    // GUNAKAN SRCDOC BLOB DYNAMIC INJECTION
+                    // Atribut src di DOM inner TIDAK AKAN menampilkan URL target!
                     var f = document.createElement('iframe');
                     f.allow = "autoplay; encrypted-media; fullscreen";
                     f.allowFullscreen = true;
-                    f.src = res;
+                    
+                    var innerHtml = '<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0;width:100%%;height:100%%;overflow:hidden;}iframe{width:100%%;height:100%%;border:none;}</style></head><body><iframe src="' + res + '" allowfullscreen allow="autoplay; encrypted-media"></iframe></body></html>';
+                    
+                    var blob = new Blob([innerHtml], {type: 'text/html'});
+                    f.src = URL.createObjectURL(blob);
                     container.appendChild(f);
                 }
             } catch(e) {}
