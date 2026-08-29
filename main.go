@@ -201,40 +201,75 @@ func proxyStreamHandler(c *gin.Context) {
 		return
 	}
 
-	targetURL := fmt.Sprintf("https://drive.google.com/uc?export=download&id=%s&confirm=t", fileID)
+	client := &http.Client{
+		Timeout: 60 * time.Second,
+	}
 
-	req, err := http.NewRequest("GET", targetURL, nil)
+	initialURL := fmt.Sprintf("https://drive.google.com/uc?export=download&id=%s", fileID)
+	req1, err := http.NewRequest("GET", initialURL, nil)
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Failed to create request")
 		return
 	}
+	req1.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 
-	if rangeHeader := c.GetHeader("Range"); rangeHeader != "" {
-		req.Header.Set("Range", rangeHeader)
-	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
+	resp1, err := client.Do(req1)
 	if err != nil {
 		c.String(http.StatusBadGateway, "Stream Connection Error")
 		return
 	}
-	defer resp.Body.Close()
+	defer resp1.Body.Close()
+
+	targetURL := initialURL
+	var cookies []*http.Cookie = resp1.Cookies()
+
+	if resp1.StatusCode == http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp1.Body)
+		bodyStr := string(bodyBytes)
+		if strings.Contains(bodyStr, "confirm=") {
+			parts := strings.Split(bodyStr, "confirm=")
+			if len(parts) > 1 {
+				confirmToken := strings.Split(parts[1], "&")[0]
+				confirmToken = strings.Split(confirmToken, "\"")[0]
+				targetURL = fmt.Sprintf("https://drive.google.com/uc?export=download&id=%s&confirm=%s", fileID, confirmToken)
+			}
+		}
+	}
+
+	req2, err := http.NewRequest("GET", targetURL, nil)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to stream")
+		return
+	}
+
+	for _, cookie := range cookies {
+		req2.AddCookie(cookie)
+	}
+	if rangeHeader := c.GetHeader("Range"); rangeHeader != "" {
+		req2.Header.Set("Range", rangeHeader)
+	}
+	req2.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+
+	resp2, err := client.Do(req2)
+	if err != nil {
+		c.String(http.StatusBadGateway, "Stream Read Error")
+		return
+	}
+	defer resp2.Body.Close()
 
 	c.Header("Content-Type", "video/mp4")
 	c.Header("Accept-Ranges", "bytes")
-	if contentLength := resp.Header.Get("Content-Length"); contentLength != "" {
+	if contentLength := resp2.Header.Get("Content-Length"); contentLength != "" {
 		c.Header("Content-Length", contentLength)
 	}
-	if contentRange := resp.Header.Get("Content-Range"); contentRange != "" {
+	if contentRange := resp2.Header.Get("Content-Range"); contentRange != "" {
 		c.Header("Content-Range", contentRange)
 		c.Status(http.StatusPartialContent)
 	} else {
 		c.Status(http.StatusOK)
 	}
 
-	io.Copy(c.Writer, resp.Body)
+	io.Copy(c.Writer, resp2.Body)
 }
 
 func botanicalSecurityMiddleware() gin.HandlerFunc {
