@@ -40,7 +40,7 @@ func embeddedPlayerHandler(c *gin.Context) {
 	isDomainValid := strings.Contains(referer, bubalinumDomain)
 
 	if referer == "" || (!isDomainValid && !isLocal) {
-		c.String(http.StatusForbidden, "Access Denied: Direct Access Not Allowed")
+		c.String(http.StatusForbidden, "Access Denied")
 		return
 	}
 
@@ -50,6 +50,21 @@ func embeddedPlayerHandler(c *gin.Context) {
 		return
 	}
 
+	unescapedTarget, _ := url.QueryUnescape(targetParam)
+	decodedBytes, err := base64.StdEncoding.DecodeString(unescapedTarget)
+	if err != nil {
+		c.String(http.StatusBadRequest, "Invalid Payload Token")
+		return
+	}
+	rawVideoURL := string(decodedBytes)
+
+	xorKey := byte(0x5A)
+	var byteArray []string
+	for i := 0; i < len(rawVideoURL); i++ {
+		byteArray = append(byteArray, fmt.Sprintf("%d", rawVideoURL[i]^xorKey))
+	}
+	encryptedData := strings.Join(byteArray, ",")
+
 	htmlTemplate := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
@@ -58,36 +73,37 @@ func embeddedPlayerHandler(c *gin.Context) {
     <style>html,body{margin:0;padding:0;width:100%%;height:100%%;background:#000;overflow:hidden;}iframe,video{width:100%%;height:100%%;border:none;}</style>
 </head>
 <body oncontextmenu="return false;">
-    <div id="app"></div>
+    <div id="v-app"></div>
     <script>
         (function(){
             try {
-                // Token Base64 dibaca di runtime saja
-                var rawToken = "%s";
-                var cleanToken = decodeURIComponent(rawToken);
-                var decodedUrl = atob(cleanToken);
-                var app = document.getElementById('app');
-
-                if (decodedUrl.indexOf('.mp4') !== -1 || decodedUrl.indexOf('.m3u8') !== -1) {
+                // Data berupa deretan angka byte acak, bukan string URL!
+                var payload = [%s];
+                var k = 0x5A;
+                var res = "";
+                for(var i=0; i<payload.length; i++) {
+                    res += String.fromCharCode(payload[i] ^ k);
+                }
+                
+                var container = document.getElementById('v-app');
+                if (res.indexOf('.mp4') !== -1 || res.indexOf('.m3u8') !== -1) {
                     var v = document.createElement('video');
-                    v.controls = true;
-                    v.autoplay = true;
-                    v.playsInline = true;
+                    v.controls = true; v.autoplay = true; v.playsInline = true;
                     v.controlsList = "nodownload";
-                    v.src = decodedUrl;
-                    app.appendChild(v);
+                    v.src = res;
+                    container.appendChild(v);
                 } else {
                     var f = document.createElement('iframe');
                     f.allow = "autoplay; encrypted-media; fullscreen";
                     f.allowFullscreen = true;
-                    f.src = decodedUrl;
-                    app.appendChild(f);
+                    f.src = res;
+                    container.appendChild(f);
                 }
             } catch(e) {}
         })();
     </script>
 </body>
-</html>`, targetParam)
+</html>`, encryptedData)
 
 	c.Header("Content-Type", "text/html; charset=utf-8")
 	c.Header("X-Frame-Options", "SAMEORIGIN")
