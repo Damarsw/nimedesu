@@ -121,47 +121,17 @@ func embeddedPlayerHandler(c *gin.Context) {
 	}
 	rawVideoURL := string(decodedBytes)
 
-	// =========================================================================
-	// SOLUSI GDRIVE: STREAM VIA BACKEND PROXY (LANGSUNG PLAY TANPA MUTING)
-	// =========================================================================
+	// JIKA GOOGLE DRIVE EMBED
 	if strings.Contains(rawVideoURL, "drive.google.com") {
-		var fileID string
-		if strings.Contains(rawVideoURL, "/d/") {
-			parts := strings.Split(rawVideoURL, "/d/")
-			if len(parts) > 1 {
-				fileID = strings.Split(parts[1], "/")[0]
-			}
-		} else if strings.Contains(rawVideoURL, "id=") {
-			u, err := url.Parse(rawVideoURL)
-			if err == nil {
-				fileID = u.Query().Get("id")
-			}
+		driveEmbedURL := rawVideoURL
+		driveEmbedURL = strings.ReplaceAll(driveEmbedURL, "/view?usp=drivesdk", "/preview")
+		driveEmbedURL = strings.ReplaceAll(driveEmbedURL, "/view", "/preview")
+		if !strings.Contains(driveEmbedURL, "/preview") {
+			driveEmbedURL = strings.TrimRight(driveEmbedURL, "/") + "/preview"
 		}
 
-		if fileID != "" {
-			// Alirkan lewat endpoint proxy-stream backend
-			proxyStreamURL := fmt.Sprintf("/api-backend/proxy-stream?file_id=%s", fileID)
-			
-			htmlTemplate := fmt.Sprintf(`<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { width: 100%%; height: 100%%; background: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
-        video { width: 100%%; height: 100%%; outline: none; object-fit: contain; }
-    </style>
-</head>
-<body oncontextmenu="return false;">
-    <video controls autoplay playsinline controlsList="nodownload" src="%s"></video>
-</body>
-</html>`, proxyStreamURL)
-
-			c.Header("Content-Type", "text/html; charset=utf-8")
-			c.String(http.StatusOK, htmlTemplate)
-			return
-		}
+		c.Redirect(http.StatusFound, driveEmbedURL)
+		return
 	}
 
 	// UNTUK LINK NON-GDRIVE (.mp4, .m3u8, DLL)
@@ -224,7 +194,6 @@ func embeddedPlayerHandler(c *gin.Context) {
 	c.String(http.StatusOK, htmlTemplate)
 }
 
-// HANDLER PROXY UTAMA UNTUK GDRIVE STREAMING
 func proxyStreamHandler(c *gin.Context) {
 	fileID := c.Query("file_id")
 	if fileID == "" {
@@ -240,7 +209,6 @@ func proxyStreamHandler(c *gin.Context) {
 		return
 	}
 
-	// Teruskan Range Header (Sangat penting agar video player bisa scrubbing & auto-play)
 	if rangeHeader := c.GetHeader("Range"); rangeHeader != "" {
 		req.Header.Set("Range", rangeHeader)
 	}
