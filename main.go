@@ -70,43 +70,43 @@ func embeddedPlayerHandler(c *gin.Context) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.12/hls.min.js"></script>
     <style>
         html, body { margin: 0; padding: 0; width: 100%%; height: 100%%; background: #000; overflow: hidden; }
-        #v-app { width: 100%%; height: 100%%; display: flex; justify-content: center; align-items: center; }
-        iframe, video { width: 100%%; height: 100%%; border: none; object-fit: contain; }
+        video { width: 100%%; height: 100%%; object-fit: contain; outline: none; }
     </style>
 </head>
 <body oncontextmenu="return false;">
-    <div id="v-app"></div>
+    <video id="pureVideoPlayer" controls controlsList="nodownload" disablePictureInPicture playsinline autoplay></video>
     <script>
         (function(){
             try {
+                // Dekode Byte Array Kembali ke String URL di Memory RAM
                 var payload = [%s];
                 var k = 0x5A;
-                var res = "";
+                var targetUrl = "";
                 for(var i=0; i<payload.length; i++) {
-                    res += String.fromCharCode(payload[i] ^ k);
+                    targetUrl += String.fromCharCode(payload[i] ^ k);
                 }
-                
-                var container = document.getElementById('v-app');
-                if (res.indexOf('.mp4') !== -1 || res.indexOf('.m3u8') !== -1) {
-                    var v = document.createElement('video');
-                    v.controls = true; v.autoplay = true; v.playsInline = true;
-                    v.controlsList = "nodownload";
-                    v.src = res;
-                    container.appendChild(v);
-                } else {
-                    // GUNAKAN SRCDOC BLOB DYNAMIC INJECTION
-                    // Atribut src di DOM inner TIDAK AKAN menampilkan URL target!
-                    var f = document.createElement('iframe');
-                    f.allow = "autoplay; encrypted-media; fullscreen";
-                    f.allowFullscreen = true;
-                    
-                    var innerHtml = '<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0;width:100%%;height:100%%;overflow:hidden;}iframe{width:100%%;height:100%%;border:none;}</style></head><body><iframe src="' + res + '" allowfullscreen allow="autoplay; encrypted-media"></iframe></body></html>';
-                    
-                    var blob = new Blob([innerHtml], {type: 'text/html'});
-                    f.src = URL.createObjectURL(blob);
-                    container.appendChild(f);
+
+                var video = document.getElementById('pureVideoPlayer');
+
+                // Jika Browser Mendukung Native HLS (Safari / iOS)
+                if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    video.src = targetUrl;
+                } 
+                // Gunakan HLS.js untuk Chrome, Firefox, Edge, Android agar dibungkus ke Tag <video>
+                else if (Hls.isSupported()) {
+                    var hls = new Hls({
+                        enableWorker: true,
+                        lowLatencyMode: true
+                    });
+                    hls.loadSource(targetUrl);
+                    hls.attachMedia(video);
+                } 
+                // Direct File MP4 Fallback
+                else {
+                    video.src = targetUrl;
                 }
             } catch(e) {}
         })();
