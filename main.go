@@ -147,8 +147,6 @@ func embeddedPlayerHandler(c *gin.Context) {
             display: flex; 
             justify-content: center; 
             align-items: center; 
-            position: relative;
-            overflow: hidden;
         }
         iframe, video { 
             width: 100%% !important; 
@@ -156,24 +154,6 @@ func embeddedPlayerHandler(c *gin.Context) {
             border: none; 
             outline: none;
             object-fit: contain; 
-        }
-
-        /* PERBAIKAN KHUSUS RESPONSIVE DISPLAY GDRIVE DI MOBILE */
-        @media screen and (max-width: 640px) {
-            #v-app iframe {
-                width: 125%% !important;
-                height: 125%% !important;
-                transform: scale(0.8);
-                transform-origin: 0 0;
-            }
-        }
-        @media screen and (max-width: 400px) {
-            #v-app iframe {
-                width: 135%% !important;
-                height: 135%% !important;
-                transform: scale(0.74);
-                transform-origin: 0 0;
-            }
         }
     </style>
 </head>
@@ -191,7 +171,8 @@ func embeddedPlayerHandler(c *gin.Context) {
                 
                 var container = document.getElementById('v-app');
 
-                if (res.endsWith('.mp4') || res.endsWith('.m3u8')) {
+                // Jika link adalah Direct Video (MP4/M3U8) atau Direct Stream Drive
+                if (res.endsWith('.mp4') || res.endsWith('.m3u8') || res.includes('export=download')) {
                     var v = document.createElement('video');
                     v.controls = true; 
                     v.autoplay = true; 
