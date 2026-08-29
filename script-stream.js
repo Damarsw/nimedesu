@@ -617,6 +617,10 @@ function formatEmbedUrl(url) {
         finalUrl = url;
     }
 
+    if (finalUrl.includes('mega.nz')) {
+        return finalUrl.replace('/file/', '/embed/').replace('/v/', '/embed/');
+    }
+
     if (finalUrl.includes('drive.google.com')) {
         let fileId = "";
         const match = finalUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || finalUrl.match(/id=([a-zA-Z0-9_-]+)/);
@@ -630,13 +634,10 @@ function formatEmbedUrl(url) {
         return finalUrl.replace('/view?usp=drivesdk', '/preview').replace('/view', '/preview');
     }
 
-    if (finalUrl.includes('mega.nz')) {
-        return finalUrl.replace('/file/', '/embed/');
-    }
-
     return finalUrl;
 }
 
+// SATU-SATUNYA FUNGSI SELECTSERVER (BERSIH & TEPAT TARGET)
 async function selectServer(element, resolution, serverNum, videoUrl) {
     document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
     document.querySelectorAll('.server-btn').forEach(btn => {
@@ -656,20 +657,13 @@ async function selectServer(element, resolution, serverNum, videoUrl) {
 
     const rawVideoUrl = formatEmbedUrl(videoUrl);
 
-    if (rawVideoUrl.includes('drive.google.com')) {
-        let fileId = "";
-        const match = rawVideoUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || rawVideoUrl.match(/id=([a-zA-Z0-9_-]+)/);
-        if (match && match[1]) {
-            fileId = match[1];
-        }
-
-        if (fileId) {
-            const proxyPlayerUrl = `${ARCHIDENDRON_BRIDGE}/player?v=${btoa(rawVideoUrl)}`;
-            iframe.src = proxyPlayerUrl;
-            return;
-        }
+    // BILA GDRIVE ATAU MEGA: LANGSUNG MASUKKAN LINK PREVIEW/EMBED KE IFRAME (TANPA PROXY TOKEN)
+    if (rawVideoUrl.includes('drive.google.com') || rawVideoUrl.includes('mega.nz')) {
+        iframe.src = rawVideoUrl;
+        return;
     }
 
+    // SERVER MP4/M3U8 LAINNYA
     try {
         const sec = generateBubalinumHeaderSignature();
         const tokenRes = await fetch(`${ARCHIDENDRON_BRIDGE}/get-player-token?url=${encodeURIComponent(rawVideoUrl)}`, {
@@ -681,10 +675,13 @@ async function selectServer(element, resolution, serverNum, videoUrl) {
 
         if (!tokenRes.ok) throw new Error(`Token failed: ${tokenRes.status}`);
         const tokenData = await tokenRes.json();
+        if (!tokenData.token) throw new Error("Token payload empty");
+        
         const securePlayerUrl = `${ARCHIDENDRON_BRIDGE}/player?${tokenData.token}`;
         iframe.src = securePlayerUrl;
 
     } catch (err) {
+        console.error("Gagal memuat secure player:", err);
         const base64Token = btoa(rawVideoUrl);
         iframe.src = `${ARCHIDENDRON_BRIDGE}/player?v=${encodeURIComponent(base64Token)}`;
     }
