@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"log"
 	"math"
 	"net/http"
@@ -73,25 +72,8 @@ func embeddedPlayerHandler(c *gin.Context) {
 	referer := c.GetHeader("Referer")
 	isLocal := strings.Contains(referer, "localhost") || strings.Contains(referer, "127.0.0.1")
 	isDomainValid := strings.Contains(referer, bubalinumDomain)
-	tokenParam := c.Query("t")
-	if tokenParam == "" && c.Query("v") != "" {
-	    tokenParam = c.Query("v")
-	}
-	
-	if tokenParam == "" {
-	    c.String(http.StatusBadRequest, "Invalid Security Token")
-	    return
-	}
-	
-	if referer != "" && !isDomainValid && !isLocal {
-	    c.String(http.StatusForbidden, "Access Denied: Invalid Origin")
-	    return
-	}
 
 	tokenParam := c.Query("t")
-	expiresParam := c.Query("e")
-	sigParam := c.Query("s")
-
 	if tokenParam == "" && c.Query("v") != "" {
 		tokenParam = c.Query("v")
 	}
@@ -100,6 +82,14 @@ func embeddedPlayerHandler(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Invalid Security Token")
 		return
 	}
+
+	if referer != "" && !isDomainValid && !isLocal {
+		c.String(http.StatusForbidden, "Access Denied: Invalid Origin")
+		return
+	}
+
+	expiresParam := c.Query("e")
+	sigParam := c.Query("s")
 
 	if expiresParam != "" && sigParam != "" {
 		expTime, err := strconv.ParseInt(expiresParam, 10, 64)
@@ -131,42 +121,45 @@ func embeddedPlayerHandler(c *gin.Context) {
 	rawVideoURL := string(decodedBytes)
 
 	// =========================================================================
-	// TANGANI GDRIVE DENGAN CLEAN STREAM HTML (MEMBERSIHKAN LOCK REFERER & DOUBLE IFRAME)
+	// TANGANI GOOGLE DRIVE: EXTRACT DIRECT FILE STREAM (BYPASS REFERER 100%)
 	// =========================================================================
 	if strings.Contains(rawVideoURL, "drive.google.com") {
-		driveEmbedURL := rawVideoURL
-		driveEmbedURL = strings.ReplaceAll(driveEmbedURL, "/view?usp=drivesdk", "/preview")
-		driveEmbedURL = strings.ReplaceAll(driveEmbedURL, "/view", "/preview")
-		if !strings.Contains(driveEmbedURL, "/preview") {
-			driveEmbedURL = strings.TrimRight(driveEmbedURL, "/") + "/preview"
-		}
-
-		// Ambil langsung via Server tanpa mengirimkan Referer Vercel ke Google Drive
-		req, err := http.NewRequest("GET", driveEmbedURL, nil)
-		if err == nil {
-			req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
-			
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, err := client.Do(req)
-			if err == nil && resp.StatusCode == 200 {
-				defer resp.Body.Close()
-				bodyBytes, err := io.ReadAll(resp.Body)
-				if err == nil {
-					htmlStr := string(bodyBytes)
-					
-					// Inject meta referrer no-referrer & perbaiki viewport responsive untuk HP
-					headInject := `<head><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">`
-					htmlStr = strings.Replace(htmlStr, "<head>", headInject, 1)
-
-					c.Header("Content-Type", "text/html; charset=utf-8")
-					c.String(http.StatusOK, htmlStr)
-					return
-				}
+		var fileID string
+		if strings.Contains(rawVideoURL, "/d/") {
+			parts := strings.Split(rawVideoURL, "/d/")
+			if len(parts) > 1 {
+				fileID = strings.Split(parts[1], "/")[0]
+			}
+		} else if strings.Contains(rawVideoURL, "id=") {
+			u, err := url.Parse(rawVideoURL)
+			if err == nil {
+				fileID = u.Query().Get("id")
 			}
 		}
 
-		c.Redirect(http.StatusFound, driveEmbedURL)
-		return
+		if fileID != "" {
+			directStreamURL := fmt.Sprintf("https://drive.google.com/uc?export=download&id=%s", fileID)
+			
+			htmlTemplate := fmt.Sprintf(`<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { width: 100%%; height: 100%%; background: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+        video { width: 100%%; height: 100%%; outline: none; object-fit: contain; }
+    </style>
+</head>
+<body>
+    <video controls autoplay playsinline controlsList="nodownload" src="%s"></video>
+</body>
+</html>`, directStreamURL)
+
+			c.Header("Content-Type", "text/html; charset=utf-8")
+			c.String(http.StatusOK, htmlTemplate)
+			return
+		}
 	}
 
 	// UNTUK LINK NON-GDRIVE (.mp4, .m3u8, DLL)
@@ -182,7 +175,6 @@ func embeddedPlayerHandler(c *gin.Context) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="referrer" content="no-referrer">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { width: 100%%; height: 100%%; background: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
