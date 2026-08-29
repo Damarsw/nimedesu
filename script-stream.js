@@ -378,23 +378,19 @@ async function initStream() {
         }
 
         if (data && data.episodes && data.episodes.length > 0) {
-            activeEpisodes = data.episodes.filter(ep => ep && (ep.episode_title || ep.video_servers));
+            activeEpisodes = data.episodes;
             
-            // SORTING MUTLAK: URUTKAN DARI NOMOR KECIL KE BESAR BERDASARKAN JUDUL EPISODE
+            // SORTING MUTLAK BERDASARKAN ANGKA DI DATABASE (01, 02, 03...)
             activeEpisodes.sort((a, b) => {
                 const numA = extractEpisodeNumber(a.episode_title);
                 const numB = extractEpisodeNumber(b.episode_title);
                 return numA - numB;
             });
 
-            // PENENTUAN INDEX AWAL YANG AMAN & PRESISI
-            if (!isNaN(targetEps) && targetEps > 0) {
-                const foundIndex = activeEpisodes.findIndex(ep => extractEpisodeNumber(ep.episode_title) === targetEps);
-                activeEpisodeIndex = foundIndex !== -1 ? foundIndex : 0;
+            if (!isNaN(targetEps) && targetEps >= 0 && targetEps < activeEpisodes.length) {
+                activeEpisodeIndex = targetEps;
             } else {
-                // Cari index yang benar-benar bernilai angka 1 agar selalu membuka Episode 1 pertama kali
-                const firstEpIndex = activeEpisodes.findIndex(ep => extractEpisodeNumber(ep.episode_title) === 1);
-                activeEpisodeIndex = firstEpIndex !== -1 ? firstEpIndex : 0;
+                activeEpisodeIndex = 0; // Selalu mulai dari index 0 (Episode 01)
             }
 
             globalAnimeTitle = data.title;
@@ -414,13 +410,11 @@ async function initStream() {
     }
 }
 
+// KHUSUS FORMAT DB "01", "02", "03", DST
 function extractEpisodeNumber(title) {
     if (!title) return 0;
-    const cleanTitle = String(title);
-    const match = cleanTitle.match(/(?:episode|eps?\.?)\s*(\d+)/i) || 
-                  cleanTitle.match(/^(\d+)/) || 
-                  cleanTitle.match(/(\d+)/);
-    return match ? parseInt(match[1], 10) : 0;
+    const parsed = parseInt(String(title).trim(), 10);
+    return isNaN(parsed) ? 0 : parsed;
 }
 
 function scrollSlider(direction) {
@@ -510,10 +504,7 @@ function renderDynamicEpisodes() {
 
     const currentEp = activeEpisodes[activeEpisodeIndex];
     
-    let cleanEpTitle = `Episode ${activeEpisodeIndex + 1}`;
-    if (currentEp && currentEp.episode_title) {
-        cleanEpTitle = currentEp.episode_title.replace(/Sub.*$/, '').trim();
-    }
+    let cleanEpTitle = `Episode ${currentEp && currentEp.episode_title ? currentEp.episode_title : (activeEpisodeIndex + 1)}`;
     document.getElementById('streamTitle').innerText = `Nonton ${globalAnimeTitle} (${cleanEpTitle})`;
 
     document.getElementById('prevEpBtn').disabled = activeEpisodeIndex <= 0;
@@ -524,10 +515,7 @@ function renderDynamicEpisodes() {
     container.innerHTML = activeEpisodes.map((ep, index) => {
         const activeClass = index === activeEpisodeIndex ? 'bg-neon-yellow text-black font-bold shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border border-neon-yellow/60 dark:border-neon-darkBorder hover:border-neon-yellow';
         
-        let epLabel = `Eps ${index + 1}`;
-        if (ep.episode_title) {
-            epLabel = ep.episode_title.replace(/Sub.*$/, '').trim();
-        }
+        let epLabel = `Eps ${ep.episode_title || (index + 1)}`;
 
         return `<button onclick='selectEpisode(${index})' class="episode-btn ${activeClass} px-3 py-1.5 rounded-lg text-xs font-semibold transition">${epLabel}</button>`;
     }).join('');
