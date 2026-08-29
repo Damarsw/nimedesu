@@ -445,7 +445,7 @@ async function renderMixedGenreRecommendations() {
             }).then(res => res.json()).catch(() => ({ data: [] }))
         );
 
-        const results = await Promise.all(fetchPromises);
+        const results = me || [];
         let recommendedAnimeList = results.flatMap(r => r.data || []);
 
         const uniqueMap = new Map();
@@ -605,6 +605,7 @@ function toggleEpisodeBox() {
     }
 }
 
+// PERBAIKAN FORMAT EMBED URL PENUTUP REFERER BLOCKING
 function formatEmbedUrl(url) {
     if (!url) return "about:blank";
 
@@ -619,6 +620,17 @@ function formatEmbedUrl(url) {
     }
 
     if (finalUrl.includes('drive.google.com')) {
+        // Ambil ID File Google Drive
+        let fileId = "";
+        const match = finalUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || finalUrl.match(/id=([a-zA-Z0-9_-]+)/);
+        if (match && match[1]) {
+            fileId = match[1];
+        }
+        
+        if (fileId) {
+            // Gunakan format preview standar tanpa query sdk tambahan agar lolos proteksi origin
+            return `https://drive.google.com/file/d/${fileId}/preview`;
+        }
         return finalUrl.replace('/view?usp=drivesdk', '/preview').replace('/view', '/preview');
     }
 
