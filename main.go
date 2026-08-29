@@ -133,6 +133,7 @@ func embeddedPlayerHandler(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
+        * { box-sizing: border-box; }
         html, body { 
             margin: 0; 
             padding: 0; 
@@ -151,9 +152,9 @@ func embeddedPlayerHandler(c *gin.Context) {
         iframe, video { 
             width: 100%% !important; 
             height: 100%% !important; 
-            border: none; 
+            border: 0; 
             outline: none;
-            object-fit: contain; 
+            object-fit: contain;
         }
     </style>
 </head>
@@ -171,15 +172,37 @@ func embeddedPlayerHandler(c *gin.Context) {
                 
                 var container = document.getElementById('v-app');
 
-                // Jika link adalah Direct Video (MP4/M3U8) atau Direct Stream Drive
-                if (res.endsWith('.mp4') || res.endsWith('.m3u8') || res.includes('export=download')) {
-                    var v = document.createElement('video');
-                    v.controls = true; 
-                    v.autoplay = true; 
-                    v.playsInline = true;
-                    v.controlsList = "nodownload";
-                    v.src = res;
-                    container.appendChild(v);
+                if (res.includes('drive.google.com') && (res.includes('export=download') || res.endsWith('.mp4'))) {
+                    // MEMAKAI COOKIE / CREDENTIALS STREAM
+                    var video = document.createElement('video');
+                    video.controls = true;
+                    video.autoplay = true;
+                    video.playsInline = true;
+                    video.crossOrigin = "use-credentials"; // Sertakan cookie autentikasi
+
+                    // Mengambil Cookie gdrive_auth jika ada
+                    var authCookie = document.cookie.split('; ').find(row => row.startsWith('gdrive_auth='));
+                    var token = authCookie ? authCookie.split('=')[1] : '';
+
+                    fetch(res, {
+                        method: 'GET',
+                        headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+                        credentials: 'include' // Mengirimkan Cookie Browser
+                    })
+                    .then(response => response.blob())
+                    .then(blob => {
+                        var blobUrl = URL.createObjectURL(blob);
+                        video.src = blobUrl;
+                        container.appendChild(video);
+                    })
+                    .catch(err => {
+                        // Fallback ke iframe biasa jika cookie/fetch gagal
+                        var f = document.createElement('iframe');
+                        f.allow = "autoplay; encrypted-media; fullscreen";
+                        f.allowFullscreen = true;
+                        f.src = res;
+                        container.appendChild(f);
+                    });
                 } else {
                     var f = document.createElement('iframe');
                     f.allow = "autoplay; encrypted-media; fullscreen";
@@ -254,9 +277,9 @@ func main() {
 	appEngine.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
 		AllowMethods:     []string{"GET", "POST", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "X-Bubalinum-Seed", "X-Bubalinum-Chrono", "X-Turnstile-Token", "User-Agent", "Referer"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "X-Bubalinum-Seed", "X-Bubalinum-Chrono", "X-Turnstile-Token", "User-Agent", "Referer", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: false,
+		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
 
