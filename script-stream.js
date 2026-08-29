@@ -10,12 +10,6 @@ let currentAnimeThumbnail = "";
 let currentAnimeGenres = []; 
 let currentAnimeId = null;
 let searchDebounceTimer = null;
-let currentBlobUrl = null;
-
-function setGDriveAuthCookie(accessToken) {
-    if (!accessToken) return;
-    document.cookie = `gdrive_auth=${accessToken}; path=/; max-age=86400; SameSite=None; Secure`;
-}
 
 function fractionateSeedEssence(rawString) {
     try { return btoa(rawString).replace(/=/g, ''); } catch(e) { return ""; }
@@ -648,11 +642,6 @@ async function selectServer(element, resolution, serverNum, videoUrl) {
         return;
     }
 
-    if (currentBlobUrl) {
-        URL.revokeObjectURL(currentBlobUrl);
-        currentBlobUrl = null;
-    }
-
     try {
         const rawVideoUrl = formatEmbedUrl(videoUrl);
         const sec = generateBubalinumHeaderSignature();
@@ -668,8 +657,8 @@ async function selectServer(element, resolution, serverNum, videoUrl) {
         const tokenData = await tokenRes.json();
         if (!tokenData.token) throw new Error("Token payload empty");
         
-        const securePlayerUrl = `${ARCHIDENDRON_BRIDGE}/player?${tokenData.token}`;
-        iframe.src = securePlayerUrl;
+        // Langsung arahkan src iframe ke backend tanpa Blob() agar pembungkus ganda terhapus
+        iframe.src = `${ARCHIDENDRON_BRIDGE}/player?${tokenData.token}`;
 
     } catch (err) {
         console.error("Gagal memuat secure player:", err);
