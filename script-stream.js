@@ -630,45 +630,34 @@ function formatEmbedUrl(url) {
 
 let currentIframeBlobUrl = null;
 
-function selectServer(element, resolution, serverNum, videoUrl) {
+async function selectServer(element, resolution, serverNum, videoUrl) {
     document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
-    
-    document.querySelectorAll('.server-btn').forEach(btn => {
-        btn.className = "server-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-black dark:text-white border border-neon-yellow/60 dark:border-neon-darkBorder";
-    });
-    if(element) {
-        element.className = "server-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs bg-neon-yellow text-black font-bold shadow-glow-yellow transition flex justify-between items-center";
-    }
-    document.getElementById('mainServerContainer').classList.add('hidden');
-    document.getElementById('mainServerArrow').style.transform = 'rotate(-90deg)';
 
-    const container = document.getElementById('playerContainer') || document.getElementById('videoIframe').parentElement;
-    
-    if (!videoUrl || videoUrl === 'undefined' || videoUrl === 'null') {
-        container.innerHTML = '';
+    const iframe = document.getElementById('videoIframe');
+    if (!videoUrl || videoUrl === 'undefined') {
+        iframe.src = "about:blank";
         return;
     }
 
-    container.innerHTML = '<div id="shadowHost" class="w-full h-full"></div>';
+    try {
+        const rawVideoUrl = formatEmbedUrl(videoUrl);
 
-    const shadowHost = document.getElementById('shadowHost');
+        const tokenRes = await fetch(`${ARCHIDENDRON_BRIDGE}/get-token?url=${encodeURIComponent(rawVideoUrl)}`);
+        const tokenData = await tokenRes.json();
+        
+        const securePlayerUrl = `${ARCHIDENDRON_BRIDGE}/player?${tokenData.token}`;
 
-    const shadowRoot = shadowHost.attachShadow({ mode: 'closed' });
+        const res = await fetch(securePlayerUrl);
+        const htmlContent = await res.text();
+        
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        iframe.src = URL.createObjectURL(blob);
 
-    const rawVideoUrl = formatEmbedUrl(videoUrl);
-    const base64Token = btoa(rawVideoUrl);
-    const securePlayerUrl = `${ARCHIDENDRON_BRIDGE}/player?v=${encodeURIComponent(base64Token)}`;
-
-    const iframe = document.createElement('iframe');
-    iframe.style.width = '100%';
-    iframe.style.height = '100%';
-    iframe.style.border = 'none';
-    iframe.allow = "autoplay; encrypted-media; fullscreen";
-    iframe.allowFullscreen = true;
-    iframe.src = securePlayerUrl;
-
-    shadowRoot.appendChild(iframe);
+    } catch (err) {
+        console.error("Gagal memuat secure server:", err);
+    }
 }
+
 function toggleTheme() {
     const html = document.documentElement;
     const isDark = html.classList.contains('dark');
