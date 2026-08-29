@@ -183,11 +183,14 @@ func embeddedPlayerHandler(c *gin.Context) {
 func botanicalSecurityMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		reqPath := c.Request.URL.Path
-		
+
+		// Whitelist semua variasi rute player dan token agar tidak terblokir middleware
 		if reqPath == "/" || reqPath == "/health" || reqPath == "/sitemap.xml" || reqPath == "/robots.txt" ||
 			reqPath == "/api/clear-cache" || reqPath == "/api/test-apis" ||
 			reqPath == "/player" || strings.HasPrefix(reqPath, "/api/player") || strings.HasPrefix(reqPath, "/api-backend/player") ||
-			strings.HasPrefix(reqPath, "/get-token") || strings.HasPrefix(reqPath, "/api/get-player-token") || strings.HasPrefix(reqPath, "/api-backend/get-token") ||
+			strings.HasPrefix(reqPath, "/get-token") || strings.HasPrefix(reqPath, "/get-player-token") ||
+			strings.HasPrefix(reqPath, "/api/get-token") || strings.HasPrefix(reqPath, "/api/get-player-token") ||
+			strings.HasPrefix(reqPath, "/api-backend/get-token") || strings.HasPrefix(reqPath, "/api-backend/get-player-token") ||
 			strings.HasPrefix(reqPath, "/api/proxy-stream") || strings.HasPrefix(reqPath, "/proxy-stream") {
 			c.Next()
 			return
@@ -245,10 +248,14 @@ func main() {
 	appEngine.GET("/", botanicalHealthHandler)
 	appEngine.GET("/health", botanicalHealthHandler)
 
+	// Pendaftaran rute get-token dengan berbagai variasi prefix
 	appEngine.GET("/get-token", generatePlayerTokenHandler)
+	appEngine.GET("/get-player-token", generatePlayerTokenHandler)
 	appEngine.GET("/api/get-player-token", generatePlayerTokenHandler)
 	appEngine.GET("/api-backend/get-token", generatePlayerTokenHandler)
+	appEngine.GET("/api-backend/get-player-token", generatePlayerTokenHandler)
 
+	// Pendaftaran rute player
 	appEngine.GET("/player", embeddedPlayerHandler)
 	appEngine.GET("/api/player", embeddedPlayerHandler)
 	appEngine.GET("/api-backend/player", embeddedPlayerHandler)
