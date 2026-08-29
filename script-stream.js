@@ -637,7 +637,7 @@ function formatEmbedUrl(url) {
     return finalUrl;
 }
 
-// FUNGSI SINGLE SELECTSERVER (GOOGLE DRIVE EMBED LANGSUNG)
+// SATU-SATUNYA FUNGSI SELECTSERVER (DUPLIKASI DIHAPUS 100%)
 async function selectServer(element, resolution, serverNum, videoUrl) {
     document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
     document.querySelectorAll('.server-btn').forEach(btn => {
@@ -657,13 +657,13 @@ async function selectServer(element, resolution, serverNum, videoUrl) {
 
     const rawVideoUrl = formatEmbedUrl(videoUrl);
 
-    // GOOGLE DRIVE: LANGSUNG MASUKKAN LINK PREVIEW MURNI KE IFRAME
+    // BILA GOOGLE DRIVE: SEGERA MASUKKAN EMBED PREVIEW MURNI KEDALAM IFRAME
     if (rawVideoUrl.includes('drive.google.com')) {
         iframe.src = rawVideoUrl;
         return;
     }
 
-    // SERVER LAIN: GUNAKAN TOKEN BACKEND PROXY
+    // SERVER LAIN (NON-GDRIVE): AKSES VIA PLAYER SECURE TOKEN BACKEND
     try {
         const sec = generateBubalinumHeaderSignature();
         const tokenRes = await fetch(`${ARCHIDENDRON_BRIDGE}/get-player-token?url=${encodeURIComponent(rawVideoUrl)}`, {
