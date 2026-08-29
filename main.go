@@ -121,19 +121,6 @@ func embeddedPlayerHandler(c *gin.Context) {
 	}
 	rawVideoURL := string(decodedBytes)
 
-	// JIKA GOOGLE DRIVE EMBED
-	if strings.Contains(rawVideoURL, "drive.google.com") {
-		driveEmbedURL := rawVideoURL
-		driveEmbedURL = strings.ReplaceAll(driveEmbedURL, "/view?usp=drivesdk", "/preview")
-		driveEmbedURL = strings.ReplaceAll(driveEmbedURL, "/view", "/preview")
-		if !strings.Contains(driveEmbedURL, "/preview") {
-			driveEmbedURL = strings.TrimRight(driveEmbedURL, "/") + "/preview"
-		}
-
-		c.Redirect(http.StatusFound, driveEmbedURL)
-		return
-	}
-
 	// UNTUK LINK NON-GDRIVE (.mp4, .m3u8, DLL)
 	xorKey := byte(0x5A)
 	var byteArray []string
@@ -194,84 +181,6 @@ func embeddedPlayerHandler(c *gin.Context) {
 	c.String(http.StatusOK, htmlTemplate)
 }
 
-func proxyStreamHandler(c *gin.Context) {
-	fileID := c.Query("file_id")
-	if fileID == "" {
-		c.String(http.StatusBadRequest, "File ID Required")
-		return
-	}
-
-	client := &http.Client{
-		Timeout: 60 * time.Second,
-	}
-
-	initialURL := fmt.Sprintf("https://drive.google.com/uc?export=download&id=%s", fileID)
-	req1, err := http.NewRequest("GET", initialURL, nil)
-	if err != nil {
-		c.String(http.StatusInternalServerError, "Failed to create request")
-		return
-	}
-	req1.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-
-	resp1, err := client.Do(req1)
-	if err != nil {
-		c.String(http.StatusBadGateway, "Stream Connection Error")
-		return
-	}
-	defer resp1.Body.Close()
-
-	targetURL := initialURL
-	var cookies []*http.Cookie = resp1.Cookies()
-
-	if resp1.StatusCode == http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp1.Body)
-		bodyStr := string(bodyBytes)
-		if strings.Contains(bodyStr, "confirm=") {
-			parts := strings.Split(bodyStr, "confirm=")
-			if len(parts) > 1 {
-				confirmToken := strings.Split(parts[1], "&")[0]
-				confirmToken = strings.Split(confirmToken, "\"")[0]
-				targetURL = fmt.Sprintf("https://drive.google.com/uc?export=download&id=%s&confirm=%s", fileID, confirmToken)
-			}
-		}
-	}
-
-	req2, err := http.NewRequest("GET", targetURL, nil)
-	if err != nil {
-		c.String(http.StatusInternalServerError, "Failed to stream")
-		return
-	}
-
-	for _, cookie := range cookies {
-		req2.AddCookie(cookie)
-	}
-	if rangeHeader := c.GetHeader("Range"); rangeHeader != "" {
-		req2.Header.Set("Range", rangeHeader)
-	}
-	req2.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-
-	resp2, err := client.Do(req2)
-	if err != nil {
-		c.String(http.StatusBadGateway, "Stream Read Error")
-		return
-	}
-	defer resp2.Body.Close()
-
-	c.Header("Content-Type", "video/mp4")
-	c.Header("Accept-Ranges", "bytes")
-	if contentLength := resp2.Header.Get("Content-Length"); contentLength != "" {
-		c.Header("Content-Length", contentLength)
-	}
-	if contentRange := resp2.Header.Get("Content-Range"); contentRange != "" {
-		c.Header("Content-Range", contentRange)
-		c.Status(http.StatusPartialContent)
-	} else {
-		c.Status(http.StatusOK)
-	}
-
-	io.Copy(c.Writer, resp2.Body)
-}
-
 func botanicalSecurityMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		reqPath := c.Request.URL.Path
@@ -281,9 +190,7 @@ func botanicalSecurityMiddleware() gin.HandlerFunc {
 			reqPath == "/player" || strings.HasPrefix(reqPath, "/api/player") || strings.HasPrefix(reqPath, "/api-backend/player") ||
 			strings.HasPrefix(reqPath, "/get-token") || strings.HasPrefix(reqPath, "/get-player-token") ||
 			strings.HasPrefix(reqPath, "/api/get-token") || strings.HasPrefix(reqPath, "/api/get-player-token") ||
-			strings.HasPrefix(reqPath, "/api-backend/get-token") || strings.HasPrefix(reqPath, "/api-backend/get-player-token") ||
-			strings.HasPrefix(reqPath, "/api/proxy-stream") || strings.HasPrefix(reqPath, "/proxy-stream") ||
-			strings.HasPrefix(reqPath, "/api-backend/proxy-stream") {
+			strings.HasPrefix(reqPath, "/api-backend/get-token") || strings.HasPrefix(reqPath, "/api-backend/get-player-token") {
 			c.Next()
 			return
 		}
@@ -349,10 +256,6 @@ func main() {
 	appEngine.GET("/player", embeddedPlayerHandler)
 	appEngine.GET("/api/player", embeddedPlayerHandler)
 	appEngine.GET("/api-backend/player", embeddedPlayerHandler)
-
-	appEngine.GET("/api/proxy-stream", proxyStreamHandler)
-	appEngine.GET("/proxy-stream", proxyStreamHandler)
-	appEngine.GET("/api-backend/proxy-stream", proxyStreamHandler)
 
 	appEngine.GET("/api/anime", animeListHandler)
 	appEngine.GET("/api/anime-detail", animeDetailHandler)
