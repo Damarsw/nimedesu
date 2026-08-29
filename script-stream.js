@@ -619,6 +619,10 @@ function formatEmbedUrl(url) {
     }
 
     if (finalUrl.includes('drive.google.com')) {
+        const match = finalUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || finalUrl.match(/id=([a-zA-Z0-9_-]+)/);
+        if (match && match[1]) {
+            return `https://drive.google.com/uc?export=download&id=${match[1]}.mp4`;
+        }
         return finalUrl.replace('/view?usp=drivesdk', '/preview').replace('/view', '/preview');
     }
 
