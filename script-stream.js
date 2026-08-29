@@ -380,18 +380,15 @@ async function initStream() {
         if (data && data.episodes && data.episodes.length > 0) {
             activeEpisodes = data.episodes.filter(ep => ep && (ep.episode_title || ep.video_servers));
             
+            // SORTING YANG LEBIH KETAT BERDASARKAN NOMOR EPISODE
             activeEpisodes.sort((a, b) => {
-                const titleA = (a.episode_title || "").toLowerCase();
-                const titleB = (b.episode_title || "").toLowerCase();
-                
-                const isOvaSpecialA = titleA.includes('ova') || titleA.includes('special') || titleA.includes('sp');
-                const isOvaSpecialB = titleB.includes('ova') || titleB.includes('special') || titleB.includes('sp');
-                
-                if (isOvaSpecialA && !isOvaSpecialB) return 1;
-                if (!isOvaSpecialA && isOvaSpecialB) return -1;
-
                 const numA = extractEpisodeNumber(a.episode_title);
                 const numB = extractEpisodeNumber(b.episode_title);
+                
+                // Kalau nomor episodenya sama atau tidak ketemu, fallback ke perbandingan string judul
+                if (numA === numB) {
+                    return (a.episode_title || "").localeCompare(b.episode_title || "");
+                }
                 return numA - numB;
             });
 
@@ -411,6 +408,69 @@ async function initStream() {
         }
     } catch (error) {
         document.getElementById('streamTitle').innerText = "Gagal memuat server streaming.";
+    }
+}
+
+function renderDynamicEpisodes() {
+    const container = document.getElementById('episodeBoxContainer');
+    const label = document.getElementById('episodeBoxLabel');
+
+    if(!activeEpisodes || activeEpisodes.length === 0) {
+        container.innerHTML = '<p class="text-xs text-zinc-500">Tidak ada episode tersedia.</p>';
+        if(label) label.innerText = "Daftar Episode (0)";
+        return;
+    }
+
+    if(label) label.innerText = `Daftar Episode (${activeEpisodes.length})`;
+
+    const currentEp = activeEpisodes[activeEpisodeIndex];
+    
+    // AMBIL LABEL JUDUL EPISODE YANG BERSIH UNTUK HEADER
+    let cleanEpTitle = `Episode ${activeEpisodeIndex + 1}`;
+    if (currentEp && currentEp.episode_title) {
+        cleanEpTitle = currentEp.episode_title.replace(/Sub.*$/, '').trim();
+    }
+    document.getElementById('streamTitle').innerText = `Nonton ${globalAnimeTitle} (${cleanEpTitle})`;
+
+    document.getElementById('prevEpBtn').disabled = activeEpisodeIndex <= 0;
+    document.getElementById('prevEpBtn').style.opacity = activeEpisodeIndex <= 0 ? '0.5' : '1';
+    document.getElementById('nextEpBtn').disabled = activeEpisodeIndex >= activeEpisodes.length - 1;
+    document.getElementById('nextEpBtn').style.opacity = activeEpisodeIndex >= activeEpisodes.length - 1 ? '0.5' : '1';
+
+    container.innerHTML = activeEpisodes.map((ep, index) => {
+        const activeClass = index === activeEpisodeIndex ? 'bg-neon-yellow text-black font-bold shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border border-neon-yellow/60 dark:border-neon-darkBorder hover:border-neon-yellow';
+        
+        let epLabel = `Eps ${index + 1}`;
+        if (ep.episode_title) {
+            epLabel = ep.episode_title.replace(/Sub.*$/, '').trim();
+        }
+
+        return `<button onclick='selectEpisode(${index})' class="episode-btn ${activeClass} px-3 py-1.5 rounded-lg text-xs font-semibold transition">${epLabel}</button>`;
+    }).join('');
+
+    // AMBIL SERVER TEPAT BERDASARKAN activeEpisodeIndex YANG DIPILIH
+    if (currentEp && currentEp.video_servers) {
+        let parsedServers = currentEp.video_servers;
+        if (typeof parsedServers === 'string') {
+            try { parsedServers = JSON.parse(parsedServers); } catch(e) { parsedServers = []; }
+        }
+
+        if (Array.isArray(parsedServers) && parsedServers.length > 0) {
+            renderDynamicServers(parsedServers);
+            const firstSrv = parsedServers[0];
+            const srvUrl = firstSrv.url || firstSrv.video_url || "";
+            selectServer(null, "MP4", "Server 1", encodeURIComponent(srvUrl));
+        } else {
+            renderDynamicServers([]);
+        }
+    } else {
+        renderDynamicServers([]);
+    }
+
+    if (currentEp) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const animeUrl = urlParams.get('url');
+        saveStreamToHistory(globalAnimeTitle, animeUrl, cleanEpTitle, activeEpisodeIndex, currentAnimeThumbnail);
     }
 }
 
