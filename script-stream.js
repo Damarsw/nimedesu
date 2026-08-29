@@ -315,7 +315,7 @@ function liveSearchAnime() {
                 const genres = rawGenre ? (Array.isArray(rawGenre) ? rawGenre.join(', ') : rawGenre.split(',').map(g => g.trim()).join(', ')) : '-';
 
                 return `
-                    <div onclick="window.location.href='stream.html?id=${animeId}&url=${encodeURIComponent(animeUrl)}&eps=0'" class="flex items-center gap-3 p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer transition">
+                    <div onclick="window.location.href='stream.html?id=${animeId}&url=${encodeURIComponent(animeUrl)}&eps=01'" class="flex items-center gap-3 p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl cursor-pointer transition">
                         <img src="${thumb}" class="w-10 h-14 object-cover rounded-lg shrink-0">
                         <div class="overflow-hidden">
                             <h4 class="text-xs font-semibold text-black dark:text-white truncate">${title}</h4>
@@ -342,7 +342,7 @@ async function initStream() {
     const urlParams = new URLSearchParams(window.location.search);
     const animeId = urlParams.get('id') || urlParams.get('anime_id');
     const animeUrl = urlParams.get('url');
-    const targetEps = parseInt(urlParams.get('eps')) || 0; 
+    const targetEpsStr = urlParams.get('eps') || ""; // Ambil sebagai string mentah (misal: "01", "02")
 
     if (!animeId && !animeUrl) {
         document.getElementById('streamTitle').innerText = "URL Anime Tidak Ditemukan!";
@@ -377,14 +377,23 @@ async function initStream() {
             }
         }
 
-if (data && data.episodes && data.episodes.length > 0) {
-            activeEpisodes = data.episodes.sort((a, b) => {
-                let numA = parseInt(String(a.episode_title).trim(), 10) || 0;
-                let numB = parseInt(String(b.episode_title).trim(), 10) || 0;
-                return numA - numB;
+        if (data && data.episodes && data.episodes.length > 0) {
+            activeEpisodes = data.episodes;
+            
+            // SORTING STRING SECARA ALFABETIS (Karena isinya "01", "02", "03"... ini sudah otomatis urut string-nya)
+            activeEpisodes.sort((a, b) => {
+                let strA = String(a.episode_title || "").trim();
+                let strB = String(b.episode_title || "").trim();
+                return strA.localeCompare(strB);
             });
 
-            activeEpisodeIndex = (targetEps >= 0 && targetEps < activeEpisodes.length) ? targetEps : 0;
+            // COCOKKAN STRING MENTAH DARI URL (Contoh: "01") DENGAN string episode_title DI DATABASE
+            if (targetEpsStr !== "") {
+                const foundIndex = activeEpisodes.findIndex(ep => String(ep.episode_title).trim() === targetEpsStr);
+                activeEpisodeIndex = foundIndex !== -1 ? foundIndex : 0;
+            } else {
+                activeEpisodeIndex = 0; // Default ambil data teratas (yang string-nya paling kecil/pertama, misal "01")
+            }
 
             globalAnimeTitle = data.title;
             if (!globalAnimeTitle && animeUrl) {
@@ -395,11 +404,12 @@ if (data && data.episodes && data.episodes.length > 0) {
             document.getElementById('episodeNavContainer').classList.remove('hidden');
             renderDynamicEpisodes();
             renderMixedGenreRecommendations();
+        } else {
+            document.getElementById('streamTitle').innerText = "Data Episode Tidak Tersedia.";
         }
-function extractEpisodeNumber(title) {
-    if (!title) return 0;
-    const parsed = parseInt(String(title).trim(), 10);
-    return isNaN(parsed) ? 0 : parsed;
+    } catch (error) {
+        document.getElementById('streamTitle').innerText = "Gagal memuat server streaming.";
+    }
 }
 
 function scrollSlider(direction) {
@@ -453,7 +463,7 @@ async function renderMixedGenreRecommendations() {
             const status = rec.status || "Ongoing";
 
             return `
-                <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow/60 dark:border-neon-darkBorder hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?id=${recId}&url=${encodeURIComponent(recUrl)}&eps=0'">
+                <div class="min-w-[140px] sm:min-w-[160px] w-[140px] sm:w-[160px] group bg-neon-lightCard dark:bg-neon-darkCard rounded-xl overflow-hidden border border-neon-yellow/60 dark:border-neon-darkBorder hover:border-neon-yellow transition-all duration-200 shadow-sm flex flex-col cursor-pointer shrink-0" onclick="window.location.href='stream.html?id=${recId}&url=${encodeURIComponent(recUrl)}&eps=01'">
                     <div class="relative aspect-[3/4] overflow-hidden bg-zinc-200 dark:bg-zinc-800 poster-hover-container">
                         <img src="${thumb}" alt="${title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300">
                         <div class="play-overlay absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
@@ -488,9 +498,8 @@ function renderDynamicEpisodes() {
     if(label) label.innerText = `Daftar Episode (${activeEpisodes.length})`;
 
     const currentEp = activeEpisodes[activeEpisodeIndex];
-    
-    let cleanEpTitle = `Episode ${currentEp && currentEp.episode_title ? currentEp.episode_title : (activeEpisodeIndex + 1)}`;
-    document.getElementById('streamTitle').innerText = `Nonton ${globalAnimeTitle} (${cleanEpTitle})`;
+    let epString = currentEp && currentEp.episode_title ? String(currentEp.episode_title).trim() : `0${activeEpisodeIndex + 1}`;
+    document.getElementById('streamTitle').innerText = `Nonton ${globalAnimeTitle} (Episode ${epString})`;
 
     document.getElementById('prevEpBtn').disabled = activeEpisodeIndex <= 0;
     document.getElementById('prevEpBtn').style.opacity = activeEpisodeIndex <= 0 ? '0.5' : '1';
@@ -500,9 +509,10 @@ function renderDynamicEpisodes() {
     container.innerHTML = activeEpisodes.map((ep, index) => {
         const activeClass = index === activeEpisodeIndex ? 'bg-neon-yellow text-black font-bold shadow-glow-yellow' : 'bg-neon-lightCard dark:bg-neon-darkCard text-black dark:text-white border border-neon-yellow/60 dark:border-neon-darkBorder hover:border-neon-yellow';
         
-        let epLabel = `Eps ${ep.episode_title || (index + 1)}`;
+        let epVal = String(ep.episode_title || (index + 1)).trim();
+        let epLabel = `Eps ${epVal}`;
 
-        return `<button onclick='selectEpisode(${index})' class="episode-btn ${activeClass} px-3 py-1.5 rounded-lg text-xs font-semibold transition">${epLabel}</button>`;
+        return `<button onclick='selectEpisode(${index}, "${epVal}")' class="episode-btn ${activeClass} px-3 py-1.5 rounded-lg text-xs font-semibold transition">${epLabel}</button>`;
     }).join('');
 
     if (currentEp && currentEp.video_servers) {
@@ -526,12 +536,17 @@ function renderDynamicEpisodes() {
     if (currentEp) {
         const urlParams = new URLSearchParams(window.location.search);
         const animeUrl = urlParams.get('url');
-        saveStreamToHistory(globalAnimeTitle, animeUrl, cleanEpTitle, activeEpisodeIndex, currentAnimeThumbnail);
+        saveStreamToHistory(globalAnimeTitle, animeUrl, `Episode ${epString}`, activeEpisodeIndex, currentAnimeThumbnail);
     }
 }
 
-function selectEpisode(index) {
+function selectEpisode(index, epStr) {
     activeEpisodeIndex = index;
+    // Set parameter URL persis pakai string (misal: ?eps=01)
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.set('eps', epStr);
+    window.history.replaceState({}, '', `${window.location.pathname}?${urlParams.toString()}`);
+
     renderDynamicEpisodes();
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -539,7 +554,8 @@ function selectEpisode(index) {
 function changeEpisodeRelative(direction) {
     const newIndex = activeEpisodeIndex + direction;
     if (newIndex >= 0 && newIndex < activeEpisodes.length) {
-        selectEpisode(newIndex);
+        let targetEpStr = String(activeEpisodes[newIndex].episode_title || "").trim();
+        selectEpisode(newIndex, targetEpStr);
     }
 }
 
