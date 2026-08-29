@@ -245,7 +245,9 @@ func main() {
 	appEngine.GET("/", botanicalHealthHandler)
 	appEngine.GET("/health", botanicalHealthHandler)
 
+	appEngine.GET("/get-token", generatePlayerTokenHandler)
 	appEngine.GET("/api/get-player-token", generatePlayerTokenHandler)
+	appEngine.GET("/api-backend/get-token", generatePlayerTokenHandler)
 
 	appEngine.GET("/player", embeddedPlayerHandler)
 	appEngine.GET("/api/player", embeddedPlayerHandler)
