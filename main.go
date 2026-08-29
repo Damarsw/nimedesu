@@ -120,15 +120,25 @@ func embeddedPlayerHandler(c *gin.Context) {
 	}
 	rawVideoURL := string(decodedBytes)
 
-	// =============================================================
-	// KHUSUS LINK GOOGLE DRIVE: REDIRECT LANGSUNG (TANPA PEMBUNGKUS HTML)
-	// =============================================================
+	// =========================================================================
+	// PERBAIKAN KHUSUS GOOGLE DRIVE:
+	// 1. Tanpa pembungkus HTML kedua (menghilangkan double iframe)
+	// 2. Format URL diubah otomatis ke /preview agar tidak diblokir CSP Google
+	// =========================================================================
 	if strings.Contains(rawVideoURL, "drive.google.com") {
-		c.Redirect(http.StatusFound, rawVideoURL)
+		driveEmbedURL := rawVideoURL
+		driveEmbedURL = strings.ReplaceAll(driveEmbedURL, "/view?usp=drivesdk", "/preview")
+		driveEmbedURL = strings.ReplaceAll(driveEmbedURL, "/view", "/preview")
+		
+		if !strings.Contains(driveEmbedURL, "/preview") {
+			driveEmbedURL = strings.TrimRight(driveEmbedURL, "/") + "/preview"
+		}
+
+		c.Redirect(http.StatusFound, driveEmbedURL)
 		return
 	}
 
-	// UNTUK LINK NON-GDRIVE (.mp4, .m3u8, dll): MENGGUNAKAN HTML PLAYER ORDINARIS
+	// KHUSUS LINK NON-GDRIVE (.mp4, .m3u8, DLL)
 	xorKey := byte(0x5A)
 	var byteArray []string
 	for i := 0; i < len(rawVideoURL); i++ {
