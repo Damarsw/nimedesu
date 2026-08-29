@@ -127,7 +127,6 @@ func embeddedPlayerHandler(c *gin.Context) {
 	}
 	encryptedData := strings.Join(byteArray, ",")
 
-	// Perbaikan HTML Template: Mengoptimalkan Viewport & Menghindari Double Blob Iframe pada Layar HP
 	htmlTemplate := fmt.Sprintf(`<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -148,6 +147,8 @@ func embeddedPlayerHandler(c *gin.Context) {
             display: flex; 
             justify-content: center; 
             align-items: center; 
+            position: relative;
+            overflow: hidden;
         }
         iframe, video { 
             width: 100%% !important; 
@@ -155,6 +156,24 @@ func embeddedPlayerHandler(c *gin.Context) {
             border: none; 
             outline: none;
             object-fit: contain; 
+        }
+
+        /* PERBAIKAN KHUSUS RESPONSIVE DISPLAY GDRIVE DI MOBILE */
+        @media screen and (max-width: 640px) {
+            #v-app iframe {
+                width: 125%% !important;
+                height: 125%% !important;
+                transform: scale(0.8);
+                transform-origin: 0 0;
+            }
+        }
+        @media screen and (max-width: 400px) {
+            #v-app iframe {
+                width: 135%% !important;
+                height: 135%% !important;
+                transform: scale(0.74);
+                transform-origin: 0 0;
+            }
         }
     </style>
 </head>
@@ -184,7 +203,6 @@ func embeddedPlayerHandler(c *gin.Context) {
                     var f = document.createElement('iframe');
                     f.allow = "autoplay; encrypted-media; fullscreen";
                     f.allowFullscreen = true;
-                    // Langsung set URL ke iframe utama agar tidak terjadi pemotongan UI/Double-Iframe di HP
                     f.src = res;
                     container.appendChild(f);
                 }
