@@ -522,12 +522,21 @@ function renderDynamicEpisodes() {
         return `<button onclick='selectEpisode(${index})' class="episode-btn ${activeClass} px-3 py-1.5 rounded-lg text-xs font-semibold transition">${epLabel}</button>`;
     }).join('');
 
-    // AMBIL SERVER MILIK EPISODE AKTIF SAAT INI SECARA AMAN DAN TEPAT
-    if (currentEp && currentEp.video_servers && currentEp.video_servers.length > 0) {
-        renderDynamicServers(currentEp.video_servers);
-        const firstSrv = currentEp.video_servers[0];
-        const srvUrl = firstSrv.url || firstSrv.video_url || "";
-        selectServer(null, "MP4", "Server 1", srvUrl);
+    // AMBIL SERVER MILIK EPISODE AKTIF SAAT INI SECARA AMAN DARI JSONB
+    if (currentEp && currentEp.video_servers) {
+        let parsedServers = currentEp.video_servers;
+        if (typeof parsedServers === 'string') {
+            try { parsedServers = JSON.parse(parsedServers); } catch(e) { parsedServers = []; }
+        }
+
+        if (Array.isArray(parsedServers) && parsedServers.length > 0) {
+            renderDynamicServers(parsedServers);
+            const firstSrv = parsedServers[0];
+            const srvUrl = firstSrv.url || firstSrv.video_url || "";
+            selectServer(null, "MP4", "Server 1", encodeURIComponent(srvUrl));
+        } else {
+            renderDynamicServers([]);
+        }
     } else {
         renderDynamicServers([]);
     }
@@ -555,7 +564,17 @@ function changeEpisodeRelative(direction) {
 
 function renderDynamicServers(servers) {
     const mainContainer = document.getElementById('mainServerContainer');
-    if (!servers || servers.length === 0) {
+    
+    let parsedServers = servers;
+    if (typeof servers === 'string') {
+        try {
+            parsedServers = JSON.parse(servers);
+        } catch (e) {
+            parsedServers = [];
+        }
+    }
+
+    if (!parsedServers || !Array.isArray(parsedServers) || parsedServers.length === 0) {
         mainContainer.innerHTML = '<p class="text-xs text-zinc-500 p-2">Server tidak ditemukan.</p>';
         document.getElementById('currentServerLabel').innerText = "Tidak ada";
         document.getElementById('videoIframe').src = "";
@@ -564,13 +583,13 @@ function renderDynamicServers(servers) {
 
     let htmlContent = '';
 
-    servers.forEach((srv, index) => {
+    parsedServers.forEach((srv, index) => {
         const videoUrl = srv.url || srv.video_url || "";
         const serverName = `Server ${index + 1}`;
         const resolution = "MP4";
 
         htmlContent += `
-            <button onclick="selectServer(this, '${resolution}', '${serverName}', '${videoUrl}')" class="server-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-black dark:text-white border border-neon-yellow/60 dark:border-neon-darkBorder">
+            <button onclick="selectServer(this, '${resolution}', '${serverName}', '${encodeURIComponent(videoUrl)}')" class="server-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-black dark:text-white border border-neon-yellow/60 dark:border-neon-darkBorder">
                 <span><i class="fa-solid fa-play text-black dark:text-neon-yellow mr-2"></i> ${serverName}</span>
                 <span class="text-[9px] px-2 py-0.5 rounded-full bg-neon-yellow text-black font-bold">HD</span>
             </button>
@@ -621,4 +640,89 @@ function formatEmbedUrl(url) {
         return finalUrl.replace('/file/', '/embed/').replace('/v/', '/embed/');
     }
 
-    if (finalUrl.includes('
+    if (finalUrl.includes('drive.google.com')) {
+        let fileId = "";
+        const match = finalUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || finalUrl.match(/id=([a-zA-Z0-9_-]+)/);
+        if (match && match[1]) {
+            fileId = match[1];
+        }
+        
+        if (fileId) {
+            return `https://drive.google.com/file/d/${fileId}/preview`;
+        }
+        return finalUrl.replace('/view?usp=drivesdk', '/preview').replace('/view', '/preview');
+    }
+
+    return finalUrl;
+}
+
+async function selectServer(element, resolution, serverNum, encodedVideoUrl) {
+    const videoUrl = decodeURIComponent(encodedVideoUrl);
+
+    document.getElementById('currentServerLabel').innerText = `${resolution} (${serverNum})`;
+    document.querySelectorAll('.server-btn').forEach(btn => {
+        btn.className = "server-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs bg-neon-lightCard dark:bg-neon-darkCard hover:bg-neon-yellow hover:text-black transition flex justify-between items-center text-black dark:text-white border border-neon-yellow/60 dark:border-neon-darkBorder";
+    });
+    if(element) {
+        element.className = "server-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs bg-neon-yellow text-black font-bold shadow-glow-yellow transition flex justify-between items-center";
+    }
+    document.getElementById('mainServerContainer').classList.add('hidden');
+    document.getElementById('mainServerArrow').style.transform = 'rotate(-90deg)';
+
+    const iframe = document.getElementById('videoIframe');
+    if (!videoUrl || videoUrl === 'undefined' || videoUrl === 'null') {
+        iframe.src = "about:blank";
+        return;
+    }
+
+    const rawVideoUrl = formatEmbedUrl(videoUrl);
+
+    // BILA GDRIVE ATAU MEGA: LANGSUNG MASUKKAN LINK PREVIEW/EMBED KE IFRAME
+    if (rawVideoUrl.includes('drive.google.com') || rawVideoUrl.includes('mega.nz')) {
+        iframe.src = rawVideoUrl;
+        return;
+    }
+
+    // SERVER MP4/M3U8 LAINNYA
+    try {
+        const sec = generateBubalinumHeaderSignature();
+        const tokenRes = await fetch(`${ARCHIDENDRON_BRIDGE}/get-player-token?url=${encodeURIComponent(rawVideoUrl)}`, {
+            headers: {
+                "X-Bubalinum-Seed": sec.seed,
+                "X-Bubalinum-Chrono": sec.chrono
+            }
+        });
+
+        if (!tokenRes.ok) throw new Error(`Token failed: ${tokenRes.status}`);
+        const tokenData = await tokenRes.json();
+        if (!tokenData.token) throw new Error("Token payload empty");
+        
+        const securePlayerUrl = `${ARCHIDENDRON_BRIDGE}/player?${tokenData.token}`;
+        iframe.src = securePlayerUrl;
+
+    } catch (err) {
+        console.error("Gagal memuat secure player:", err);
+        const base64Token = btoa(rawVideoUrl);
+        iframe.src = `${ARCHIDENDRON_BRIDGE}/player?v=${encodeURIComponent(base64Token)}`;
+    }
+}
+
+function toggleTheme() {
+    const html = document.documentElement;
+    const isDark = html.classList.contains('dark');
+    const floatingIcon = document.getElementById('floatingThemeIcon');
+
+    if (isDark) {
+        html.classList.remove('dark');
+        if (floatingIcon) floatingIcon.classList.replace('fa-sun', 'fa-moon');
+    } else {
+        html.classList.add('dark');
+        if (floatingIcon) floatingIcon.classList.replace('fa-moon', 'fa-sun');
+    }
+}
+
+window.onload = function() {
+    handleAniListOAuthCallback();
+    checkAniListAuthStatus();
+    initStream();
+};
