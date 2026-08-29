@@ -70,14 +70,17 @@ func embeddedPlayerHandler(c *gin.Context) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>html,body{margin:0;padding:0;width:100%%;height:100%%;background:#000;overflow:hidden;}iframe,video{width:100%%;height:100%%;border:none;}</style>
+    <style>
+        html, body { margin: 0; padding: 0; width: 100%%; height: 100%%; background: #000; overflow: hidden; }
+        #v-app { width: 100%%; height: 100%%; display: flex; justify-content: center; align-items: center; }
+        iframe, video { width: 100%%; height: 100%%; border: none; object-fit: contain; }
+    </style>
 </head>
 <body oncontextmenu="return false;">
     <div id="v-app"></div>
     <script>
         (function(){
             try {
-                // Data berupa deretan angka byte acak, bukan string URL!
                 var payload = [%s];
                 var k = 0x5A;
                 var res = "";
