@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"net/http"
@@ -121,7 +122,7 @@ func embeddedPlayerHandler(c *gin.Context) {
 	rawVideoURL := string(decodedBytes)
 
 	// =========================================================================
-	// TANGANI GOOGLE DRIVE: EXTRACT DIRECT FILE STREAM (BYPASS REFERER 100%)
+	// SOLUSI GDRIVE: STREAM VIA BACKEND PROXY (LANGSUNG PLAY TANPA MUTING)
 	// =========================================================================
 	if strings.Contains(rawVideoURL, "drive.google.com") {
 		var fileID string
@@ -138,7 +139,8 @@ func embeddedPlayerHandler(c *gin.Context) {
 		}
 
 		if fileID != "" {
-			directStreamURL := fmt.Sprintf("https://drive.google.com/uc?export=download&id=%s", fileID)
+			// Alirkan lewat endpoint proxy-stream backend
+			proxyStreamURL := fmt.Sprintf("/api-backend/proxy-stream?file_id=%s", fileID)
 			
 			htmlTemplate := fmt.Sprintf(`<!DOCTYPE html>
 <html lang="id">
@@ -151,10 +153,10 @@ func embeddedPlayerHandler(c *gin.Context) {
         video { width: 100%%; height: 100%%; outline: none; object-fit: contain; }
     </style>
 </head>
-<body>
+<body oncontextmenu="return false;">
     <video controls autoplay playsinline controlsList="nodownload" src="%s"></video>
 </body>
-</html>`, directStreamURL)
+</html>`, proxyStreamURL)
 
 			c.Header("Content-Type", "text/html; charset=utf-8")
 			c.String(http.StatusOK, htmlTemplate)
@@ -222,6 +224,51 @@ func embeddedPlayerHandler(c *gin.Context) {
 	c.String(http.StatusOK, htmlTemplate)
 }
 
+// HANDLER PROXY UTAMA UNTUK GDRIVE STREAMING
+func proxyStreamHandler(c *gin.Context) {
+	fileID := c.Query("file_id")
+	if fileID == "" {
+		c.String(http.StatusBadRequest, "File ID Required")
+		return
+	}
+
+	targetURL := fmt.Sprintf("https://drive.google.com/uc?export=download&id=%s&confirm=t", fileID)
+
+	req, err := http.NewRequest("GET", targetURL, nil)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to create request")
+		return
+	}
+
+	// Teruskan Range Header (Sangat penting agar video player bisa scrubbing & auto-play)
+	if rangeHeader := c.GetHeader("Range"); rangeHeader != "" {
+		req.Header.Set("Range", rangeHeader)
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.String(http.StatusBadGateway, "Stream Connection Error")
+		return
+	}
+	defer resp.Body.Close()
+
+	c.Header("Content-Type", "video/mp4")
+	c.Header("Accept-Ranges", "bytes")
+	if contentLength := resp.Header.Get("Content-Length"); contentLength != "" {
+		c.Header("Content-Length", contentLength)
+	}
+	if contentRange := resp.Header.Get("Content-Range"); contentRange != "" {
+		c.Header("Content-Range", contentRange)
+		c.Status(http.StatusPartialContent)
+	} else {
+		c.Status(http.StatusOK)
+	}
+
+	io.Copy(c.Writer, resp.Body)
+}
+
 func botanicalSecurityMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		reqPath := c.Request.URL.Path
@@ -232,7 +279,8 @@ func botanicalSecurityMiddleware() gin.HandlerFunc {
 			strings.HasPrefix(reqPath, "/get-token") || strings.HasPrefix(reqPath, "/get-player-token") ||
 			strings.HasPrefix(reqPath, "/api/get-token") || strings.HasPrefix(reqPath, "/api/get-player-token") ||
 			strings.HasPrefix(reqPath, "/api-backend/get-token") || strings.HasPrefix(reqPath, "/api-backend/get-player-token") ||
-			strings.HasPrefix(reqPath, "/api/proxy-stream") || strings.HasPrefix(reqPath, "/proxy-stream") {
+			strings.HasPrefix(reqPath, "/api/proxy-stream") || strings.HasPrefix(reqPath, "/proxy-stream") ||
+			strings.HasPrefix(reqPath, "/api-backend/proxy-stream") {
 			c.Next()
 			return
 		}
@@ -278,8 +326,8 @@ func main() {
 	appEngine.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
 		AllowMethods:     []string{"GET", "POST", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "X-Bubalinum-Seed", "X-Bubalinum-Chrono", "X-Turnstile-Token", "User-Agent", "Referer"},
-		ExposeHeaders:    []string{"Content-Length"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "X-Bubalinum-Seed", "X-Bubalinum-Chrono", "X-Turnstile-Token", "User-Agent", "Referer", "Range"},
+		ExposeHeaders:    []string{"Content-Length", "Content-Range", "Accept-Ranges"},
 		AllowCredentials: false,
 		MaxAge:           12 * time.Hour,
 	}))
@@ -301,6 +349,7 @@ func main() {
 
 	appEngine.GET("/api/proxy-stream", proxyStreamHandler)
 	appEngine.GET("/proxy-stream", proxyStreamHandler)
+	appEngine.GET("/api-backend/proxy-stream", proxyStreamHandler)
 
 	appEngine.GET("/api/anime", animeListHandler)
 	appEngine.GET("/api/anime-detail", animeDetailHandler)
