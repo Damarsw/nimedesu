@@ -380,11 +380,14 @@ async function initStream() {
         if (data && data.episodes && data.episodes.length > 0) {
             activeEpisodes = data.episodes;
             
-            // SORTING STRING SECARA ALFABETIS BERDASARKAN ep.title
             activeEpisodes.sort((a, b) => {
-                let strA = String(a.title || a.episode_title || "").trim();
-                let strB = String(b.title || b.episode_title || "").trim();
-                return strA.localeCompare(strB);
+                let strA = String(a.title || a.episode_title || "").replace(/[^0-9]/g, "");
+                let strB = String(b.title || b.episode_title || "").replace(/[^0-9]/g, "");
+                
+                let numA = strA !== "" ? parseInt(strA, 10) : 0;
+                let numB = strB !== "" ? parseInt(strB, 10) : 0;
+                
+                return numA - numB;
             });
 
             if (targetEpsStr !== "") {
