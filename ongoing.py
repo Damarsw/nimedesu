@@ -132,13 +132,14 @@ def process_anime(anime):
         soup = BeautifulSoup(res.text, "html.parser")
         ep_divs = soup.find_all("div", class_="ep")
 
+        # PERUBAHAN UTAMA DISINI: Cek duplikat berdasarkan episode_url
         existing_res = (
             db.table("episode")
-            .select("episode_title")
+            .select("episode_url")
             .eq("anime_id", anime_id)
             .execute()
         )
-        existing_titles = {row["episode_title"] for row in existing_res.data}
+        existing_urls = {row["episode_url"] for row in existing_res.data}
 
         new_episodes = []
 
@@ -148,15 +149,16 @@ def process_anime(anime):
                 ep_link = a_tag.get("href")
                 ep_title = a_tag.text.strip()
 
-                if ep_title in existing_titles:
-                    continue
-
                 if ep_link and not ep_link.startswith("http"):
                     ep_link = (
                         BASE_URL + ep_link
                         if ep_link.startswith("/")
                         else BASE_URL + "/" + ep_link
                     )
+
+                # Filter berdasarkan URL, bukan title lagi biar gak duplikat
+                if ep_link in existing_urls:
+                    continue
 
                 new_episodes.append({"title": ep_title, "link": ep_link})
 
